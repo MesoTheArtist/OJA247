@@ -375,7 +375,7 @@ function Products() {
                           : "bg-gray-200 text-gray-500 cursor-not-allowed pointer-events-none"
                       }`}
                     >
-                      Shop {getBusinessName(product) ? `${getBusinessName(product)}'s` : "vendor"} storefront
+                      Visit store
                     </Link>
                   ) : (
                     <span className="block w-full text-center py-2 rounded-lg text-sm sm:text-base font-medium bg-gray-100 text-gray-400">
