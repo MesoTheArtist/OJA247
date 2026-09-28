@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Package, ChevronRight, ShoppingBag } from "lucide-react";
+import { Package, ChevronRight, ShoppingBag, LifeBuoy } from "lucide-react";
 import axiosInstance from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import DisputeModal from "../components/DisputeModal";
+import { getDisputeEligibility } from "../utils/disputes";
 
 const STATUS_STYLES = {
   paid: "bg-green-100 text-green-700",
@@ -33,6 +35,7 @@ const OrderHistoryPage = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [disputeOrder, setDisputeOrder] = useState(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -54,6 +57,13 @@ const OrderHistoryPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // filed=true means a dispute went through. Refetch rather than patch the
+  // order locally: which vendors are still disputable changes too.
+  const handleDisputeClose = (filed) => {
+    setDisputeOrder(null);
+    if (filed) fetchOrders();
   };
 
   if (authLoading || loading) {
@@ -143,18 +153,32 @@ const OrderHistoryPage = () => {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => navigate(`/payment-status?reference=${order.reference}`)}
-                    className="mt-4 flex items-center gap-1 text-sm font-semibold text-green-600 hover:text-green-700 transition"
-                  >
-                    View details <ChevronRight size={16} />
-                  </button>
+                  <div className="mt-4 flex items-center justify-between gap-4">
+                    <button
+                      onClick={() => navigate(`/payment-status?reference=${order.reference}`)}
+                      className="flex items-center gap-1 text-sm font-semibold text-green-600 hover:text-green-700 transition"
+                    >
+                      View details <ChevronRight size={16} />
+                    </button>
+                    {getDisputeEligibility(order).eligible && (
+                      <button
+                        onClick={() => setDisputeOrder(order)}
+                        className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-orange-600 transition"
+                      >
+                        <LifeBuoy size={15} /> Report a problem
+                      </button>
+                    )}
+                  </div>
                 </motion.div>
               );
             })}
           </div>
         )}
       </div>
+
+      {disputeOrder && (
+        <DisputeModal order={disputeOrder} email={disputeOrder.customer?.email} onClose={handleDisputeClose} />
+      )}
     </div>
   );
 };

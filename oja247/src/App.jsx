@@ -24,6 +24,7 @@ import ForgotPasswordForm from "./pages/ForgotPasswordForm";
 import ResetPasswordForm from "./pages/ResetPasswordForm";
 import CustomerAuthPage from "./pages/CustomerAuthPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
+import ReportProblemPage from "./pages/ReportProblemPage";
 
 function App() {
   return (
@@ -53,6 +54,7 @@ function App() {
           <Route path="/reset-password" element={<ResetPasswordForm />} />
           <Route path="/account" element={<CustomerAuthPage />} />
           <Route path="/orders" element={<OrderHistoryPage />} />
+          <Route path="/report-problem" element={<ReportProblemPage />} />
           {/* Protected Routes */}
           <Route
             path="/dashboard/:businessId"

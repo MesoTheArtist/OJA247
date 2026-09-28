@@ -31,6 +31,7 @@ const companyLinks = [
 
 const supportLinks = [
   { label: "Help Center", path: "/about" },
+  { label: "Report a Problem", path: "/report-problem" },
   { label: "Delivery Information", path: "/about" },
   { label: "Privacy Policy", path: "/about" },
   { label: "Terms & Conditions", path: "/about" },

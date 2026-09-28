@@ -235,6 +235,18 @@ function PaymentStatusPage() {
                 </motion.button>
               )}
             </motion.div>
+
+            {(order?.status === "paid" || order?.status === "disputed") && (
+              <p className="text-center text-sm text-gray-500 mt-5">
+                Problem with this order?{" "}
+                <button
+                  onClick={() => navigate(`/report-problem?reference=${encodeURIComponent(order.reference)}`)}
+                  className="font-semibold text-green-600 hover:text-green-700"
+                >
+                  Report it
+                </button>
+              </p>
+            )}
           </div>
         </div>
       </motion.div>

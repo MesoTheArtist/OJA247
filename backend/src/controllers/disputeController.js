@@ -1,6 +1,7 @@
 import Order from "../models/Order.js";
 import Dispute, { DISPUTE_WINDOW_DAYS, SELF_RESOLVE_WINDOW_DAYS } from "../models/Dispute.js";
 import User from "../models/User.js";
+import { ACTIVE_DISPUTE_STATUSES, settleOrderAfterResolution } from "../services/disputeOrderStatus.js";
 import {
   sendDisputeFiledVendorEmail,
   sendDisputeFiledCustomerEmail,
@@ -37,9 +38,11 @@ export const fileDispute = async (req, res) => {
     }
 
     // Only paid orders can be disputed — nothing to dispute on an order
-    // that never went through, and re-disputing an already-disputed order
-    // should happen through the existing dispute, not a second one.
-    if (order.status !== "paid") {
+    // that never went through. "disputed" is allowed too: an order can span
+    // several vendors, and a dispute against one vendor flips the whole
+    // order to "disputed", which must not lock the customer out of
+    // disputing the others. Duplicates are blocked per vendor below.
+    if (order.status !== "paid" && order.status !== "disputed") {
       return res.status(400).json({
         message: `This order can't be disputed (status: ${order.status}).`,
       });
@@ -55,6 +58,21 @@ export const fileDispute = async (req, res) => {
     const vendorOnOrder = order.vendors.find((v) => v.businessId === businessId);
     if (!vendorOnOrder) {
       return res.status(400).json({ message: "That business wasn't part of this order" });
+    }
+
+    // One active dispute per vendor per order — a second complaint about
+    // the same vendor belongs in the existing dispute. Once that one is
+    // resolved/unresolved the customer can raise a new one (still inside the
+    // filing window).
+    const existingActive = await Dispute.exists({
+      orderId: order._id,
+      businessId,
+      status: { $in: ACTIVE_DISPUTE_STATUSES },
+    });
+    if (existingActive) {
+      return res.status(409).json({
+        message: "You already have an open dispute with this vendor on this order.",
+      });
     }
 
     // If specific items were named, every one of them has to actually
@@ -189,14 +207,11 @@ export const vendorResolveDispute = async (req, res) => {
     dispute.vendorResponse = { note, respondedAt: new Date() };
     await dispute.save();
 
-    const order = await Order.findById(dispute.orderId);
-    if (order && order.status === "disputed") {
-      // Refunded off-platform -> record it; otherwise the dispute's
-      // resolved but the money never moved, so the order just goes back
-      // to reflecting a normal paid order.
-      order.status = refunded ? "refunded" : "paid";
-      await order.save();
-    }
+    // Refunded off-platform -> record it; otherwise the dispute's resolved
+    // but the money never moved, so the order goes back to a normal paid
+    // order — unless another vendor's dispute on it is still active (see
+    // settleOrderAfterResolution).
+    await settleOrderAfterResolution(dispute.orderId, refunded);
 
     sendDisputeResolvedCustomerEmail({
       to: dispute.customer.email,

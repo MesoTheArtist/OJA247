@@ -5,6 +5,7 @@ import Business from "../models/Business.js";
 import TaxLedger from "../models/TaxLedger.js";
 import { sendOrderConfirmationEmail, sendVendorNewOrderEmail, sendOrderPaymentFailedEmail } from "../services/emailService.js";
 import { sendVendorNewOrderWhatsApp } from "../services/whatsappService.js";
+import { withActiveDisputeVendors } from "../services/disputeOrderStatus.js";
 
 // Shared by /verify and the webhook — idempotent, safe to call twice for the
 // same reference (e.g. if the customer's browser confirms AND the webhook
@@ -438,7 +439,8 @@ export const lookupOrderForDispute = async (req, res) => {
       return res.status(404).json({ message: "No matching order found" });
     }
 
-    res.json({ order });
+    const [withDisputes] = await withActiveDisputeVendors([order]);
+    res.json({ order: withDisputes });
   } catch (error) {
     console.error("Lookup order for dispute error:", error);
     res.status(500).json({ message: "Error looking up order" });
@@ -497,7 +499,7 @@ export const getOrdersByBusiness = async (req, res) => {
 export const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ userId: req.user._id }).sort({ createdAt: -1 });
-    res.json(orders);
+    res.json(await withActiveDisputeVendors(orders));
   } catch (error) {
     console.error("Get my orders error:", error);
     res.status(500).json({ message: "Error fetching your orders" });

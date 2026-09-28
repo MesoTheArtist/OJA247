@@ -20,7 +20,4 @@ router.post("/reset-password", authLimiter, customerResetPassword);
 
 router.get("/me", protect, requireCustomer, getCustomerMe);
 
-// Order history (Phase 2), follow (Phase 4), and reviews (Phase 5)
-// endpoints land here next.
-
 export default router;

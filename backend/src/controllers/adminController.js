@@ -10,6 +10,7 @@ import ReferralAttribution from "../models/ReferralAttribution.js";
 import SubscriptionPayment from "../models/SubscriptionPayment.js";
 import PointsLedger from "../models/PointsLedger.js";
 import TaxLedger from "../models/TaxLedger.js";
+import { settleOrderAfterResolution } from "../services/disputeOrderStatus.js";
 import Dispute, { FLAG_WINDOW_DAYS, FLAG_MIN_ORDERS, FLAG_DISPUTE_RATE_THRESHOLD } from "../models/Dispute.js";
 import { sendVerificationReviewedEmail, sendAccountBanStatusEmail } from "../services/emailService.js";
 
@@ -697,11 +698,7 @@ export const adminResolveDispute = async (req, res) => {
     dispute.adminResolution = { note: note || "", resolvedBy: req.user._id, resolvedAt: new Date() };
     await dispute.save();
 
-    const order = await Order.findById(dispute.orderId);
-    if (order && order.status === "disputed") {
-      order.status = refunded ? "refunded" : "paid";
-      await order.save();
-    }
+    await settleOrderAfterResolution(dispute.orderId, refunded);
 
     res.json({ dispute });
   } catch (error) {
