@@ -5,12 +5,15 @@ import axiosInstance from "../services/api";
 import Loader from "../components/Loader";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
 import Logo from "../assets/OJA247 VX1.png";
+import { useAuth } from "../context/AuthContext";
 
 function PaymentStatusPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [hidePrompt, setHidePrompt] = useState(false);
+  const { isCustomer, loading: authLoading } = useAuth();
 
   const showLoader = useMinimumLoadingTime(loading);
 
@@ -38,6 +41,19 @@ function PaymentStatusPage() {
   }, [reference]);
 
   const isSuccess = status === "success";
+
+  // Guests (and anyone not signed in as a customer) get offered an account
+  // right after paying — the moment they're most likely to want to track the
+  // order. Their guest orders link up automatically on signup by matching
+  // email/phone, so the checkout details are passed along as prefill.
+  const showAccountPrompt = isSuccess && order && !authLoading && !isCustomer && !hidePrompt;
+  const signupParams = new URLSearchParams({
+    mode: "signup",
+    redirect: "/orders",
+    email: order?.customer?.email || "",
+    fullName: order?.customer?.fullName || "",
+    phone: order?.customer?.phone || "",
+  }).toString();
 
   if (showLoader) {
     return <Loader text="Checking your payment status..." />;
@@ -209,10 +225,46 @@ function PaymentStatusPage() {
               </motion.div>
             )}
 
+            {showAccountPrompt && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.9 }}
+                className="relative rounded-2xl bg-green-50 border border-green-100 p-5 text-left mb-6"
+              >
+                <button
+                  onClick={() => setHidePrompt(true)}
+                  aria-label="Dismiss"
+                  className="absolute top-3 right-4 text-gray-400 hover:text-gray-600 text-xl leading-none"
+                >
+                  ×
+                </button>
+                <p className="font-bold text-gray-900 mb-1">Save this order to an account</p>
+                <p className="text-sm text-gray-600 mb-4 pr-4">
+                  Track it and see all your orders in one place. It takes a few seconds, and you can follow the
+                  vendors you buy from.
+                </p>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => navigate(`/account?${signupParams}`)}
+                    className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                  >
+                    Create free account
+                  </button>
+                  <button
+                    onClick={() => navigate("/account?redirect=/orders")}
+                    className="text-sm font-semibold text-green-700 hover:text-green-800"
+                  >
+                    Sign in instead
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.9 }}
+              transition={{ delay: 1.0 }}
               className="flex flex-col sm:flex-row gap-3 justify-center"
             >
               <motion.button

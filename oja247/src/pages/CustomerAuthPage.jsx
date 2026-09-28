@@ -20,8 +20,17 @@ const CustomerAuthPage = () => {
   const redirectTo = searchParams.get('redirect') || '/';
   const { customerRegister, customerLogin, customerGoogleLogin } = useAuth();
 
-  const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
-  const [formData, setFormData] = useState({ email: '', password: '', fullName: '', phone: '' });
+  // ?mode=signup and ?email= / ?fullName= / ?phone= let another page (e.g. the
+  // post-payment prompt) open this straight into signup with the buyer's
+  // checkout details filled in. Matching email or phone is what links their
+  // guest orders to the new account, so prefilling them matters.
+  const [mode, setMode] = useState(searchParams.get('mode') === 'signup' ? 'signup' : 'signin'); // 'signin' | 'signup'
+  const [formData, setFormData] = useState({
+    email: searchParams.get('email') || '',
+    password: '',
+    fullName: searchParams.get('fullName') || '',
+    phone: searchParams.get('phone') || '',
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
