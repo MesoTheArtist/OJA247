@@ -241,8 +241,8 @@ function PaymentStatusPage() {
                 </button>
                 <p className="font-bold text-gray-900 mb-1">Save this order to an account</p>
                 <p className="text-sm text-gray-600 mb-4 pr-4">
-                  Track it and see all your orders in one place. It takes a few seconds, and you can follow the
-                  vendors you buy from.
+                  Track it and see all your orders in one place. Continue with Google to see this order straight
+                  away, or sign up with email and confirm it from your inbox.
                 </p>
                 <div className="flex items-center gap-4">
                   <button

@@ -323,6 +323,9 @@ export const AuthProvider = ({ children }) => {
     customerRegister,
     customerLogin,
     customerGoogleLogin,
+    // Re-reads the signed-in user from the API, e.g. after they confirm their
+    // email in another tab so emailVerified updates without a reload.
+    refreshUser: loadUser,
     logout,
     updatePassword,
     getTotpSetupQr,

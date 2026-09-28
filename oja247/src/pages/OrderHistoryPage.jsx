@@ -5,6 +5,7 @@ import { Package, ChevronRight, ShoppingBag, LifeBuoy } from "lucide-react";
 import axiosInstance from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import DisputeModal from "../components/DisputeModal";
+import VerifyEmailBanner from "../components/VerifyEmailBanner";
 import { getDisputeEligibility } from "../utils/disputes";
 
 const STATUS_STYLES = {
@@ -82,6 +83,8 @@ const OrderHistoryPage = () => {
           <p className="text-gray-600">Every order you've placed while signed in — or that matches this email.</p>
         </motion.div>
 
+        <VerifyEmailBanner />
+
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">{error}</div>
         )}
@@ -95,8 +98,8 @@ const OrderHistoryPage = () => {
             <ShoppingBag className="mx-auto text-gray-300 mb-4" size={48} />
             <h2 className="text-xl font-bold text-gray-900 mb-2">No orders yet</h2>
             <p className="text-gray-500 mb-6">
-              Orders you place — including ones from before you signed up, if they used this email — will show up
-              here.
+              Orders you place — including ones from before you signed up, once your email is confirmed — will show
+              up here.
             </p>
             <button
               onClick={() => navigate("/explore")}

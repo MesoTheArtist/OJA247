@@ -6,6 +6,7 @@ import TaxLedger from "../models/TaxLedger.js";
 import { sendOrderConfirmationEmail, sendVendorNewOrderEmail, sendOrderPaymentFailedEmail } from "../services/emailService.js";
 import { sendVendorNewOrderWhatsApp } from "../services/whatsappService.js";
 import { withActiveDisputeVendors } from "../services/disputeOrderStatus.js";
+import { linkGuestOrders } from "../services/orderLinking.js";
 
 // Shared by /verify and the webhook — idempotent, safe to call twice for the
 // same reference (e.g. if the customer's browser confirms AND the webhook
@@ -498,6 +499,9 @@ export const getOrdersByBusiness = async (req, res) => {
 // has to for businessId.
 export const getMyOrders = async (req, res) => {
   try {
+    // Pick up orders placed with this email since the last login (no-op for
+    // an unverified email — see services/orderLinking.js).
+    await linkGuestOrders(req.user);
     const orders = await Order.find({ userId: req.user._id }).sort({ createdAt: -1 });
     res.json(await withActiveDisputeVendors(orders));
   } catch (error) {

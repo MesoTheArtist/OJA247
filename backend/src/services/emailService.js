@@ -192,6 +192,22 @@ export async function sendPasswordResetEmail({ to, name, resetUrl }) {
   });
 }
 
+export async function sendCustomerVerificationEmail({ to, name, verifyUrl }) {
+  return sendEmail({
+    to,
+    subject: "Confirm your email for OJA247",
+    html: layout(
+      `
+      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Confirm your email</h1>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${name || "there"}, confirm this is your email address to finish setting up your OJA247 account. Once it's confirmed, orders you placed as a guest with this email show up in your order history. This link works for 48 hours.</p>
+      ${button("Confirm my email", verifyUrl)}
+      <p style="color:#9ca3af; font-size:13px; line-height:1.6;">Didn't create an OJA247 account? You can ignore this email.</p>
+      `,
+      { preheader: "Confirm your email to see your OJA247 orders" }
+    ),
+  });
+}
+
 // --- Vendor / business -----------------------------------------------------
 
 export async function sendVendorWelcomeEmail({ to, businessName }) {
@@ -876,6 +892,7 @@ export async function sendNewProductFollowerEmail({
 export default {
   sendEmail,
   sendPasswordResetEmail,
+  sendCustomerVerificationEmail,
   sendMarketerWithdrawalRequestEmail,
   sendBusinessPointsWithdrawalRequestEmail,
   sendVendorWelcomeEmail,

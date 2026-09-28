@@ -44,6 +44,15 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    // Customer email verification. True once the person proves they own the
+    // address: Google sign-in (Google verified it), clicking the confirmation
+    // email, or completing a password reset. Guest orders are only linked to
+    // a verified account (see services/orderLinking.js). Only the SHA-256 hash
+    // of the confirmation token is stored, same as the reset token below.
+    emailVerified: { type: Boolean, default: false },
+    emailVerifyTokenHash: { type: String, default: null },
+    emailVerifyExpires: { type: Date, default: null },
+    lastVerificationEmailAt: { type: Date, default: null },
     // Set by forgotPassword, cleared by resetPassword or on expiry. Only the
     // SHA-256 hash is stored — the raw token only ever exists in the email
     // link and the reset request body, never in the database.

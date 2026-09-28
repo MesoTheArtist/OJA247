@@ -25,6 +25,7 @@ import ResetPasswordForm from "./pages/ResetPasswordForm";
 import CustomerAuthPage from "./pages/CustomerAuthPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
 import ReportProblemPage from "./pages/ReportProblemPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
 
 function App() {
   return (
@@ -55,6 +56,7 @@ function App() {
           <Route path="/account" element={<CustomerAuthPage />} />
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/report-problem" element={<ReportProblemPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           {/* Protected Routes */}
           <Route
             path="/dashboard/:businessId"

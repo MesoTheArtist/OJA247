@@ -3,7 +3,8 @@ import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import User from "../models/User.js";
 import Order from "../models/Order.js";
-import { sendPasswordResetEmail } from "../services/emailService.js";
+import { sendPasswordResetEmail, sendCustomerVerificationEmail } from "../services/emailService.js";
+import { linkGuestOrders } from "../services/orderLinking.js";
 
 // Deliberately a separate controller from authController.js rather than
 // extending register/login/googleLogin there — customer accounts skip
@@ -17,30 +18,40 @@ const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
 };
 
-// Backfills userId on any of this email's past guest orders that aren't
-// linked yet. Runs after every successful register/login/google — not
-// just once at signup — so it also catches guest orders placed with the
-// same email AFTER the account already existed (different browser, forgot
-// they were logged out, etc.), not only the ones that existed before
-// signup. Cheap and idempotent either way (updateMany only touches
-// unlinked rows), so running it every time costs nothing when there's
-// nothing new to link.
-async function linkGuestOrders(user) {
+// Guest-order linking lives in services/orderLinking.js and only links for a
+// verified email — see the security note there.
+
+const VERIFY_LINK_TTL_MS = 48 * 60 * 60 * 1000;
+const VERIFY_RESEND_COOLDOWN_MS = 60 * 1000;
+
+// Generates a fresh confirmation token (replacing any earlier one), stores
+// only its hash, and emails the link. Never throws — a broken mail server
+// must not fail signup; the person can resend from their order history.
+async function sendVerificationLink(user) {
   try {
-    // Account emails are stored lowercase, but order emails are stored as
-    // typed at checkout ("John@Gmail.com"). The case-insensitive collation
-    // (strength 2) makes the match ignore case so those still link.
-    await Order.updateMany(
-      { "customer.email": user.email, userId: null },
-      { userId: user._id },
-      { collation: { locale: "en", strength: 2 } }
-    );
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    user.emailVerifyTokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    user.emailVerifyExpires = new Date(Date.now() + VERIFY_LINK_TTL_MS);
+    user.lastVerificationEmailAt = new Date();
+    await user.save();
+
+    const verifyUrl = `${process.env.SITE_URL || "https://oja247.store"}/verify-email?token=${rawToken}`;
+    const result = await sendCustomerVerificationEmail({ to: user.email, name: user.fullName, verifyUrl });
+    if (!result.sent) {
+      console.error(`Customer verification email did not send for ${user.email}:`, result.error || "(no transporter configured)");
+    }
+    return Boolean(result.sent);
   } catch (error) {
-    // Never let a linking hiccup block login/signup itself — the account
-    // still works fine, order history just won't show the older orders
-    // until the next successful auth retries this.
-    console.error(`Guest-order linking failed for ${user.email}:`, error.message);
+    console.error(`Customer verification email failed for ${user.email}:`, error.message);
+    return false;
   }
+}
+
+// Marks the account's email as proven and clears any pending confirmation token.
+function markEmailVerified(user) {
+  user.emailVerified = true;
+  user.emailVerifyTokenHash = null;
+  user.emailVerifyExpires = null;
 }
 
 function publicUser(user) {
@@ -50,6 +61,7 @@ function publicUser(user) {
     fullName: user.fullName,
     phone: user.phone,
     role: user.role,
+    emailVerified: user.emailVerified === true,
   };
 }
 
@@ -79,7 +91,10 @@ export const customerRegister = async (req, res) => {
       role: "customer",
     });
 
-    await linkGuestOrders(user);
+    // No guest-order linking here: the email isn't verified yet. The account
+    // works straight away (low friction); past guest orders attach once the
+    // person confirms the email — see customerVerifyEmail.
+    await sendVerificationLink(user);
 
     res.status(201).json({
       success: true,
@@ -185,9 +200,23 @@ export const customerGoogleAuth = async (req, res) => {
         email: normalizedEmail,
         fullName: payload.name || "",
         role: "customer",
+        emailVerified: true, // Google already verified this email (checked above)
         // No password field at all — comparePassword and customerLogin
         // both handle that (see their comments).
       });
+    } else if (user.emailVerified !== true) {
+      // Google just proved this person owns the email. If the account was
+      // created earlier through password signup and never confirmed, that
+      // password may have been set by someone else who typed this address
+      // (pre-hijacking) — so drop it and any pending tokens. The real owner
+      // keeps access through Google.
+      if (user.password) {
+        user.password = undefined;
+        user.resetPasswordTokenHash = null;
+        user.resetPasswordExpires = null;
+      }
+      markEmailVerified(user);
+      await user.save();
     }
 
     if (user.banned) {
@@ -267,7 +296,11 @@ export const customerResetPassword = async (req, res) => {
     user.password = password;
     user.resetPasswordTokenHash = null;
     user.resetPasswordExpires = null;
+    // The reset link only reaches the email's owner, so using it proves
+    // ownership just as the confirmation link does.
+    markEmailVerified(user);
     await user.save();
+    await linkGuestOrders(user);
 
     res.json({ success: true, message: "Password reset successfully" });
   } catch (error) {
@@ -279,4 +312,67 @@ export const customerResetPassword = async (req, res) => {
 // GET /api/customer-auth/me
 export const getCustomerMe = async (req, res) => {
   res.json(publicUser(req.user));
+};
+
+// POST /api/customer-auth/verify-email
+// body: { token } — from the link in the confirmation email. Public: the
+// token itself is the proof, and the person may open the email on a device
+// where they aren't signed in.
+export const customerVerifyEmail = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ message: "Token is required" });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(String(token)).digest("hex");
+    const user = await User.findOne({
+      role: "customer",
+      emailVerifyTokenHash: tokenHash,
+      emailVerifyExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "This confirmation link is invalid or has expired." });
+    }
+
+    markEmailVerified(user);
+    await user.save();
+    const linkedOrders = await linkGuestOrders(user);
+
+    res.json({ success: true, linkedOrders });
+  } catch (error) {
+    console.error("Customer verify email error:", error);
+    res.status(500).json({ message: "Couldn't confirm your email. Please try again." });
+  }
+};
+
+// POST /api/customer-auth/resend-verification
+// Signed-in customers only; one email per minute per account on top of the
+// route's IP rate limit.
+export const customerResendVerification = async (req, res) => {
+  try {
+    const user = req.user;
+
+    if (user.emailVerified === true) {
+      return res.json({ success: true, alreadyVerified: true });
+    }
+
+    if (
+      user.lastVerificationEmailAt &&
+      Date.now() - new Date(user.lastVerificationEmailAt).getTime() < VERIFY_RESEND_COOLDOWN_MS
+    ) {
+      return res.status(429).json({ message: "We just sent one. Give it a minute, then try again." });
+    }
+
+    const sent = await sendVerificationLink(user);
+    if (!sent) {
+      return res.status(502).json({ message: "We couldn't send the email right now. Please try again shortly." });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Customer resend verification error:", error);
+    res.status(500).json({ message: "Couldn't send the confirmation email. Please try again." });
+  }
 };
