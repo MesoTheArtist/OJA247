@@ -27,9 +27,13 @@ const generateToken = (id) => {
 // nothing new to link.
 async function linkGuestOrders(user) {
   try {
+    // Account emails are stored lowercase, but order emails are stored as
+    // typed at checkout ("John@Gmail.com"). The case-insensitive collation
+    // (strength 2) makes the match ignore case so those still link.
     await Order.updateMany(
       { "customer.email": user.email, userId: null },
-      { userId: user._id }
+      { userId: user._id },
+      { collation: { locale: "en", strength: 2 } }
     );
   } catch (error) {
     // Never let a linking hiccup block login/signup itself — the account
