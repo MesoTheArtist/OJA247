@@ -7,6 +7,7 @@ import VendorOnboardingForm from "../components/Vendoronboardingform.jsx";
 import SubscriptionTab from "../components/SubscriptionTab.jsx";
 import AccountAlertsPopup from "../components/AccountAlertsPopup.jsx";
 import ReferralPointsTab from "../components/ReferralPointsTab.jsx";
+import VendorReviewsTab from "../components/VendorReviewsTab.jsx";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { LogOut, ShoppingBag, Clock, CheckCircle2, XCircle, Copy, Check, Share2 } from "lucide-react";
@@ -386,6 +387,17 @@ const BusinessDashboard = () => {
             >
               Referrals & Points
             </button>
+
+            <button
+              onClick={() => setActiveTab("reviews")}
+              className={`py-4 px-2 border-b-2 font-semibold transition-colors whitespace-nowrap ${
+                activeTab === "reviews"
+                  ? "border-green-600 text-green-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Reviews
+            </button>
           </div>
         </div>
       </div>
@@ -398,6 +410,8 @@ const BusinessDashboard = () => {
         )}
 
         {activeTab === "referrals" && <ReferralPointsTab businessId={businessId} />}
+
+        {activeTab === "reviews" && <VendorReviewsTab businessId={businessId} />}
 
         {activeTab === "add" && (
           <AddProductForm

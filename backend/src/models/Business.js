@@ -23,6 +23,15 @@ const BusinessSchema = new mongoose.Schema(
     isHidden: { type: Boolean, default: false }, // hides this business from public listings
     featured: { type: Boolean, default: false }, // admin-only — was previously used but missing from schema
     verified: { type: Boolean, default: false }, // admin-only — shown as a trust badge on the storefront
+
+    // Denormalized off Review — recomputed by reviewController whenever a
+    // review is created (see recomputeBusinessRating), not read live from
+    // Review on every storefront view. rating is null (not 0) until the
+    // first review exists, so the frontend's `typeof business.rating ===
+    // "number"` check correctly hides the rating row for a business with
+    // no reviews yet instead of showing a misleading 0.0.
+    rating: { type: Number, default: null, min: 1, max: 5 },
+    reviewCount: { type: Number, default: 0 },
     slug: { type: String, unique: true, sparse: true, lowercase: true, trim: true }, // vendor-editable, readable store URL (e.g. "chioma-fashion")
     // Admin-controlled vendor verification countdown. Null = not started yet,
     // so the business is never auto-hidden regardless of verification tier.

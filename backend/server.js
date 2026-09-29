@@ -26,6 +26,7 @@ import cronRoutes from "./src/routes/cronRoutes.js";
 import disputeRoutes from "./src/routes/disputeRoutes.js";
 import customerAuthRoutes from "./src/routes/customerAuthRoutes.js";
 import followRoutes from "./src/routes/followRoutes.js";
+import reviewRoutes from "./src/routes/reviewRoutes.js";
 import { verifyEmailTransporter } from "./src/services/emailService.js";
 import { generalLimiter } from "./src/middleware/rateLimiters.js";
 
@@ -103,6 +104,8 @@ app.use("/api/cron", cronRoutes);
 app.use("/api/disputes", disputeRoutes);
 app.use("/api/customer-auth", customerAuthRoutes);
 app.use("/api/follows", followRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 // Awaited at module load — on a cold start this holds the response until
 // Mongo is ready instead of letting requests race ahead of the connection.

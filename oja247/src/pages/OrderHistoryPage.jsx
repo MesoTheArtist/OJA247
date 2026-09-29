@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Package, ChevronRight, ShoppingBag, LifeBuoy } from "lucide-react";
+import { Package, ChevronRight, ShoppingBag, LifeBuoy, Star } from "lucide-react";
 import axiosInstance from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import DisputeModal from "../components/DisputeModal";
+import ReviewModal from "../components/ReviewModal";
 import VerifyEmailBanner from "../components/VerifyEmailBanner";
 import { getDisputeEligibility } from "../utils/disputes";
+import { getReviewableVendors } from "../components/ReviewForm";
+import { REVIEWABLE_ORDER_STATUSES } from "../utils/reviews";
 
 const STATUS_STYLES = {
   paid: "bg-green-100 text-green-700",
@@ -37,6 +40,7 @@ const OrderHistoryPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [disputeOrder, setDisputeOrder] = useState(null);
+  const [reviewOrder, setReviewOrder] = useState(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -65,6 +69,11 @@ const OrderHistoryPage = () => {
   const handleDisputeClose = (filed) => {
     setDisputeOrder(null);
     if (filed) fetchOrders();
+  };
+
+  const handleReviewClose = (posted) => {
+    setReviewOrder(null);
+    if (posted) fetchOrders();
   };
 
   if (authLoading || loading) {
@@ -163,14 +172,25 @@ const OrderHistoryPage = () => {
                     >
                       View details <ChevronRight size={16} />
                     </button>
-                    {getDisputeEligibility(order).eligible && (
-                      <button
-                        onClick={() => setDisputeOrder(order)}
-                        className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-orange-600 transition"
-                      >
-                        <LifeBuoy size={15} /> Report a problem
-                      </button>
-                    )}
+                    <div className="flex items-center gap-4">
+                      {REVIEWABLE_ORDER_STATUSES.includes(order.status) &&
+                        getReviewableVendors(order).length > 0 && (
+                          <button
+                            onClick={() => setReviewOrder(order)}
+                            className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-green-600 transition"
+                          >
+                            <Star size={15} /> Leave a review
+                          </button>
+                        )}
+                      {getDisputeEligibility(order).eligible && (
+                        <button
+                          onClick={() => setDisputeOrder(order)}
+                          className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-orange-600 transition"
+                        >
+                          <LifeBuoy size={15} /> Report a problem
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               );
@@ -182,6 +202,7 @@ const OrderHistoryPage = () => {
       {disputeOrder && (
         <DisputeModal order={disputeOrder} email={disputeOrder.customer?.email} onClose={handleDisputeClose} />
       )}
+      {reviewOrder && <ReviewModal order={reviewOrder} onClose={handleReviewClose} />}
     </div>
   );
 };

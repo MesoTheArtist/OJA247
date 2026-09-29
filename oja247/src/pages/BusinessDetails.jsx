@@ -5,6 +5,8 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import Loader from "../components/Loader";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
+import StarRating from "../components/StarRating";
+import ReviewsSection from "../components/ReviewsSection";
 
 const DAY_KEYS = [
   "sunday",
@@ -66,24 +68,6 @@ function formatMemberSince(dateString) {
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-}
-
-function StarRating({ rating }) {
-  const rounded = Math.round(rating * 2) / 2;
-  return (
-    <span className="inline-flex items-center gap-0.5" aria-hidden="true">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <svg
-          key={i}
-          viewBox="0 0 20 20"
-          className="w-4 h-4"
-          fill={i <= rounded ? "#f59e0b" : "#e5e7eb"}
-        >
-          <path d="M10 1.5l2.6 5.27 5.82.85-4.21 4.1.99 5.79L10 14.9l-5.2 2.61.99-5.79-4.21-4.1 5.82-.85L10 1.5z" />
-        </svg>
-      ))}
-    </span>
-  );
 }
 
 function BusinessDetails() {
@@ -753,6 +737,8 @@ function BusinessDetails() {
             ))}
           </div>
         )}
+
+        <ReviewsSection business={business} />
       </div>
     </div>
   );

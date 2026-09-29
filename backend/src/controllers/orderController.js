@@ -7,6 +7,7 @@ import { sendOrderConfirmationEmail, sendVendorNewOrderEmail, sendOrderPaymentFa
 import { sendVendorNewOrderWhatsApp } from "../services/whatsappService.js";
 import { withActiveDisputeVendors } from "../services/disputeOrderStatus.js";
 import { linkGuestOrders } from "../services/orderLinking.js";
+import { withReviewedVendors } from "../services/reviewEligibility.js";
 
 // Shared by /verify and the webhook — idempotent, safe to call twice for the
 // same reference (e.g. if the customer's browser confirms AND the webhook
@@ -503,7 +504,8 @@ export const getMyOrders = async (req, res) => {
     // an unverified email — see services/orderLinking.js).
     await linkGuestOrders(req.user);
     const orders = await Order.find({ userId: req.user._id }).sort({ createdAt: -1 });
-    res.json(await withActiveDisputeVendors(orders));
+    const withDisputes = await withActiveDisputeVendors(orders);
+    res.json(await withReviewedVendors(withDisputes, req.user._id));
   } catch (error) {
     console.error("Get my orders error:", error);
     res.status(500).json({ message: "Error fetching your orders" });
