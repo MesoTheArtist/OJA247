@@ -209,7 +209,7 @@ legend {
 }
 `;
 
-export default function VendorOnboardingForm({ onSubmitted } = {}) {
+export default function VendorOnboardingForm({ onSubmitted, existing = null } = {}) {
   const { business, isAuthenticated } = useAuth();
 
   const [banks, setBanks] = useState([]);
@@ -237,6 +237,27 @@ export default function VendorOnboardingForm({ onSubmitted } = {}) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [result, setResult] = useState(null);
+
+  // A vendor who has already submitted sees a summary first, not a blank
+  // form; "Update details" opens the form with everything prefilled so
+  // adding a document never means retyping what they already gave us.
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!existing) return;
+    setForm({
+      business_name: existing.businessName || '',
+      contact_email: existing.contactEmail || '',
+      contact_phone: existing.contactPhone || '',
+      contact_whatsapp:
+        existing.contactWhatsapp && existing.contactWhatsapp !== existing.contactPhone
+          ? existing.contactWhatsapp
+          : '',
+      bank_code: existing.bankCode || '',
+      account_number: existing.accountNumber || '',
+    });
+    setNin(existing.nin || '');
+  }, [existing]);
 
   // Load banks for the dropdown
   useEffect(() => {
@@ -395,12 +416,67 @@ export default function VendorOnboardingForm({ onSubmitted } = {}) {
     );
   }
 
+  if (existing && !editing) {
+    const tier = existing.verificationTier;
+    const docs = [
+      { label: 'CAC document', done: Boolean(existing.cacDocumentUrl) },
+      { label: 'Proof of address', done: Boolean(existing.addressProofUrl) },
+      { label: 'Selfie', done: Boolean(existing.selfieUrl) },
+    ];
+    const missingDocs = docs.filter((d) => !d.done);
+    return (
+      <div className="vof-card">
+        <style>{styles}</style>
+        <header className="vof-header">
+          <h1>Your payout &amp; verification details</h1>
+          <p>
+            Tier: <strong style={{ textTransform: 'capitalize' }}>{tier}</strong> · Review:{' '}
+            <strong style={{ textTransform: 'capitalize' }}>{existing.reviewStatus}</strong>
+          </p>
+        </header>
+
+        <fieldset>
+          <legend>Payout account</legend>
+          <p>
+            {existing.bankName || 'Bank'} · ****{String(existing.accountNumber || '').slice(-4)}
+            {existing.accountName ? ` · ${existing.accountName}` : ''}
+          </p>
+          {existing.payoutHold && (
+            <p className="vof-error">Payouts are on hold pending admin review of your bank change.</p>
+          )}
+        </fieldset>
+
+        <fieldset>
+          <legend>Documents</legend>
+          {docs.map((d) => (
+            <p key={d.label}>
+              {d.done ? '✓' : '○'} {d.label} {d.done ? '' : '(not added yet)'}
+            </p>
+          ))}
+          {missingDocs.length > 0 && (
+            <p className="vof-tier-note">
+              Add the missing document{missingDocs.length > 1 ? 's' : ''} to reach <strong>Verified</strong>.
+            </p>
+          )}
+        </fieldset>
+
+        <button type="button" className="vof-submit" onClick={() => setEditing(true)}>
+          {missingDocs.length > 0 ? 'Add documents / update details' : 'Update details'}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <form className="vof-card" onSubmit={handleSubmit}>
       <style>{styles}</style>
       <header className="vof-header">
-        <h1>Set up your store</h1>
-        <p>Payout details and ID verification — one form, five minutes.</p>
+        <h1>{existing ? 'Update your details' : 'Set up your store'}</h1>
+        <p>
+          {existing
+            ? 'Your saved details are filled in — just change what you need or add a missing document.'
+            : 'Payout details and ID verification — one form, five minutes.'}
+        </p>
       </header>
 
       <fieldset>
@@ -518,12 +594,12 @@ export default function VendorOnboardingForm({ onSubmitted } = {}) {
 
         <div className="vof-row">
           <label className="vof-field vof-upload">
-            <span>CAC document <em>(optional now)</em></span>
+            <span>CAC document <em>{existing?.cacDocumentUrl ? '(✓ uploaded — choose a file only to replace it)' : '(optional now)'}</em></span>
             <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange(setCacFile)} />
             {cacFile && <span className="vof-filename">{cacFile.name}</span>}
           </label>
           <label className="vof-field vof-upload">
-            <span>Proof of address <em>(optional now)</em></span>
+            <span>Proof of address <em>{existing?.addressProofUrl ? '(✓ uploaded — choose a file only to replace it)' : '(optional now)'}</em></span>
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
@@ -534,7 +610,7 @@ export default function VendorOnboardingForm({ onSubmitted } = {}) {
         </div>
 
         <label className="vof-field vof-upload">
-          <span>Headshot / selfie <em>(optional now)</em></span>
+          <span>Headshot / selfie <em>{existing?.selfieUrl ? '(✓ uploaded — choose a file only to replace it)' : '(optional now)'}</em></span>
           <input type="file" accept=".jpg,.jpeg,.png" onChange={handleFileChange(setSelfieFile)} />
           {selfieFile && <span className="vof-filename">{selfieFile.name}</span>}
         </label>
@@ -543,7 +619,7 @@ export default function VendorOnboardingForm({ onSubmitted } = {}) {
       {submitError && <p className="vof-error vof-submit-error">{submitError}</p>}
 
       <button type="submit" className="vof-submit" disabled={submitting}>
-        {submitting ? 'Setting up your store…' : 'Set up my store'}
+        {submitting ? (existing ? 'Saving…' : 'Setting up your store…') : existing ? 'Save changes' : 'Set up my store'}
       </button>
     </form>
   );

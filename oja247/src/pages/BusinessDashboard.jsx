@@ -900,7 +900,7 @@ const BusinessDashboard = () => {
               </div>
             )}
 
-            <VendorOnboardingForm onSubmitted={() => fetchVendorStatus()} />
+            <VendorOnboardingForm existing={vendorStatus} onSubmitted={() => fetchVendorStatus()} />
           </div>
         )}
       </div>
