@@ -1,1 +1,54 @@
 @import "tailwindcss";   
+/* Responsive admin tables — below the sm breakpoint (640px), a table with
+   this class turns into a stack of cards (one per row) instead of forcing
+   horizontal scroll. Each <td> needs data-label="Column Name" matching its
+   header, which is shown as a bold label to the left of the cell's value.
+   Used across AdminDashboard.jsx's data tables (orders, users, businesses,
+   vendors, marketers, transactions, etc). */
+@media (max-width: 640px) {
+  .admin-table {
+    min-width: 0 !important;
+  }
+  .admin-table thead {
+    display: none;
+  }
+  .admin-table,
+  .admin-table tbody,
+  .admin-table tr,
+  .admin-table td {
+    display: block;
+    width: 100%;
+  }
+  .admin-table tr {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .admin-table td {
+    padding: 0.375rem 0 !important;
+    text-align: right !important;
+    border: none !important;
+  }
+  .admin-table td:empty {
+    display: none;
+  }
+  .admin-table td[data-label]::before {
+    content: attr(data-label);
+    float: left;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6b7280;
+  }
+  /* A cell holding buttons or multi-line content (Actions, Customer,
+     evidence thumbnails) reads better stacked under its label than forced
+     onto one line — opt in per-cell with data-stack="true". */
+  .admin-table td[data-stack="true"] {
+    text-align: left !important;
+  }
+  .admin-table td[data-stack="true"]::before {
+    float: none;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+}

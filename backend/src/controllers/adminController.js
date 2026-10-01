@@ -12,7 +12,10 @@ import PointsLedger from "../models/PointsLedger.js";
 import TaxLedger from "../models/TaxLedger.js";
 import { settleOrderAfterResolution } from "../services/disputeOrderStatus.js";
 import Dispute, { FLAG_WINDOW_DAYS, FLAG_MIN_ORDERS, FLAG_DISPUTE_RATE_THRESHOLD } from "../models/Dispute.js";
+import Follow from "../models/Follow.js";
+import Review from "../models/Review.js";
 import { sendVerificationReviewedEmail, sendAccountBanStatusEmail } from "../services/emailService.js";
+import { linkGuestOrders } from "../services/orderLinking.js";
 
 // Get all users
 export const getAllUsers = async (req, res) => {
@@ -243,29 +246,6 @@ export const reviewVendor = async (req, res) => {
   }
 };
 
-// Start, extend, or clear a business's verification countdown.
-// deadline: an ISO date string to set it explicitly, or null to stop the
-// countdown entirely (business is never auto-hidden while it's null).
-export const setVerificationDeadline = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { deadline } = req.body;
-
-    const business = await Business.findByIdAndUpdate(
-      id,
-      { verificationDeadline: deadline ? new Date(deadline) : null },
-      { new: true }
-    );
-
-    if (!business) {
-      return res.status(404).json({ message: "Business not found" });
-    }
-
-    res.json(business);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
 // GET /api/admin/settings
 export const getPlatformSettings = async (req, res) => {
   try {
@@ -712,6 +692,169 @@ export const adminResolveDispute = async (req, res) => {
 // "visible to admin" and the ban toggle above. Dispute count and order
 // count are both scoped to the same rolling window (FLAG_WINDOW_DAYS) so
 // a vendor's ancient history doesn't drag their current standing around.
+// GET /api/admin/customers
+// List of customer accounts with the counters an admin actually needs to
+// see at a glance — order volume/spend, engagement, and account state.
+// Aggregated in bulk rather than N+1 queries per customer.
+export const getAllCustomersAdmin = async (req, res) => {
+  try {
+    const customers = await User.find({ role: "customer" }).select("-password").sort({ createdAt: -1 });
+    if (customers.length === 0) return res.json({ customers: [] });
+
+    const ids = customers.map((c) => c._id);
+    // Case-insensitive: order/dispute emails are stored as typed at
+    // checkout, account emails are lowercase (see services/orderLinking.js
+    // for the same reasoning applied to guest-order linking).
+    const emails = customers.map((c) => c.email);
+
+    const [orderAgg, followCounts, reviewCounts, disputeCounts] = await Promise.all([
+      Order.aggregate([
+        { $match: { userId: { $in: ids }, status: { $in: ["paid", "disputed", "refunded"] } } },
+        { $group: { _id: "$userId", orderCount: { $sum: 1 }, totalSpent: { $sum: "$total" } } },
+      ]),
+      Follow.aggregate([
+        { $match: { customerId: { $in: ids } } },
+        { $group: { _id: "$customerId", count: { $sum: 1 } } },
+      ]),
+      Review.aggregate([
+        { $match: { customerId: { $in: ids } } },
+        { $group: { _id: "$customerId", count: { $sum: 1 } } },
+      ]),
+      Dispute.aggregate([
+        { $addFields: { emailLower: { $toLower: "$customer.email" } } },
+        { $match: { emailLower: { $in: emails } } },
+        { $group: { _id: "$emailLower", count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const orderById = new Map(orderAgg.map((o) => [o._id.toString(), o]));
+    const followById = new Map(followCounts.map((f) => [f._id.toString(), f.count]));
+    const reviewById = new Map(reviewCounts.map((r) => [r._id.toString(), r.count]));
+    const disputeByEmail = new Map(disputeCounts.map((d) => [d._id, d.count]));
+
+    const result = customers.map((c) => {
+      const orders = orderById.get(c._id.toString());
+      return {
+        ...c.toObject(),
+        orderCount: orders?.orderCount || 0,
+        totalSpent: orders?.totalSpent || 0,
+        followingCount: followById.get(c._id.toString()) || 0,
+        reviewCount: reviewById.get(c._id.toString()) || 0,
+        disputeCount: disputeByEmail.get(c.email.toLowerCase()) || 0,
+      };
+    });
+
+    res.json({ customers: result });
+  } catch (error) {
+    console.error("Get all customers error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// GET /api/admin/customers/:id — full drill-in for one customer: their
+// order history, disputes, reviews, and who they follow, plus the same
+// counters as the list for consistency.
+export const getCustomerDetailAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const customer = await User.findOne({ _id: id, role: "customer" }).select("-password");
+    if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+    const [orders, disputes, reviews, follows] = await Promise.all([
+      Order.find({ userId: id }).sort({ createdAt: -1 }),
+      // Disputes have no userId link (filed before an account may have
+      // existed — see Dispute.js) so they're matched by email, case-
+      // insensitively via collation — same approach as guest-order linking
+      // in services/orderLinking.js.
+      Dispute.find({ "customer.email": customer.email })
+        .collation({ locale: "en", strength: 2 })
+        .sort({ createdAt: -1 }),
+      Review.find({ customerId: id }).sort({ createdAt: -1 }),
+      Follow.find({ customerId: id }).populate("businessId", "name storeUrl").sort({ createdAt: -1 }),
+    ]);
+
+    const paidOrders = orders.filter((o) => ["paid", "disputed", "refunded"].includes(o.status));
+
+    res.json({
+      customer,
+      orders,
+      disputes,
+      reviews,
+      follows,
+      stats: {
+        orderCount: paidOrders.length,
+        totalSpent: paidOrders.reduce((sum, o) => sum + (o.total || 0), 0),
+        disputeCount: disputes.length,
+        reviewCount: reviews.length,
+        followingCount: follows.length,
+      },
+    });
+  } catch (error) {
+    console.error("Get customer detail error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// PATCH /api/admin/customers/:id
+// Support edit — correcting a typo'd name or phone number. Email is
+// deliberately not editable here: it's the identity key used to link guest
+// orders (see services/orderLinking.js) and is proven via the verification
+// flow, so changing it needs its own re-verification step, not a plain edit.
+export const updateCustomerAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fullName, phone } = req.body;
+
+    const customer = await User.findOne({ _id: id, role: "customer" });
+    if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+    if (fullName !== undefined) customer.fullName = String(fullName).trim();
+    if (phone !== undefined) customer.phone = String(phone).trim();
+    await customer.save();
+
+    res.json({ success: true, customer: publicAdminCustomer(customer) });
+  } catch (error) {
+    console.error("Update customer error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// PATCH /api/admin/customers/:id/verify-email
+// Manual override for support cases — a delivery problem with the
+// confirmation email, a customer who proved ownership some other way
+// (phone call, ID at pickup), etc. Also links their guest orders on the
+// spot, same as the customer's own verify-email flow.
+export const adminVerifyCustomerEmail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const customer = await User.findOne({ _id: id, role: "customer" });
+    if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+    customer.emailVerified = true;
+    customer.emailVerifyTokenHash = null;
+    customer.emailVerifyExpires = null;
+    await customer.save();
+
+    const linkedOrders = await linkGuestOrders(customer);
+
+    res.json({ success: true, linkedOrders, customer: publicAdminCustomer(customer) });
+  } catch (error) {
+    console.error("Admin verify customer email error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+function publicAdminCustomer(user) {
+  return {
+    _id: user._id,
+    email: user.email,
+    fullName: user.fullName,
+    phone: user.phone,
+    emailVerified: user.emailVerified === true,
+    banned: user.banned,
+  };
+}
+
 export const getFlaggedVendors = async (req, res) => {
   try {
     const windowStart = new Date(Date.now() - FLAG_WINDOW_DAYS * 24 * 60 * 60 * 1000);

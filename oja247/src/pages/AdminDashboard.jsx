@@ -4,6 +4,7 @@ import axiosInstance from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
+import CustomerAdminTab from "../components/CustomerAdminTab.jsx";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
 import {
   Users,
@@ -33,6 +34,7 @@ import {
   Receipt,
   ArrowLeft,
   Wallet,
+  UserCircle,
 } from "lucide-react";
 import {
   LineChart,
@@ -53,6 +55,7 @@ const NAV_ITEMS = [
   { id: "products", label: "Products", icon: Package },
   { id: "orders", label: "Orders", icon: ShoppingCart },
   { id: "users", label: "Users", icon: Users },
+  { id: "customers", label: "Customers", icon: UserCircle },
   { id: "vendors", label: "Vendor Verification", icon: ShieldCheck },
   { id: "marketers", label: "Marketers", icon: UserCog },
   { id: "payout-batches", label: "Payout Batches", icon: Wallet },
@@ -477,33 +480,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const setVerificationDeadline = async (id, deadline) => {
-    try {
-      await axiosInstance.patch(`/api/admin/businesses/${id}/verification-deadline`, { deadline });
-      fetchAllData();
-    } catch (error) {
-      showToast(error.response?.data?.message || "Failed to update verification deadline", "error");
-    }
-  };
-
-  const startVerificationCountdown = (biz) => {
-    const deadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    setVerificationDeadline(biz._id, deadline);
-  };
-
-  const extendVerificationDeadline = (biz, days) => {
-    const base = biz.verificationDeadline ? new Date(biz.verificationDeadline) : new Date();
-    const deadline = new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
-    setVerificationDeadline(biz._id, deadline);
-  };
-
-  const clearVerificationDeadline = (biz) => {
-    if (!window.confirm(`Stop the verification countdown for "${biz.name}"? Their store will never be auto-hidden until you start it again.`)) {
-      return;
-    }
-    setVerificationDeadline(biz._id, null);
-  };
-
   const deleteBusiness = async (id, name) => {
     if (
       !window.confirm(
@@ -896,7 +872,7 @@ const AdminDashboard = () => {
                 />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[720px]">
+                  <table className="w-full sm:min-w-[720px] admin-table">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Reference</th>
@@ -910,16 +886,16 @@ const AdminDashboard = () => {
                     <tbody>
                       {filteredOrders.map((order) => (
                         <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="p-4 font-medium text-sm text-gray-600">{order.reference}</td>
-                          <td className="p-4">
+                          <td data-label="Reference" className="p-4 font-medium text-sm text-gray-600">{order.reference}</td>
+                          <td data-label="Customer" data-stack="true" className="p-4">
                             <div>
                               <p className="font-medium text-gray-900">{order.customer?.fullName}</p>
                               <p className="text-sm text-gray-500">{order.customer?.email}</p>
                             </div>
                           </td>
-                          <td className="p-4 text-sm text-gray-500">{order.items?.length || 0}</td>
-                          <td className="p-4 font-semibold text-gray-900">₦{Number(order.total || 0).toLocaleString()}</td>
-                          <td className="p-4">
+                          <td data-label="Items" className="p-4 text-sm text-gray-500">{order.items?.length || 0}</td>
+                          <td data-label="Total" className="p-4 font-semibold text-gray-900">₦{Number(order.total || 0).toLocaleString()}</td>
+                          <td data-label="Payment" className="p-4">
                             <span
                               className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
                                 order.paymentStatus === "paid"
@@ -932,7 +908,7 @@ const AdminDashboard = () => {
                               {order.paymentStatus}
                             </span>
                           </td>
-                          <td className="p-4 text-sm text-gray-500">
+                          <td data-label="Date" className="p-4 text-sm text-gray-500">
                             {new Date(order.createdAt).toLocaleString()}
                           </td>
                         </tr>
@@ -1113,7 +1089,7 @@ const AdminDashboard = () => {
                 />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[720px]">
+                  <table className="w-full sm:min-w-[720px] admin-table">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Business</th>
@@ -1121,14 +1097,13 @@ const AdminDashboard = () => {
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Location</th>
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Contact</th>
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Featured</th>
-                        <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Verification Deadline</th>
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredBusinesses.map((biz) => (
                         <tr key={biz._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="p-4">
+                          <td data-label="Business" data-stack="true" className="p-4">
                             <div className="flex items-center gap-3">
                               {biz.logo && (
                                 <img
@@ -1140,10 +1115,10 @@ const AdminDashboard = () => {
                               <span className="font-medium text-gray-900">{biz.name}</span>
                             </div>
                           </td>
-                          <td className="p-4 text-gray-500">{biz.category}</td>
-                          <td className="p-4 text-gray-500">{biz.location}</td>
-                          <td className="p-4 text-gray-500">{biz.contact}</td>
-                          <td className="p-4">
+                          <td data-label="Category" className="p-4 text-gray-500">{biz.category}</td>
+                          <td data-label="Location" className="p-4 text-gray-500">{biz.location}</td>
+                          <td data-label="Contact" className="p-4 text-gray-500">{biz.contact}</td>
+                          <td data-label="Featured" className="p-4">
                             <button
                               onClick={() => toggleFeatured(biz._id, biz.featured)}
                               className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium border transition ${
@@ -1156,41 +1131,7 @@ const AdminDashboard = () => {
                               {biz.featured ? "Featured" : "Not Featured"}
                             </button>
                           </td>
-                          <td className="p-4">
-                            <p className="text-xs text-gray-500 mb-1.5">
-                              {biz.verificationDeadline
-                                ? `${new Date(biz.verificationDeadline) < new Date() ? "Expired" : "Due"} ${new Date(
-                                    biz.verificationDeadline
-                                  ).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}`
-                                : "Not started"}
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {!biz.verificationDeadline ? (
-                                <button
-                                  onClick={() => startVerificationCountdown(biz)}
-                                  className="px-2.5 py-1 bg-green-500/15 text-green-700 border border-green-500/30 rounded-lg hover:bg-green-500/25 text-xs font-medium transition"
-                                >
-                                  Start 30-day countdown
-                                </button>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => extendVerificationDeadline(biz, 7)}
-                                    className="px-2.5 py-1 bg-gray-50 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100 text-xs font-medium transition"
-                                  >
-                                    +7 days
-                                  </button>
-                                  <button
-                                    onClick={() => clearVerificationDeadline(biz)}
-                                    className="px-2.5 py-1 bg-red-500/15 text-red-600 border border-red-500/30 rounded-lg hover:bg-red-500/25 text-xs font-medium transition"
-                                  >
-                                    Clear
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-4">
+                          <td data-label="Actions" data-stack="true" className="p-4">
                             <div className="flex gap-2">
                               <button
                                 onClick={() => navigate(`/dashboard/${biz._id}`)}
@@ -1289,7 +1230,7 @@ const AdminDashboard = () => {
                 />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[720px]">
+                  <table className="w-full sm:min-w-[720px] admin-table">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Email</th>
@@ -1303,9 +1244,9 @@ const AdminDashboard = () => {
                     <tbody>
                       {filteredUsers.map((u) => (
                         <tr key={u._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="p-4 font-medium text-gray-900">{u.email}</td>
-                          <td className="p-4 text-gray-500">{u.businessId?.name || "No business"}</td>
-                          <td className="p-4">
+                          <td data-label="Email" className="p-4 font-medium text-gray-900">{u.email}</td>
+                          <td data-label="Business" className="p-4 text-gray-500">{u.businessId?.name || "No business"}</td>
+                          <td data-label="Role" className="p-4">
                             <span
                               className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
                                 u.role === "admin"
@@ -1316,9 +1257,9 @@ const AdminDashboard = () => {
                               {u.role}
                             </span>
                           </td>
-                          <td className="p-4">
+                          <td data-label="Status" className="p-4">
                             <span
-                              className={`flex items-center gap-1.5 text-sm font-medium ${
+                              className={`flex items-center gap-1.5 text-sm font-medium justify-end sm:justify-start ${
                                 u.banned ? "text-red-600" : "text-green-700"
                               }`}
                             >
@@ -1326,10 +1267,10 @@ const AdminDashboard = () => {
                               {u.banned ? "Banned" : "Active"}
                             </span>
                           </td>
-                          <td className="p-4 text-sm text-gray-500">
+                          <td data-label="Joined" className="p-4 text-sm text-gray-500">
                             {new Date(u.createdAt).toLocaleDateString()}
                           </td>
-                          <td className="p-4">
+                          <td data-label="Actions" className="p-4">
                             {u.role !== "admin" && (
                               <button
                                 onClick={() => toggleUserBan(u._id, u.banned, u.email)}
@@ -1352,6 +1293,8 @@ const AdminDashboard = () => {
             </div>
           )}
 
+          {activeTab === "customers" && <CustomerAdminTab showToast={showToast} />}
+
           {activeTab === "vendors" && (
             <div className="bg-white border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
               <div className="p-6 border-b border-gray-200">
@@ -1363,7 +1306,7 @@ const AdminDashboard = () => {
                 <EmptyState icon={ShieldCheck} title="Nothing to review" message="Vendor verification submissions will show up here." />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[900px]">
+                  <table className="w-full sm:min-w-[900px] admin-table">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Business</th>
@@ -1376,16 +1319,16 @@ const AdminDashboard = () => {
                     <tbody>
                       {vendors.map((v) => (
                         <tr key={v._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="p-4">
+                          <td data-label="Business" data-stack="true" className="p-4">
                             <p className="font-medium text-gray-900">{v.businessId?.name || v.businessName}</p>
                             <p className="text-sm text-gray-500">{v.contactEmail}</p>
                           </td>
-                          <td className="p-4">
+                          <td data-label="Tier" className="p-4">
                             <span className="px-2.5 py-1 rounded-full text-xs font-semibold border bg-blue-500/15 text-blue-700 border-blue-500/30 capitalize">
                               {v.verificationTier}
                             </span>
                           </td>
-                          <td className="p-4 text-sm">
+                          <td data-label="Documents" data-stack="true" className="p-4 text-sm">
                             <div className="flex flex-col gap-1">
                               {[
                                 { label: "NIN", value: v.nin },
@@ -1411,7 +1354,7 @@ const AdminDashboard = () => {
                               ))}
                             </div>
                           </td>
-                          <td className="p-4">
+                          <td data-label="Status" data-stack="true" className="p-4">
                             <span
                               className={`px-2.5 py-1 rounded-full text-xs font-semibold border capitalize ${
                                 v.reviewStatus === "approved"
@@ -1436,7 +1379,7 @@ const AdminDashboard = () => {
                               <p className="text-xs text-orange-700/80 mt-1 max-w-[220px]">{v.payoutHoldReason}</p>
                             )}
                           </td>
-                          <td className="p-4">
+                          <td data-label="Actions" data-stack="true" className="p-4">
                             <div className="flex gap-2">
                               <button
                                 onClick={() => reviewVendor(v._id, "approved", v.businessId?.name || v.businessName)}
@@ -1559,7 +1502,7 @@ const AdminDashboard = () => {
                     />
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[820px]">
+                      <table className="w-full sm:min-w-[820px] admin-table">
                         <thead className="bg-gray-50">
                           <tr>
                             <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Marketer</th>
@@ -1572,18 +1515,18 @@ const AdminDashboard = () => {
                         <tbody>
                           {filteredMarketers.map((m) => (
                             <tr key={m._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                              <td className="p-4">
+                              <td data-label="Marketer" data-stack="true" className="p-4">
                                 <p className="font-medium text-gray-900">{m.name}</p>
                                 <p className="text-sm text-gray-500">{m.email}</p>
                               </td>
-                              <td className="p-4 text-gray-500 font-mono text-sm">{m.referralCode}</td>
-                              <td className="p-4 text-gray-500">
+                              <td data-label="Referral Code" className="p-4 text-gray-500 font-mono text-sm">{m.referralCode}</td>
+                              <td data-label="Referred / Converted" className="p-4 text-gray-500">
                                 {m.totalReferred} / {m.totalConverted}
                               </td>
-                              <td className="p-4 text-gray-500">
+                              <td data-label="Pending / Paid" className="p-4 text-gray-500">
                                 ₦{(m.pendingPayoutTotal || 0).toLocaleString()} / ₦{(m.lifetimePaidTotal || 0).toLocaleString()}
                               </td>
-                              <td className="p-4">
+                              <td data-label="Actions" data-stack="true" className="p-4">
                                 <div className="flex gap-2">
                                   <button
                                     onClick={() => viewMarketerDetail(m._id)}
@@ -1643,7 +1586,7 @@ const AdminDashboard = () => {
                 />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[900px]">
+                  <table className="w-full sm:min-w-[900px] admin-table">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Marketer</th>
@@ -1655,11 +1598,11 @@ const AdminDashboard = () => {
                     <tbody>
                       {payoutBatches.map((b) => (
                         <tr key={b.marketerId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="p-4">
+                          <td data-label="Marketer" data-stack="true" className="p-4">
                             <p className="font-medium text-gray-900">{b.name}</p>
                             <p className="text-xs text-gray-500">{b.email}</p>
                           </td>
-                          <td className="p-4 text-sm text-gray-600">
+                          <td data-label="Bank Details" data-stack="true" className="p-4 text-sm text-gray-600">
                             {b.hasPayoutDetails ? (
                               <>
                                 <p>{b.bankName}</p>
@@ -1673,8 +1616,8 @@ const AdminDashboard = () => {
                               </span>
                             )}
                           </td>
-                          <td className="p-4 font-semibold text-gray-900">₦{Number(b.total).toLocaleString()}</td>
-                          <td className="p-4">
+                          <td data-label="Total Owed" className="p-4 font-semibold text-gray-900">₦{Number(b.total).toLocaleString()}</td>
+                          <td data-label="Actions" data-stack="true" className="p-4">
                             <div className="flex items-center gap-2">
                               <input
                                 type="text"
@@ -1743,7 +1686,7 @@ const AdminDashboard = () => {
                 />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[820px]">
+                  <table className="w-full sm:min-w-[820px] admin-table">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Type</th>
@@ -1757,16 +1700,16 @@ const AdminDashboard = () => {
                     <tbody>
                       {filteredTransactions.map((t) => (
                         <tr key={`${t.kind}-${t.id}`} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="p-4">
+                          <td data-label="Type" className="p-4">
                             <span className="px-2.5 py-1 rounded-full text-xs font-semibold border bg-blue-500/15 text-blue-700 border-blue-500/30 capitalize">
                               {t.kind === "marketer_payout" ? "Marketer Payout" : t.kind === "points" ? `Points (${t.pointsType})` : `Subscription (${t.planType})`}
                             </span>
                           </td>
-                          <td className="p-4 font-medium text-gray-900">{t.party}</td>
-                          <td className="p-4 text-gray-500">
+                          <td data-label="Party" className="p-4 font-medium text-gray-900">{t.party}</td>
+                          <td data-label="Amount" className="p-4 text-gray-500">
                             {t.kind === "points" ? t.amount : `₦${Number(t.amount).toLocaleString()}`}
                           </td>
-                          <td className="p-4">
+                          <td data-label="Status" className="p-4">
                             <span
                               className={`px-2.5 py-1 rounded-full text-xs font-semibold border capitalize ${
                                 ["success", "paid"].includes(t.status)
@@ -1779,10 +1722,10 @@ const AdminDashboard = () => {
                               {t.status}
                             </span>
                           </td>
-                          <td className="p-4 text-gray-500 text-sm">
+                          <td data-label="Date" className="p-4 text-gray-500 text-sm">
                             {new Date(t.date).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
                           </td>
-                          <td className="p-4">
+                          <td data-label="Actions" className="p-4">
                             {t.kind === "points" && t.pointsType === "withdrawn_cash" && t.status === "pending" && (
                               <button
                                 onClick={() => markPointsWithdrawalPaid(t.id)}
@@ -1818,7 +1761,7 @@ const AdminDashboard = () => {
                 <EmptyState icon={ToggleLeft} title="No businesses" message="Businesses will appear here once vendors sign up." />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[600px]">
+                  <table className="w-full sm:min-w-[600px] admin-table">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Business</th>
@@ -1829,9 +1772,9 @@ const AdminDashboard = () => {
                     <tbody>
                       {filteredVisibilityBusinesses.map((biz) => (
                         <tr key={biz._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="p-4 font-medium text-gray-900">{biz.name}</td>
-                          <td className="p-4 text-gray-500 capitalize">{biz.subscriptionStatus}</td>
-                          <td className="p-4">
+                          <td data-label="Business" className="p-4 font-medium text-gray-900">{biz.name}</td>
+                          <td data-label="Subscription" className="p-4 text-gray-500 capitalize">{biz.subscriptionStatus}</td>
+                          <td data-label="Exempt" className="p-4">
                             <button
                               onClick={() => toggleVisibilityExempt(biz._id, biz.visibilityExempt)}
                               className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
@@ -1870,7 +1813,7 @@ const AdminDashboard = () => {
                 <EmptyState icon={CalendarClock} title="No businesses" message="Businesses will appear here once vendors sign up." />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[680px]">
+                  <table className="w-full sm:min-w-[680px] admin-table">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Business</th>
@@ -1889,8 +1832,8 @@ const AdminDashboard = () => {
                         const isActive = biz.grandfatherExemptUntil && new Date(biz.grandfatherExemptUntil) > new Date();
                         return (
                           <tr key={biz._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                            <td className="p-4 font-medium text-gray-900">{biz.name}</td>
-                            <td className="p-4">
+                            <td data-label="Business" className="p-4 font-medium text-gray-900">{biz.name}</td>
+                            <td data-label="Exempt Until" data-stack="true" className="p-4">
                               <span
                                 className={`text-xs font-semibold mr-2 ${isActive ? "text-green-700" : "text-gray-400"}`}
                               >
@@ -1905,7 +1848,7 @@ const AdminDashboard = () => {
                                 className="px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900"
                               />
                             </td>
-                            <td className="p-4">
+                            <td data-label="Actions" data-stack="true" className="p-4">
                               <div className="flex gap-2">
                                 <button
                                   onClick={() => saveGrandfatherExemption(biz._id, draft)}
@@ -1982,7 +1925,7 @@ const AdminDashboard = () => {
                 <EmptyState icon={FileText} title="No tax entries" message="VAT from paid orders will show up here." />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[820px]">
+                  <table className="w-full sm:min-w-[820px] admin-table">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Order Ref</th>
@@ -1996,10 +1939,10 @@ const AdminDashboard = () => {
                     <tbody>
                       {taxEntries.map((entry) => (
                         <tr key={entry._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="p-4 font-medium text-gray-900">{entry.orderReference}</td>
-                          <td className="p-4 text-gray-500">₦{Number(entry.orderTotal).toLocaleString()}</td>
-                          <td className="p-4 text-gray-500">₦{Number(entry.taxAmount).toLocaleString()}</td>
-                          <td className="p-4">
+                          <td data-label="Order Ref" className="p-4 font-medium text-gray-900">{entry.orderReference}</td>
+                          <td data-label="Order Total" className="p-4 text-gray-500">₦{Number(entry.orderTotal).toLocaleString()}</td>
+                          <td data-label="VAT" className="p-4 text-gray-500">₦{Number(entry.taxAmount).toLocaleString()}</td>
+                          <td data-label="Status" data-stack="true" className="p-4">
                             <span
                               className={`px-2.5 py-1 rounded-full text-xs font-semibold border capitalize ${
                                 entry.taxStatus === "remitted"
@@ -2013,10 +1956,10 @@ const AdminDashboard = () => {
                               <p className="text-xs text-gray-400 mt-1 max-w-[200px]">{entry.remittanceNote}</p>
                             )}
                           </td>
-                          <td className="p-4 text-gray-500 text-sm">
+                          <td data-label="Date" className="p-4 text-gray-500 text-sm">
                             {new Date(entry.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
                           </td>
-                          <td className="p-4">
+                          <td data-label="Actions" data-stack="true" className="p-4">
                             {entry.taxStatus === "accrued" && (
                               <div className="flex items-center gap-2">
                                 <input

@@ -10,7 +10,6 @@ import {
   toggleUserBan,
   getAllVendors,
   reviewVendor,
-  setVerificationDeadline,
   getPlatformSettings,
   setSubscriptionVisibilityEnforcement,
   getAllBusinessesAdmin,
@@ -27,6 +26,10 @@ import {
   adminListDisputes,
   adminResolveDispute,
   getFlaggedVendors,
+  getAllCustomersAdmin,
+  getCustomerDetailAdmin,
+  updateCustomerAdmin,
+  adminVerifyCustomerEmail,
 } from "../controllers/adminController.js";
 import { getPayoutBatches, markPayoutBatchPaid } from "../controllers/payoutBatchController.js";
 
@@ -38,6 +41,14 @@ router.use(requireAdmin);
 
 // Admin routes
 router.get("/users", getAllUsers);
+
+// Customers — separate from the generic /users list, with the counters
+// (orders, spend, follows, reviews, disputes) an admin needs to manage a
+// customer, not just see they exist. See getAllCustomersAdmin.
+router.get("/customers", getAllCustomersAdmin);
+router.get("/customers/:id", getCustomerDetailAdmin);
+router.patch("/customers/:id", updateCustomerAdmin);
+router.patch("/customers/:id/verify-email", adminVerifyCustomerEmail);
 router.get("/stats", getStats);
 router.get("/orders", getAllOrders);
 router.patch("/businesses/:id/featured", toggleFeatured);
@@ -45,7 +56,6 @@ router.delete("/businesses/:id", deleteBusiness);
 router.patch("/users/:id/ban", toggleUserBan);
 router.get("/vendors", getAllVendors);
 router.patch("/vendors/:id/review", reviewVendor);
-router.patch("/businesses/:id/verification-deadline", setVerificationDeadline);
 
 // Marketer payout batches (weekly, frozen by the cron job — see cronRoutes.js)
 router.get("/payout-batches", getPayoutBatches);
