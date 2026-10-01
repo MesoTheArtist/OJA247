@@ -127,7 +127,7 @@ function SubscriptionTab({ businessId, business, email }) {
 
   return (
     <div className="max-w-2xl">
-      <div className="bg-white rounded-2xl shadow-sm border p-6 mb-6">
+      <div className="bg-white rounded-2xl shadow-sm border p-4 sm:p-6 mb-6">
         <h3 className="text-lg font-bold text-gray-900 mb-1">Subscription Status</h3>
         <p className={`font-semibold ${status.color}`}>{status.text}</p>
         {expiresAt && (

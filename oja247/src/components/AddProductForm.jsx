@@ -87,7 +87,7 @@ const AddProductForm = ({ businessId, onProductAdded }) => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 sm:p-8 bg-white rounded-2xl shadow-sm border border-green-100">
+    <div className="max-w-2xl mx-auto p-4 sm:p-8 bg-white rounded-2xl shadow-sm border border-green-100">
       <h2 className="text-2xl font-bold mb-6 text-gray-900">Add New Product</h2>
       
       {error && (
@@ -130,7 +130,7 @@ const AddProductForm = ({ businessId, onProductAdded }) => {
         </div>
 
         {/* Price and Stock */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Price (₦) *
@@ -196,7 +196,7 @@ const AddProductForm = ({ businessId, onProductAdded }) => {
           
           {/* Display uploaded images */}
           {uploadedImages.length > 0 && (
-            <div className="mt-3 grid grid-cols-5 gap-2">
+            <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2">
               {uploadedImages.map((url, index) => (
                 <div key={index} className="relative group">
                   <img
@@ -207,7 +207,7 @@ const AddProductForm = ({ businessId, onProductAdded }) => {
                   <button
                     type="button"
                     onClick={() => removeImage(index)}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 sm:w-5 sm:h-5 flex items-center justify-center text-sm sm:text-xs opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                   >
                     ×
                   </button>

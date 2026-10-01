@@ -19,7 +19,7 @@ function ReferralActivityList({ referrals, title = "Your Referrals", emptyCta })
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-      <div className="px-6 py-4 border-b">
+      <div className="px-4 sm:px-6 py-4 border-b">
         <h3 className="font-bold text-gray-900">{title}</h3>
       </div>
       {referrals.length === 0 ? (
@@ -31,9 +31,9 @@ function ReferralActivityList({ referrals, title = "Your Referrals", emptyCta })
       ) : (
         <div className="divide-y">
           {referrals.map((r) => (
-            <div key={r.id} className="px-6 py-4 flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-gray-900">{r.businessName}</p>
+            <div key={r.id} className="px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-gray-900 break-words">{r.businessName}</p>
                 <p className="text-xs text-gray-400">
                   Referred {new Date(r.referredAt).toLocaleDateString("en-NG")} ·{" "}
                   {r.status === "converted" && r.convertedAt

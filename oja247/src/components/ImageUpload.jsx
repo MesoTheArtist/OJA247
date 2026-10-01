@@ -114,7 +114,7 @@ const ImageUpload = ({ onImagesUploaded, multiple = false, maxFiles = 5 }) => {
       )}
 
       <div
-        className={`relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+        className={`relative border-2 border-dashed rounded-lg p-4 sm:p-6 text-center cursor-pointer transition-colors ${
           dragActive 
             ? 'border-blue-500 bg-blue-50' 
             : 'border-gray-300 hover:border-gray-400'

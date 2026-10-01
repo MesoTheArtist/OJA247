@@ -97,21 +97,21 @@ function ReferralPointsTab({ businessId }) {
   return (
     <div className="max-w-3xl space-y-6">
       {/* Balance + withdraw */}
-      <div className="bg-white rounded-2xl shadow-sm border p-6">
+      <div className="bg-white rounded-2xl shadow-sm border p-4 sm:p-6">
         <p className="text-sm font-semibold text-gray-500 mb-1">Points Balance</p>
-        <p className="text-3xl font-extrabold text-gray-900 mb-4">
+        <p className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-4 break-words">
           {data.pointsBalance.toLocaleString()} pts{" "}
           <span className="text-lg text-gray-400">(₦{data.pointsBalance.toLocaleString()})</span>
         </p>
 
-        <form onSubmit={handleWithdraw} className="flex gap-2">
+        <form onSubmit={handleWithdraw} className="flex flex-col sm:flex-row gap-2">
           <input
             type="number"
             min="1"
             placeholder="Amount to withdraw"
             value={withdrawAmount}
             onChange={(e) => setWithdrawAmount(e.target.value)}
-            className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+            className="w-full sm:flex-1 min-w-0 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
           />
           <button
             type="submit"
@@ -128,7 +128,7 @@ function ReferralPointsTab({ businessId }) {
       </div>
 
       {/* Progress toward next redemption + conversion rate */}
-      <div className="bg-white rounded-2xl shadow-sm border p-6">
+      <div className="bg-white rounded-2xl shadow-sm border p-4 sm:p-6">
         <div className="flex items-center gap-2 mb-2">
           <Gift size={16} className="text-green-600" />
           <p className="text-sm font-semibold text-gray-700">
@@ -143,7 +143,7 @@ function ReferralPointsTab({ businessId }) {
             style={{ width: `${Math.round(data.nextRedemption.progress * 100)}%` }}
           />
         </div>
-        <div className="flex items-center gap-2 pt-3 border-t">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-3 border-t">
           <Percent size={14} className="text-green-600" />
           <p className="text-xs text-gray-500 font-semibold">Conversion Rate</p>
           <p className="ml-auto text-sm font-extrabold text-gray-900">
@@ -156,19 +156,19 @@ function ReferralPointsTab({ businessId }) {
       </div>
 
       {/* Referral link */}
-      <div className="bg-white rounded-2xl shadow-sm border p-6">
+      <div className="bg-white rounded-2xl shadow-sm border p-4 sm:p-6">
         <p className="text-sm font-semibold text-gray-500 mb-1">Your Referral Code</p>
 
         {editingCode ? (
           <form onSubmit={handleSaveCode} className="mb-4">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 autoFocus
                 value={codeInput}
                 onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
                 maxLength={8}
                 placeholder="e.g. CHIOMA1"
-                className="flex-1 p-3 border border-gray-300 rounded-lg text-lg font-bold tracking-wide focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full sm:flex-1 min-w-0 p-3 border border-gray-300 rounded-lg text-lg font-bold tracking-wide focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               <button
                 type="submit"
@@ -189,8 +189,8 @@ function ReferralPointsTab({ businessId }) {
             {codeMessage && <p className="text-xs text-red-600 mt-1">{codeMessage}</p>}
           </form>
         ) : (
-          <div className="flex items-center gap-2 mb-4">
-            <p className="text-xl font-extrabold text-gray-900">{data.referralCode}</p>
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <p className="text-xl font-extrabold text-gray-900 break-all">{data.referralCode}</p>
             <button
               onClick={startEditingCode}
               className="flex items-center gap-1 text-xs font-semibold text-green-600 hover:text-green-700"
@@ -204,7 +204,7 @@ function ReferralPointsTab({ businessId }) {
           <input
             readOnly
             value={referralLink}
-            className="flex-1 p-3 border border-gray-300 rounded-lg text-sm bg-gray-50 text-gray-600"
+            className="flex-1 min-w-0 p-3 border border-gray-300 rounded-lg text-sm bg-gray-50 text-gray-600 truncate"
           />
         </div>
         <ShareButtons
@@ -226,7 +226,7 @@ function ReferralPointsTab({ businessId }) {
 
       {/* Ledger */}
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-        <div className="px-6 py-4 border-b">
+        <div className="px-4 sm:px-6 py-4 border-b">
           <h3 className="font-bold text-gray-900">Points History</h3>
         </div>
         {data.ledger.length === 0 ? (
@@ -234,8 +234,8 @@ function ReferralPointsTab({ businessId }) {
         ) : (
           <div className="divide-y">
             {data.ledger.map((entry) => (
-              <div key={entry.id} className="px-6 py-4 flex items-center justify-between">
-                <div>
+              <div key={entry.id} className="px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+                <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 capitalize">
                     {entry.type.replace("_", " ")}
                   </p>
@@ -245,7 +245,7 @@ function ReferralPointsTab({ businessId }) {
                   </p>
                 </div>
                 <p
-                  className={`font-bold ${
+                  className={`font-bold shrink-0 ${
                     entry.points > 0 ? "text-green-700" : "text-gray-900"
                   }`}
                 >

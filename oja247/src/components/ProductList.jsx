@@ -149,14 +149,14 @@ const ProductList = ({ businessId }) => {
                       name="price"
                       value={editFormData.price}
                       onChange={handleEditChange}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                     <input
                       type="number"
                       name="stock"
                       value={editFormData.stock}
                       onChange={handleEditChange}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
                   <div className="flex gap-2">
@@ -183,7 +183,7 @@ const ProductList = ({ businessId }) => {
                   <p className="text-sm text-gray-600 mb-2 line-clamp-2">
                     {product.description}
                   </p>
-                  <div className="flex justify-between items-center mb-3">
+                  <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
                     <span className="text-lg font-bold text-green-600">
                       ₦{product.price.toLocaleString()}
                     </span>

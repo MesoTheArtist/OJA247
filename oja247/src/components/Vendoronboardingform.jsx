@@ -10,6 +10,9 @@ import axiosInstance from '../services/api';
 const styles = `
 .vof-card {
   max-width: 560px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
   margin: 0 auto;
   padding: 2rem;
   background: #ffffff;
@@ -31,13 +34,14 @@ const styles = `
   font-size: 0.95rem;
 }
 
-fieldset {
+.vof-card fieldset {
   border: none;
+  min-width: 0;
   padding: 0;
   margin: 0 0 1.75rem;
 }
 
-legend {
+.vof-card legend {
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -91,17 +95,23 @@ legend {
 
 .vof-field input[type="file"] {
   font-size: 0.85rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .vof-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1rem;
 }
 
 @media (max-width: 480px) {
   .vof-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .vof-card {
+    padding: 1.1rem;
   }
 }
 
@@ -153,6 +163,7 @@ legend {
 
 .vof-filename {
   display: block;
+  word-break: break-all;
   font-size: 0.8rem;
   color: #5c6560;
   margin-top: 0.25rem;

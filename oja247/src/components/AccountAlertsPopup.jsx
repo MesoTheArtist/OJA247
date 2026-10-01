@@ -49,7 +49,7 @@ function AccountAlertsPopup({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 relative">
         <button
           type="button"
           onClick={dismiss}

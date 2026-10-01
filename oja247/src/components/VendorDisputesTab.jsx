@@ -134,10 +134,10 @@ const VendorDisputesTab = ({ businessId }) => {
                 : null;
 
             return (
-              <div key={dispute._id} className="bg-white border border-gray-100 rounded-2xl p-5">
+              <div key={dispute._id} className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div>
-                    <p className="font-semibold text-gray-900 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm break-words">
                       Order {dispute.orderReference} · {REASON_LABELS[dispute.reason] || dispute.reason}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
@@ -156,7 +156,7 @@ const VendorDisputesTab = ({ businessId }) => {
                   </span>
                 </div>
 
-                <p className="text-sm text-gray-700 mt-3">{dispute.description}</p>
+                <p className="text-sm text-gray-700 mt-3 break-words">{dispute.description}</p>
 
                 {dispute.itemIds?.length > 0 && (
                   <p className="text-xs text-gray-500 mt-2">{dispute.itemIds.length} item(s) named in this dispute</p>
@@ -176,8 +176,8 @@ const VendorDisputesTab = ({ businessId }) => {
                   </div>
                 )}
 
-                <div className="mt-3 text-xs text-gray-500 flex items-center gap-3 flex-wrap">
-                  <span>{dispute.customer?.email}</span>
+                <div className="mt-3 text-xs text-gray-500 flex items-center gap-x-3 gap-y-1 flex-wrap">
+                  <span className="break-all">{dispute.customer?.email}</span>
                   <span>{dispute.customer?.phone}</span>
                 </div>
 
@@ -220,16 +220,16 @@ const VendorDisputesTab = ({ businessId }) => {
                 )}
 
                 {dispute.vendorResponse?.note && (
-                  <div className="mt-4 ml-4 pl-4 border-l-2 border-green-100">
+                  <div className="mt-4 ml-2 sm:ml-4 pl-3 sm:pl-4 border-l-2 border-green-100">
                     <p className="text-xs font-semibold text-green-700 mb-1">Your response</p>
-                    <p className="text-sm text-gray-600">{dispute.vendorResponse.note}</p>
+                    <p className="text-sm text-gray-600 break-words">{dispute.vendorResponse.note}</p>
                   </div>
                 )}
 
                 {dispute.adminResolution?.note && (
-                  <div className="mt-4 ml-4 pl-4 border-l-2 border-gray-200">
+                  <div className="mt-4 ml-2 sm:ml-4 pl-3 sm:pl-4 border-l-2 border-gray-200">
                     <p className="text-xs font-semibold text-gray-500 mb-1">Admin note</p>
-                    <p className="text-sm text-gray-600">{dispute.adminResolution.note}</p>
+                    <p className="text-sm text-gray-600 break-words">{dispute.adminResolution.note}</p>
                   </div>
                 )}
               </div>

@@ -73,13 +73,13 @@ const VendorReviewsTab = ({ businessId }) => {
   return (
     <div className="space-y-4">
       {reviews.map((review) => (
-        <div key={review._id} className="bg-white border border-gray-100 rounded-2xl p-5">
+        <div key={review._id} className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-5">
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-semibold text-gray-900 text-sm">{review.customerName}</p>
-              <div className="flex items-center gap-2 mt-0.5">
+            <div className="min-w-0">
+              <p className="font-semibold text-gray-900 text-sm break-words">{review.customerName}</p>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                 <StarRating rating={review.rating} size={13} />
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-400 break-all">
                   {new Date(review.createdAt).toLocaleDateString("en-NG", {
                     day: "numeric",
                     month: "short",
@@ -91,22 +91,22 @@ const VendorReviewsTab = ({ businessId }) => {
               </div>
             </div>
           </div>
-          {review.comment && <p className="text-sm text-gray-700 mt-3">{review.comment}</p>}
+          {review.comment && <p className="text-sm text-gray-700 mt-3 break-words">{review.comment}</p>}
 
           {review.vendorReply?.note ? (
-            <div className="mt-4 ml-4 pl-4 border-l-2 border-green-100">
+            <div className="mt-4 ml-2 sm:ml-4 pl-3 sm:pl-4 border-l-2 border-green-100">
               <p className="text-xs font-semibold text-green-700 mb-1">Your reply</p>
-              <p className="text-sm text-gray-600">{review.vendorReply.note}</p>
+              <p className="text-sm text-gray-600 break-words">{review.vendorReply.note}</p>
             </div>
           ) : (
-            <div className="mt-4 flex gap-2">
+            <div className="mt-4 flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
                 value={replyDrafts[review._id] || ""}
                 onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [review._id]: e.target.value }))}
                 placeholder="Reply publicly to this review…"
                 maxLength={2000}
-                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="w-full sm:flex-1 min-w-0 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
               <button
                 onClick={() => submitReply(review._id)}
