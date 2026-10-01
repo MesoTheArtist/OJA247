@@ -97,7 +97,7 @@ const CustomerDetailModal = ({ customerId, onClose, onChanged }) => {
     const ok = window.prompt(
       `This permanently deletes ${customer.email}'s account. Their orders stay (just unlinked, so the vendor's records are untouched) but this cannot be undone.\n\nType the email to confirm:`
     );
-    if (ok !== customer.email) {
+    if ((ok || "").trim().toLowerCase() !== (customer.email || "").trim().toLowerCase()) {
       if (ok !== null) alert("Email didn't match — nothing was deleted.");
       return;
     }

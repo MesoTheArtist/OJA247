@@ -69,7 +69,7 @@ const CustomerAdminTab = ({ showToast }) => {
     const ok = window.prompt(
       `This permanently deletes ${customer.email}'s account. Their orders stay (just unlinked) but this cannot be undone.\n\nType the email to confirm:`
     );
-    if (ok !== customer.email) {
+    if ((ok || "").trim().toLowerCase() !== (customer.email || "").trim().toLowerCase()) {
       if (ok !== null) showToast?.("Email didn't match — nothing was deleted", "error");
       return;
     }
