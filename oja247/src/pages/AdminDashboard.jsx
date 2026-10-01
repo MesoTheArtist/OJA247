@@ -1380,6 +1380,12 @@ const AdminDashboard = () => {
                             )}
                           </td>
                           <td data-label="Actions" data-stack="true" className="p-4">
+                            {v.reviewStatus === "approved" ? (
+                              <span className="flex items-center gap-1.5 text-sm font-medium text-green-700">
+                                <ShieldCheck size={14} />
+                                Approved
+                              </span>
+                            ) : (
                             <div className="flex gap-2">
                               <button
                                 onClick={() => reviewVendor(v._id, "approved", v.businessId?.name || v.businessName)}
@@ -1388,6 +1394,7 @@ const AdminDashboard = () => {
                                 <ShieldCheck size={14} />
                                 Approve
                               </button>
+                              {v.reviewStatus !== "rejected" && (
                               <button
                                 onClick={() => reviewVendor(v._id, "rejected", v.businessId?.name || v.businessName)}
                                 className="px-3 py-1.5 bg-red-500/15 text-red-600 border border-red-500/30 rounded-lg hover:bg-red-500/25 text-sm font-medium flex items-center gap-1 transition"
@@ -1395,7 +1402,9 @@ const AdminDashboard = () => {
                                 <XCircle size={14} />
                                 Reject
                               </button>
+                              )}
                             </div>
+                            )}
                           </td>
                         </tr>
                       ))}
