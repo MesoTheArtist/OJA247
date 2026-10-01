@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Users, Search, BadgeCheck, Ban, Eye } from "lucide-react";
+import { Users, Search, BadgeCheck, Ban, Eye, Trash2 } from "lucide-react";
 import axiosInstance from "../services/api";
 import CustomerDetailModal from "./CustomerDetailModal";
 
@@ -64,6 +64,24 @@ const CustomerAdminTab = ({ showToast }) => {
     else sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     return sorted;
   }, [customers, search, sortBy]);
+
+  const deleteCustomer = async (customer) => {
+    const ok = window.prompt(
+      `This permanently deletes ${customer.email}'s account. Their orders stay (just unlinked) but this cannot be undone.\n\nType the email to confirm:`
+    );
+    if (ok !== customer.email) {
+      if (ok !== null) showToast?.("Email didn't match — nothing was deleted", "error");
+      return;
+    }
+    try {
+      await axiosInstance.delete(`/api/admin/customers/${customer._id}`);
+      setCustomers((prev) => prev.filter((c) => c._id !== customer._id));
+      showToast?.("Customer account deleted");
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      showToast?.(error.response?.data?.message || "Failed to delete customer", "error");
+    }
+  };
 
   const toggleBan = async (customer) => {
     if (!window.confirm(`${customer.banned ? "Unban" : "Ban"} customer "${customer.email}"?`)) return;
@@ -181,6 +199,12 @@ const CustomerAdminTab = ({ showToast }) => {
                         }`}
                       >
                         <Ban size={14} /> {c.banned ? "Unban" : "Ban"}
+                      </button>
+                      <button
+                        onClick={() => deleteCustomer(c)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 transition"
+                      >
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </td>

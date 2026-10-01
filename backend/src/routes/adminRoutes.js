@@ -29,6 +29,7 @@ import {
   getAllCustomersAdmin,
   getCustomerDetailAdmin,
   updateCustomerAdmin,
+  deleteCustomerAdmin,
   adminVerifyCustomerEmail,
 } from "../controllers/adminController.js";
 import { getPayoutBatches, markPayoutBatchPaid } from "../controllers/payoutBatchController.js";
@@ -49,6 +50,7 @@ router.get("/customers", getAllCustomersAdmin);
 router.get("/customers/:id", getCustomerDetailAdmin);
 router.patch("/customers/:id", updateCustomerAdmin);
 router.patch("/customers/:id/verify-email", adminVerifyCustomerEmail);
+router.delete("/customers/:id", deleteCustomerAdmin);
 router.get("/stats", getStats);
 router.get("/orders", getAllOrders);
 router.patch("/businesses/:id/featured", toggleFeatured);

@@ -844,6 +844,41 @@ export const adminVerifyCustomerEmail = async (req, res) => {
   }
 };
 
+// DELETE /api/admin/customers/:id
+// Deletes the account itself, but not the records that depend on it:
+// - Orders: unlinked (userId -> null) rather than deleted. The vendor's
+//   order itself isn't this customer's data to erase, and Order already
+//   stores its own snapshot of the buyer's name/email/phone from checkout
+//   (see Order.customer), independent of the User doc — nothing is lost,
+//   the order just reverts to looking like a guest order.
+// - Reviews: left in place. They're public storefront content, and
+//   Review.customerName is a snapshot taken at write time (same reasoning
+//   as Order.customer) — the storefront list never re-reads the deleted
+//   User doc, so review display is unaffected.
+// - Disputes: unaffected either way — Dispute never links to a User id in
+//   the first place (see Dispute.js), only the denormalized customer info.
+// - Follows: deleted. Following only means something for an active
+//   account; a dangling follow would just inflate a vendor's follower
+//   count for someone who can no longer act on it.
+export const deleteCustomerAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const customer = await User.findOne({ _id: id, role: "customer" });
+    if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+    await Promise.all([
+      Order.updateMany({ userId: id }, { userId: null }),
+      Follow.deleteMany({ customerId: id }),
+    ]);
+    await customer.deleteOne();
+
+    res.json({ success: true, message: "Customer account deleted" });
+  } catch (error) {
+    console.error("Delete customer error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 function publicAdminCustomer(user) {
   return {
     _id: user._id,

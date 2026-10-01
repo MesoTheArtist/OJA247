@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { X, ShoppingBag, LifeBuoy, Star, Heart, BadgeCheck, Ban, CheckCircle2, Pencil, Check } from "lucide-react";
+import { X, ShoppingBag, LifeBuoy, Star, Heart, BadgeCheck, Ban, CheckCircle2, Pencil, Check, Trash2 } from "lucide-react";
 import axiosInstance from "../services/api";
 
 const SectionTitle = ({ icon, label, count }) => {
@@ -87,6 +87,27 @@ const CustomerDetailModal = ({ customerId, onClose, onChanged }) => {
     } catch (err) {
       alert(err.response?.data?.message || "Couldn't save those changes.");
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!data) return;
+    const { customer } = data;
+    const ok = window.prompt(
+      `This permanently deletes ${customer.email}'s account. Their orders stay (just unlinked, so the vendor's records are untouched) but this cannot be undone.\n\nType the email to confirm:`
+    );
+    if (ok !== customer.email) {
+      if (ok !== null) alert("Email didn't match — nothing was deleted.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await axiosInstance.delete(`/api/admin/customers/${customer._id}`);
+      onChanged?.();
+      onClose();
+    } catch (err) {
+      alert(err.response?.data?.message || "Couldn't delete this account.");
       setBusy(false);
     }
   };
@@ -231,6 +252,13 @@ const CustomerDetailModal = ({ customerId, onClose, onChanged }) => {
                   }`}
                 >
                   <Ban size={14} /> {data.customer.banned ? "Unban" : "Ban"} customer
+                </button>
+                <button
+                  onClick={deleteAccount}
+                  disabled={busy}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-xl border bg-gray-50 text-gray-500 border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 disabled:opacity-50 transition"
+                >
+                  <Trash2 size={14} /> Delete account
                 </button>
               </div>
             </div>
