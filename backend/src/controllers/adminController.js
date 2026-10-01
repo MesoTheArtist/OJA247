@@ -217,16 +217,18 @@ export const reviewVendor = async (req, res) => {
       return res.status(404).json({ message: "Vendor not found" });
     }
 
-    // Admin approval is what actually grants the "Verified" trust badge on
-    // the storefront — this was never wired up anywhere before, so
-    // approving a vendor had no visible effect on their business record.
-    // Rejecting does NOT un-verify a business that was already verified
-    // from a past approval — only an explicit approval sets this.
+    // Admin approval of a vendor on the full Verified tier is what grants
+    // the "Verified" trust badge on the storefront. Rejecting does NOT
+    // un-verify a business that was already verified from a past approval
+    // — only an approval decision updates this.
     let businessCategory = "";
     if (decision === "approved") {
       const updatedBusiness = await Business.findByIdAndUpdate(
         vendor.businessId,
-        { verified: true },
+        // Only the full Verified tier (NIN + CAC + address proof + selfie)
+        // earns the storefront badge; an approved Basic vendor can sell
+        // but isn't badged until they submit the rest and get approved again.
+        { verified: vendor.verificationTier === "verified" },
         { new: true }
       ).select("category");
       businessCategory = updatedBusiness?.category || "";
