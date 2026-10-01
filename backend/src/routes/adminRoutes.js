@@ -33,6 +33,12 @@ import {
   adminVerifyCustomerEmail,
 } from "../controllers/adminController.js";
 import { getPayoutBatches, markPayoutBatchPaid } from "../controllers/payoutBatchController.js";
+import {
+  getGrowthAnalytics,
+  getSubscriptionBreakdown,
+  getMarketerLeaderboard,
+  getRecentActivity,
+} from "../controllers/analyticsController.js";
 
 const router = express.Router();
 
@@ -42,6 +48,12 @@ router.use(requireAdmin);
 
 // Admin routes
 router.get("/users", getAllUsers);
+
+// Analytics tab (charts, subscription breakdown, leaderboard, activity feed)
+router.get("/analytics/growth", getGrowthAnalytics);
+router.get("/analytics/subscriptions", getSubscriptionBreakdown);
+router.get("/analytics/marketer-leaderboard", getMarketerLeaderboard);
+router.get("/analytics/recent-activity", getRecentActivity);
 
 // Customers — separate from the generic /users list, with the counters
 // (orders, spend, follows, reviews, disputes) an admin needs to manage a
