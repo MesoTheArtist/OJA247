@@ -31,6 +31,15 @@ const VendorSchema = new mongoose.Schema(
 
     // KYC
     nin: { type: String, required: true },
+    // Result of the provider (Dojah) NIN lookup. ninVerified stays false when
+    // the check was skipped or the provider was unavailable, so the next
+    // submission retries it. Only the holder's name is kept, not photo/DOB.
+    ninVerified: { type: Boolean, default: false },
+    ninHolderName: { type: String, default: "" },
+    // Does the NIN holder's name appear in the payout account name? null =
+    // not checked. A mismatch isn't a rejection (business accounts won't
+    // match a person's name) — it's surfaced to the admin reviewer.
+    ninNameMatch: { type: Boolean, default: null },
     cacDocumentUrl: { type: String, default: null },
     addressProofUrl: { type: String, default: null },
     selfieUrl: { type: String, default: null },

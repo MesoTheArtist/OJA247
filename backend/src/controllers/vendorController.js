@@ -3,6 +3,7 @@ import cloudinary from "../config/cloudinaryConfig.js";
 import Vendor from "../models/Vendor.js";
 import Business from "../models/Business.js";
 import { sendPayoutHoldEmail, sendBankDetailsUpdatedEmail } from "../services/emailService.js";
+import { verifyNin, ninNameMatchesAccount } from "../services/ninVerificationService.js";
 
 // Simple in-memory cache — bank list changes rarely, no need to hit
 // Paystack on every page load. Swap for Redis if you're running multiple
@@ -233,6 +234,31 @@ export const onboardVendor = async (req, res) => {
 
     const existingVendor = await Vendor.findOne({ businessId: business_id });
 
+    // NIN existence check via Dojah. Done before any uploads or Paystack
+    // calls so a bad NIN costs nothing. Only runs when the NIN is new or
+    // hasn't been verified yet — resubmissions that just add a document
+    // don't pay for another lookup.
+    let ninVerified = existingVendor?.ninVerified === true && existingVendor.nin === nin;
+    let ninHolderName = ninVerified ? existingVendor.ninHolderName : "";
+    let ninNameMatch = ninVerified ? existingVendor.ninNameMatch : null;
+
+    if (!ninVerified) {
+      const ninResult = await verifyNin(nin);
+      if (ninResult.status === "not_found") {
+        return res.status(400).json({
+          status: false,
+          message: "We couldn't find this NIN. Please check the number and try again.",
+        });
+      }
+      if (ninResult.status === "verified") {
+        ninVerified = true;
+        ninHolderName = [ninResult.firstName, ninResult.middleName, ninResult.lastName].filter(Boolean).join(" ");
+        ninNameMatch = ninNameMatchesAccount(ninResult, account_name);
+      }
+      // "skipped" / "unavailable": carry on as before; ninVerified stays
+      // false so it's retried next time and the admin sees "not checked".
+    }
+
     const cacFile = req.files?.cac_document?.[0];
     const addressProofFile = req.files?.address_proof?.[0];
     const selfieFile = req.files?.selfie?.[0];
@@ -313,6 +339,9 @@ export const onboardVendor = async (req, res) => {
         accountName: account_name,
         bankNameMatch,
         nin,
+        ninVerified,
+        ninHolderName,
+        ninNameMatch,
         cacDocumentUrl,
         addressProofUrl,
         selfieUrl,
