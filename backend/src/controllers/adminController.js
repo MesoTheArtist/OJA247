@@ -14,7 +14,15 @@ import { settleOrderAfterResolution } from "../services/disputeOrderStatus.js";
 import Dispute, { FLAG_WINDOW_DAYS, FLAG_MIN_ORDERS, FLAG_DISPUTE_RATE_THRESHOLD } from "../models/Dispute.js";
 import Follow from "../models/Follow.js";
 import Review from "../models/Review.js";
-import { sendVerificationReviewedEmail, sendAccountBanStatusEmail } from "../services/emailService.js";
+import {
+  sendVerificationReviewedEmail,
+  sendAccountBanStatusEmail,
+  sendAccountDeletedEmail,
+  sendCustomerDetailsUpdatedEmail,
+  sendPointsWithdrawalPaidEmail,
+  sendFeaturedEmail,
+  sendDisputeAdminDecisionEmail,
+} from "../services/emailService.js";
 import { linkGuestOrders } from "../services/orderLinking.js";
 
 // Get all users
@@ -86,6 +94,8 @@ export const toggleFeatured = async (req, res) => {
     const { id } = req.params;
     const { featured } = req.body;
 
+    const wasFeatured = (await Business.findById(id).select("featured"))?.featured === true;
+
     const business = await Business.findByIdAndUpdate(
       id,
       { featured },
@@ -94,6 +104,15 @@ export const toggleFeatured = async (req, res) => {
 
     if (!business) {
       return res.status(404).json({ message: "Business not found" });
+    }
+
+    if (business.featured === true && !wasFeatured) {
+      User.findOne({ businessId: id })
+        .select("email")
+        .then((owner) =>
+          owner?.email ? sendFeaturedEmail({ to: owner.email, businessName: business.name }) : null
+        )
+        .catch((err) => console.error("Featured email failed:", err));
     }
 
     res.json(business);
@@ -117,8 +136,14 @@ export const deleteBusiness = async (req, res) => {
       return res.status(404).json({ message: "Business not found" });
     }
 
-    // Delete the user account
-    await User.findOneAndDelete({ businessId: id });
+    // Delete the user account (returns the deleted doc, so we still have
+    // the owner's email to tell them).
+    const deletedOwner = await User.findOneAndDelete({ businessId: id });
+    if (deletedOwner?.email) {
+      sendAccountDeletedEmail({ to: deletedOwner.email, name: business.name, accountType: "business" }).catch((err) =>
+        console.error("Account-deleted email failed:", err)
+      );
+    }
 
     res.json({ message: "Business and related data deleted successfully" });
   } catch (error) {
@@ -477,6 +502,10 @@ export const deleteMarketer = async (req, res) => {
     const marketer = await Marketer.findByIdAndDelete(id);
     if (!marketer) return res.status(404).json({ message: "Marketer not found" });
 
+    sendAccountDeletedEmail({ to: marketer.email, name: marketer.name, accountType: "marketer" }).catch((err) =>
+      console.error("Account-deleted email failed:", err)
+    );
+
     res.json({ message: "Marketer and their payout records deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -577,6 +606,20 @@ export const markPointsWithdrawalPaid = async (req, res) => {
 
     if (!entry) {
       return res.status(404).json({ message: "Pending points withdrawal not found." });
+    }
+
+    // 1 point = ₦1, and withdrawals are stored as negative points.
+    const [owner, withdrawnBusiness] = await Promise.all([
+      User.findOne({ businessId: entry.businessId }).select("email"),
+      Business.findById(entry.businessId).select("name"),
+    ]);
+    if (owner?.email) {
+      sendPointsWithdrawalPaidEmail({
+        to: owner.email,
+        businessName: withdrawnBusiness?.name || "your store",
+        amount: Math.abs(entry.points),
+        transferReference: entry.transferReference,
+      }).catch((err) => console.error("Points-withdrawal-paid email failed:", err));
     }
 
     res.json({ success: true, entry });
@@ -681,6 +724,35 @@ export const adminResolveDispute = async (req, res) => {
     await dispute.save();
 
     await settleOrderAfterResolution(dispute.orderId, refunded);
+
+    // Both sides hear about the decision — until now only the vendor
+    // self-resolve path sent anything.
+    sendDisputeAdminDecisionEmail({
+      to: dispute.customer.email,
+      name: dispute.customer.fullName,
+      businessName: dispute.businessName,
+      orderReference: dispute.orderReference,
+      outcome,
+      note: note || "",
+      audience: "customer",
+    }).catch((err) => console.error("Dispute-decision customer email failed:", err));
+
+    User.findOne({ businessId: dispute.businessId })
+      .select("email")
+      .then((owner) =>
+        owner?.email
+          ? sendDisputeAdminDecisionEmail({
+              to: owner.email,
+              name: dispute.businessName,
+              businessName: dispute.businessName,
+              orderReference: dispute.orderReference,
+              outcome,
+              note: note || "",
+              audience: "vendor",
+            })
+          : null
+      )
+      .catch((err) => console.error("Dispute-decision vendor email failed:", err));
 
     res.json({ dispute });
   } catch (error) {
@@ -810,9 +882,22 @@ export const updateCustomerAdmin = async (req, res) => {
     const customer = await User.findOne({ _id: id, role: "customer" });
     if (!customer) return res.status(404).json({ message: "Customer not found" });
 
-    if (fullName !== undefined) customer.fullName = String(fullName).trim();
-    if (phone !== undefined) customer.phone = String(phone).trim();
+    const changes = [];
+    if (fullName !== undefined && String(fullName).trim() !== customer.fullName) {
+      customer.fullName = String(fullName).trim();
+      changes.push("name");
+    }
+    if (phone !== undefined && String(phone).trim() !== customer.phone) {
+      customer.phone = String(phone).trim();
+      changes.push("phone number");
+    }
     await customer.save();
+
+    if (changes.length > 0) {
+      sendCustomerDetailsUpdatedEmail({ to: customer.email, name: customer.fullName, changes }).catch((err) =>
+        console.error("Customer-details-updated email failed:", err)
+      );
+    }
 
     res.json({ success: true, customer: publicAdminCustomer(customer) });
   } catch (error) {
@@ -868,11 +953,18 @@ export const deleteCustomerAdmin = async (req, res) => {
     const customer = await User.findOne({ _id: id, role: "customer" });
     if (!customer) return res.status(404).json({ message: "Customer not found" });
 
+    // Grab what the email needs before the account is gone.
+    const { email: deletedEmail, fullName: deletedName } = customer;
+
     await Promise.all([
       Order.updateMany({ userId: id }, { userId: null }),
       Follow.deleteMany({ customerId: id }),
     ]);
     await customer.deleteOne();
+
+    sendAccountDeletedEmail({ to: deletedEmail, name: deletedName, accountType: "customer" }).catch((err) =>
+      console.error("Account-deleted email failed:", err)
+    );
 
     res.json({ success: true, message: "Customer account deleted" });
   } catch (error) {

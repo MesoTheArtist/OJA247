@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import Marketer from "../models/Marketer.js";
 import { generateUniqueMarketerCode } from "../services/referralService.js";
-import { sendMarketerWelcomeEmail, sendPasswordResetEmail } from "../services/emailService.js";
+import { sendMarketerWelcomeEmail, sendPasswordResetEmail, sendPasswordChangedEmail } from "../services/emailService.js";
 
 const generateToken = (id) => {
   return jwt.sign({ id, type: "marketer" }, process.env.JWT_SECRET, {
@@ -249,6 +249,10 @@ export const resetMarketerPassword = async (req, res) => {
     marketer.resetPasswordTokenHash = null;
     marketer.resetPasswordExpires = null;
     await marketer.save();
+
+    sendPasswordChangedEmail({ to: marketer.email, name: marketer.name }).catch((err) =>
+      console.error("Password-changed email failed:", err)
+    );
 
     res.json({ success: true, message: "Password reset successfully" });
   } catch (error) {

@@ -44,6 +44,10 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    // Set when the person clicks "unsubscribe" in an admin announcement.
+    // Only stops announcements — order, security and account emails still
+    // go out. See controllers/campaignController.js.
+    marketingOptOut: { type: Boolean, default: false },
     // Customer email verification. True once the person proves they own the
     // address: Google sign-in (Google verified it), clicking the confirmation
     // email, or completing a password reset. Guest orders are only linked to

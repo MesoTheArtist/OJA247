@@ -3,6 +3,7 @@ import Review from "../models/Review.js";
 import User from "../models/User.js";
 import { REVIEWABLE_ORDER_STATUSES } from "../services/reviewEligibility.js";
 import { recomputeBusinessRating } from "../services/businessRating.js";
+import { sendNewReviewVendorEmail, sendReviewReplyCustomerEmail } from "../services/emailService.js";
 
 async function getOwnerEmail(businessId) {
   const owner = await User.findOne({ businessId }).select("email");
@@ -66,6 +67,20 @@ export const createReview = async (req, res) => {
 
     await recomputeBusinessRating(businessId);
 
+    getOwnerEmail(businessId)
+      .then((to) =>
+        to
+          ? sendNewReviewVendorEmail({
+              to,
+              businessName: vendorOnOrder.businessName || "your store",
+              customerName: review.customerName,
+              rating: numericRating,
+              comment: review.comment,
+            })
+          : null
+      )
+      .catch((err) => console.error("New-review vendor email failed:", err));
+
     res.status(201).json({ review });
   } catch (error) {
     console.error("Create review error:", error);
@@ -121,8 +136,28 @@ export const replyToReview = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to reply to this review" });
     }
 
+    // Only the FIRST reply notifies the customer — editing a reply later
+    // shouldn't re-email them every time.
+    const isFirstReply = !review.vendorReply?.note;
+
     review.vendorReply = { note: String(note).trim().slice(0, 2000), respondedAt: new Date() };
     await review.save();
+
+    if (isFirstReply) {
+      User.findById(review.customerId)
+        .select("email fullName")
+        .then((customer) =>
+          customer?.email
+            ? sendReviewReplyCustomerEmail({
+                to: customer.email,
+                customerName: customer.fullName || review.customerName,
+                businessName: review.businessName,
+                note: review.vendorReply.note,
+              })
+            : null
+        )
+        .catch((err) => console.error("Review-reply customer email failed:", err));
+    }
 
     res.json({ review });
   } catch (error) {

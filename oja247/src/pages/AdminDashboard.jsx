@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
 import CustomerAdminTab from "../components/CustomerAdminTab.jsx";
+import CampaignAdminTab from "../components/CampaignAdminTab.jsx";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
 import {
   Users,
@@ -35,6 +36,7 @@ import {
   ArrowLeft,
   Wallet,
   UserCircle,
+  Mail,
 } from "lucide-react";
 import {
   LineChart,
@@ -57,6 +59,7 @@ const NAV_ITEMS = [
   { id: "users", label: "Users", icon: Users },
   { id: "customers", label: "Customers", icon: UserCircle },
   { id: "vendors", label: "Vendor Verification", icon: ShieldCheck },
+  { id: "emails", label: "Emails", icon: Mail },
   { id: "marketers", label: "Marketers", icon: UserCog },
   { id: "payout-batches", label: "Payout Batches", icon: Wallet },
   { id: "transactions", label: "Transactions", icon: Receipt },
@@ -1295,6 +1298,8 @@ const AdminDashboard = () => {
 
           {activeTab === "customers" && <CustomerAdminTab showToast={showToast} />}
 
+          {activeTab === "emails" && <CampaignAdminTab showToast={showToast} />}
+
           {activeTab === "vendors" && (
             <div className="bg-white border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
               <div className="p-6 border-b border-gray-200">
@@ -1352,6 +1357,17 @@ const AdminDashboard = () => {
                                   )}
                                 </span>
                               ))}
+                              <span
+                                className={`mt-1 text-xs font-medium ${
+                                  v.ninVerified ? (v.ninNameMatch === false ? "text-amber-700" : "text-green-700") : "text-gray-400"
+                                }`}
+                              >
+                                {v.ninVerified
+                                  ? v.ninNameMatch === false
+                                    ? `NIN verified (${v.ninHolderName}) — name differs from payout account`
+                                    : `NIN verified (${v.ninHolderName})`
+                                  : "NIN not checked"}
+                              </span>
                             </div>
                           </td>
                           <td data-label="Status" data-stack="true" className="p-4">

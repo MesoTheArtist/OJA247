@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import User from "../models/User.js";
 import Order from "../models/Order.js";
-import { sendPasswordResetEmail, sendCustomerVerificationEmail } from "../services/emailService.js";
+import { sendPasswordResetEmail, sendCustomerVerificationEmail, sendPasswordChangedEmail } from "../services/emailService.js";
 import { linkGuestOrders } from "../services/orderLinking.js";
 
 // Deliberately a separate controller from authController.js rather than
@@ -301,6 +301,10 @@ export const customerResetPassword = async (req, res) => {
     markEmailVerified(user);
     await user.save();
     await linkGuestOrders(user);
+
+    sendPasswordChangedEmail({ to: user.email, name: user.fullName }).catch((err) =>
+      console.error("Password-changed email failed:", err)
+    );
 
     res.json({ success: true, message: "Password reset successfully" });
   } catch (error) {

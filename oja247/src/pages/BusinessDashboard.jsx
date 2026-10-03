@@ -11,7 +11,7 @@ import VendorReviewsTab from "../components/VendorReviewsTab.jsx";
 import VendorDisputesTab from "../components/VendorDisputesTab.jsx";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { LogOut, ShoppingBag, Clock, CheckCircle2, XCircle, Copy, Check, Share2 } from "lucide-react";
+import { LogOut, ShoppingBag, Clock, CheckCircle2, XCircle, Copy, Check, Share2, Truck } from "lucide-react";
 import Loader from "../components/Loader";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
 
@@ -43,6 +43,7 @@ const BusinessDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState("");
+  const [shippingRef, setShippingRef] = useState(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [ordersFetched, setOrdersFetched] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -98,6 +99,27 @@ const BusinessDashboard = () => {
       console.error("Error fetching business:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // This business's own slice of an order (an order can span several vendors,
+  // and each one ships separately). Orders from before delivery tracking
+  // existed have no value, which counts as "processing".
+  const vendorPartOf = (order) => order.vendors?.find((v) => v.businessId === businessId);
+
+  const markShipped = async (order) => {
+    const ok = window.confirm(
+      `Mark order ${order.reference} as sent out?\n\n${order.customer?.fullName || "The customer"} will be emailed so they can confirm when it arrives.`
+    );
+    if (!ok) return;
+    setShippingRef(order.reference);
+    try {
+      const res = await axiosInstance.patch(`/api/orders/${order.reference}/ship`, { businessId });
+      setOrders((prev) => prev.map((o) => (o._id === res.data.order._id ? res.data.order : o)));
+    } catch (error) {
+      window.alert(error.response?.data?.message || "Couldn't update the order. Please try again.");
+    } finally {
+      setShippingRef(null);
     }
   };
 
@@ -275,7 +297,7 @@ const BusinessDashboard = () => {
     !grandfathered;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-yellow-50">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-yellow-50" style={{ overflowX: "clip" }}>
       <AccountAlertsPopup
         businessId={businessId}
         needsVerification={needsVerification}
@@ -296,9 +318,9 @@ const BusinessDashboard = () => {
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-r from-green-900/60 via-emerald-900/30 to-yellow-500/20" />
-        <div className="relative max-w-7xl mx-auto px-4 py-6 h-full flex items-end justify-between gap-4">
-          <div className="flex items-center gap-4 pb-6">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-4 border-white bg-white shadow-lg overflow-hidden">
+        <div className="relative max-w-7xl mx-auto px-4 py-6 h-full flex items-end justify-between gap-3">
+          <div className="flex items-center gap-3 sm:gap-4 pb-4 sm:pb-6 min-w-0 flex-1">
+            <div className="shrink-0 w-16 h-16 sm:w-24 sm:h-24 rounded-2xl border-4 border-white bg-white shadow-lg overflow-hidden">
               {business.logo ? (
                 <img src={business.logo} alt={business.name} className="w-full h-full object-cover" />
               ) : (
@@ -307,26 +329,27 @@ const BusinessDashboard = () => {
                 </div>
               )}
             </div>
-            <div className="text-white">
+            <div className="text-white min-w-0">
               <p className="text-xs uppercase tracking-[0.2em] text-green-100">Vendor dashboard</p>
-              <h1 className="text-3xl sm:text-4xl font-black mt-1">{business.name}</h1>
-              <p className="text-sm sm:text-base text-green-50 mt-1">{business.category} • {business.location}</p>
+              <h1 className="text-2xl sm:text-4xl font-black mt-1 break-words line-clamp-2">{business.name}</h1>
+              <p className="text-sm sm:text-base text-green-50 mt-1 truncate">{business.category} • {business.location}</p>
             </div>
           </div>
 
           <button
             onClick={handleLogout}
-            className="mb-6 flex items-center gap-2 px-4 py-2 bg-white/15 border border-white/30 text-white rounded-xl hover:bg-white/20 transition backdrop-blur-sm"
+            aria-label="Logout"
+            className="mb-4 sm:mb-6 shrink-0 flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/15 border border-white/30 text-white rounded-xl hover:bg-white/20 transition backdrop-blur-sm"
           >
             <LogOut size={18} />
-            Logout
+            <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       </div>
 
       <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex gap-3 sm:gap-6 overflow-x-auto">
+          <div className="flex gap-3 sm:gap-6 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
               onClick={() => setActiveTab("products")}
               className={`py-4 px-2 border-b-2 font-semibold transition-colors whitespace-nowrap ${
@@ -429,7 +452,7 @@ const BusinessDashboard = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
         {activeTab === "products" && <ProductList businessId={businessId} />}
 
         {activeTab === "subscription" && (
@@ -452,36 +475,36 @@ const BusinessDashboard = () => {
         {activeTab === "orders" && (
           <div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white rounded-2xl border border-green-100 shadow-sm p-5">
+              <div className="bg-white rounded-2xl border border-green-100 shadow-sm p-4 sm:p-5 min-w-0">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-gray-500">Total Orders</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">{orderStats.total}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{orderStats.total}</p>
                   </div>
                   <ShoppingBag className="text-green-600" size={26} />
                 </div>
               </div>
-              <div className="bg-white rounded-2xl border border-yellow-100 shadow-sm p-5">
+              <div className="bg-white rounded-2xl border border-yellow-100 shadow-sm p-4 sm:p-5 min-w-0">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-gray-500">Pending</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">{orderStats.pending}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{orderStats.pending}</p>
                   </div>
                   <Clock className="text-yellow-500" size={26} />
                 </div>
               </div>
-              <div className="bg-white rounded-2xl border border-green-100 shadow-sm p-5">
+              <div className="bg-white rounded-2xl border border-green-100 shadow-sm p-4 sm:p-5 min-w-0">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-gray-500">Paid</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">{orderStats.paid}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{orderStats.paid}</p>
                   </div>
                   <CheckCircle2 className="text-green-600" size={26} />
                 </div>
               </div>
-              <div className="bg-white rounded-2xl border border-green-100 shadow-sm p-5">
+              <div className="bg-white rounded-2xl border border-green-100 shadow-sm p-4 sm:p-5 min-w-0">
                 <p className="text-xs font-medium text-gray-500">Revenue (Paid)</p>
-                <p className="text-2xl font-bold text-green-700 mt-1">
+                <p className="text-xl sm:text-2xl font-bold text-green-700 mt-1 break-words">
                   ₦{orderStats.revenue.toLocaleString()}
                 </p>
               </div>
@@ -527,7 +550,7 @@ const BusinessDashboard = () => {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full admin-table">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left p-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reference</th>
@@ -535,20 +558,21 @@ const BusinessDashboard = () => {
                         <th className="text-left p-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Items</th>
                         <th className="text-left p-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
                         <th className="text-left p-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                        <th className="text-left p-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Delivery</th>
                         <th className="text-left p-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredOrders.map((order) => (
                         <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="p-4 text-sm font-medium text-gray-700">{order.reference}</td>
-                          <td className="p-4">
+                          <td data-label="Reference" className="p-4 text-sm font-medium text-gray-700 break-all">{order.reference}</td>
+                          <td data-label="Customer" data-stack="true" className="p-4">
                             <p className="font-medium text-gray-900">{order.customer?.fullName}</p>
                             <p className="text-sm text-gray-500">{order.customer?.phone}</p>
                           </td>
-                          <td className="p-4 text-sm text-gray-600">{order.items?.length || 0}</td>
-                          <td className="p-4 font-semibold text-gray-900">₦{Number(order.total || 0).toLocaleString()}</td>
-                          <td className="p-4">
+                          <td data-label="Items" className="p-4 text-sm text-gray-600">{order.items?.length || 0}</td>
+                          <td data-label="Total" className="p-4 font-semibold text-gray-900">₦{Number(order.total || 0).toLocaleString()}</td>
+                          <td data-label="Status" className="p-4">
                             <span
                               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
                                 order.paymentStatus === "paid"
@@ -564,7 +588,46 @@ const BusinessDashboard = () => {
                               {order.paymentStatus}
                             </span>
                           </td>
-                          <td className="p-4 text-sm text-gray-500">
+                          <td data-label="Delivery" data-stack="true" className="p-4">
+                            {(() => {
+                              const mine = vendorPartOf(order);
+                              const delivery = mine?.fulfillmentStatus || "processing";
+                              const payable = order.status === "paid" || order.status === "disputed";
+                              if (!payable) return <span className="text-sm text-gray-400">—</span>;
+                              if (delivery === "received") {
+                                return (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
+                                    <CheckCircle2 size={12} />
+                                    Received{mine?.autoReceived ? " (auto)" : ""}
+                                  </span>
+                                );
+                              }
+                              if (delivery === "shipped") {
+                                return (
+                                  <div>
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+                                      <Truck size={12} />
+                                      Sent out
+                                    </span>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                      Waiting for customer to confirm
+                                    </p>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <button
+                                  onClick={() => markShipped(order)}
+                                  disabled={shippingRef === order.reference}
+                                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-xs font-semibold transition"
+                                >
+                                  <Truck size={14} />
+                                  {shippingRef === order.reference ? "Saving…" : "Mark as sent out"}
+                                </button>
+                              );
+                            })()}
+                          </td>
+                          <td data-label="Date" className="p-4 text-sm text-gray-500">
                             {new Date(order.createdAt).toLocaleString()}
                           </td>
                         </tr>
@@ -578,9 +641,9 @@ const BusinessDashboard = () => {
         )}
 
         {activeTab === "settings" && (
-          <div className="bg-white rounded-2xl shadow-md p-6 sm:p-8 border border-green-100">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Business Information</h2>
+          <div className="bg-white rounded-2xl shadow-md p-4 sm:p-8 border border-green-100">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Business Information</h2>
               <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200 text-sm font-semibold">
                 Live profile
               </span>
@@ -599,7 +662,7 @@ const BusinessDashboard = () => {
                 <p className="text-sm font-semibold text-gray-700">Your store link</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
-                <div className="flex-1 px-3 py-2 bg-white rounded-xl border border-gray-200 text-sm text-gray-700 truncate">
+                <div className="flex-1 min-w-0 px-3 py-2 bg-white rounded-xl border border-gray-200 text-sm text-gray-700 truncate">
                   {storeLink}
                 </div>
                 <button
@@ -624,11 +687,11 @@ const BusinessDashboard = () => {
                   <div className="space-y-5">
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Business Name</label>
-                      <p className="mt-1 text-lg font-semibold text-gray-900">{business.name}</p>
+                      <p className="mt-1 text-lg font-semibold text-gray-900 break-words">{business.name}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Description</label>
-                      <p className="mt-1 text-gray-700">{business.description || "No description added yet."}</p>
+                      <p className="mt-1 text-gray-700 break-words">{business.description || "No description added yet."}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Category</label>
@@ -639,11 +702,11 @@ const BusinessDashboard = () => {
                   <div className="space-y-5">
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Location</label>
-                      <p className="mt-1 text-gray-900">{business.location}</p>
+                      <p className="mt-1 text-gray-900 break-words">{business.location}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Contact</label>
-                      <p className="mt-1 text-gray-900">{business.contact}</p>
+                      <p className="mt-1 text-gray-900 break-words">{business.contact}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Delivery Fee (within your state)</label>
@@ -675,7 +738,7 @@ const BusinessDashboard = () => {
                   <button
                     type="button"
                     onClick={() => setIsEditing(true)}
-                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-yellow-500 text-white font-semibold rounded-xl hover:opacity-90 transition shadow-md"
+                    className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-green-600 to-yellow-500 text-white font-semibold rounded-xl hover:opacity-90 transition shadow-md"
                   >
                     Edit Business Info
                   </button>
@@ -753,8 +816,8 @@ const BusinessDashboard = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Store link name
                   </label>
-                  <div className="flex items-center rounded-xl border border-gray-300 focus-within:ring-2 focus-within:ring-green-500 overflow-hidden">
-                    <span className="pl-3 pr-1 text-sm text-gray-400 whitespace-nowrap">
+                  <div className="flex flex-col sm:flex-row sm:items-center rounded-xl border border-gray-300 focus-within:ring-2 focus-within:ring-green-500 overflow-hidden">
+                    <span className="px-3 pt-2 sm:pt-0 sm:pr-1 text-sm text-gray-400 break-all sm:whitespace-nowrap">
                       {window.location.origin}/business/
                     </span>
                     <input
@@ -763,7 +826,7 @@ const BusinessDashboard = () => {
                       value={editForm.slug}
                       onChange={handleEditFieldChange}
                       placeholder="your-store-name"
-                      className="flex-1 min-w-0 px-1 py-2 focus:outline-none"
+                      className="w-full sm:flex-1 min-w-0 px-3 sm:px-1 py-2 focus:outline-none"
                     />
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
@@ -835,14 +898,14 @@ const BusinessDashboard = () => {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-2">
+                <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
                   <button
                     type="button"
                     onClick={() => {
                       setIsEditing(false);
                       setFormError("");
                     }}
-                    className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50"
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50"
                   >
                     Cancel
                   </button>
@@ -850,7 +913,7 @@ const BusinessDashboard = () => {
                     type="button"
                     onClick={saveBusinessChanges}
                     disabled={saving}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-yellow-500 text-white font-semibold disabled:opacity-70 hover:opacity-90 transition"
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-yellow-500 text-white font-semibold disabled:opacity-70 hover:opacity-90 transition"
                   >
                     {saving ? "Saving..." : "Save Changes"}
                   </button>
@@ -915,7 +978,7 @@ const BusinessDashboard = () => {
               </div>
             )}
 
-            <VendorOnboardingForm onSubmitted={() => fetchVendorStatus()} />
+            <VendorOnboardingForm existing={vendorStatus} onSubmitted={() => fetchVendorStatus()} />
           </div>
         )}
       </div>

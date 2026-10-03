@@ -43,6 +43,8 @@ const MarketerSchema = new mongoose.Schema(
       default: "active",
     },
     banned: { type: Boolean, default: false },
+    // See the same field on User: opts out of admin announcements only.
+    marketingOptOut: { type: Boolean, default: false },
 
     // Same pattern as User.js — only the SHA-256 hash is ever stored.
     resetPasswordTokenHash: { type: String, default: null },

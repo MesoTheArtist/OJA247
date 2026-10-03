@@ -3,6 +3,7 @@ import { runWeeklyPayoutBatch } from "../controllers/payoutBatchController.js";
 import { runSubscriptionExpiryCheck } from "../controllers/subscriptionExpiryCronController.js";
 import { runDisputeEscalationCheck } from "../controllers/disputeCronController.js";
 import { runVerificationReminderCheck } from "../controllers/verificationReminderCronController.js";
+import { runAutoReceiveCheck } from "../controllers/receiptCronController.js";
 
 const router = express.Router();
 
@@ -12,5 +13,6 @@ router.get("/payout-batch", runWeeklyPayoutBatch);
 router.get("/subscription-expiry", runSubscriptionExpiryCheck);
 router.get("/dispute-escalation", runDisputeEscalationCheck);
 router.get("/verification-reminder", runVerificationReminderCheck);
+router.get("/auto-receive", runAutoReceiveCheck);
 
 export default router;

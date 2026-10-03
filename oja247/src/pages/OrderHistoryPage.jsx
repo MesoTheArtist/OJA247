@@ -41,6 +41,7 @@ const OrderHistoryPage = () => {
   const [error, setError] = useState("");
   const [disputeOrder, setDisputeOrder] = useState(null);
   const [reviewOrder, setReviewOrder] = useState(null);
+  const [confirmingKey, setConfirmingKey] = useState(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -69,6 +70,21 @@ const OrderHistoryPage = () => {
   const handleDisputeClose = (filed) => {
     setDisputeOrder(null);
     if (filed) fetchOrders();
+  };
+
+  // The customer says a vendor's part of the order has arrived. Refetches
+  // rather than patching locally, same reasoning as the dispute/review flows.
+  const confirmReceived = async (order, vendor) => {
+    const key = `${order.reference}:${vendor.businessId}`;
+    setConfirmingKey(key);
+    try {
+      await axiosInstance.post(`/api/orders/${order.reference}/receive`, { businessId: vendor.businessId });
+      await fetchOrders();
+    } catch (err) {
+      window.alert(err.response?.data?.message || "Couldn't confirm delivery. Please try again.");
+    } finally {
+      setConfirmingKey(null);
+    }
   };
 
   const handleReviewClose = (posted) => {
@@ -165,14 +181,53 @@ const OrderHistoryPage = () => {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between gap-4">
+                  {["paid", "disputed"].includes(order.status) &&
+                    (order.vendors || [])
+                      .filter((v) => v.fulfillmentStatus === "shipped" || v.fulfillmentStatus === "received")
+                      .map((v) => {
+                        const key = `${order.reference}:${v.businessId}`;
+                        const received = v.fulfillmentStatus === "received";
+                        return (
+                          <div
+                            key={key}
+                            className={`mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border px-4 py-3 ${
+                              received ? "border-green-100 bg-green-50/60" : "border-blue-100 bg-blue-50/60"
+                            }`}
+                          >
+                            <p className="text-sm text-gray-700 min-w-0 break-words">
+                              {received ? (
+                                <>
+                                  <span className="font-semibold">{v.businessName}</span> — delivered
+                                  {v.autoReceived ? " (marked automatically)" : ""}
+                                </>
+                              ) : (
+                                <>
+                                  <span className="font-semibold">{v.businessName}</span> has sent out your items.
+                                  Got them?
+                                </>
+                              )}
+                            </p>
+                            {!received && (
+                              <button
+                                onClick={() => confirmReceived(order, v)}
+                                disabled={confirmingKey === key}
+                                className="w-full sm:w-auto shrink-0 px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-sm font-semibold transition"
+                              >
+                                {confirmingKey === key ? "Confirming…" : "I've received it"}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                     <button
                       onClick={() => navigate(`/payment-status?reference=${order.reference}`)}
                       className="flex items-center gap-1 text-sm font-semibold text-green-600 hover:text-green-700 transition"
                     >
                       View details <ChevronRight size={16} />
                     </button>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                       {REVIEWABLE_ORDER_STATUSES.includes(order.status) &&
                         getReviewableVendors(order).length > 0 && (
                           <button

@@ -43,7 +43,7 @@ const formatDate = (d) =>
 // mail server should never take down a checkout or registration flow, so
 // every call site is deliberately "fire and forget" (no await required by
 // the caller, though awaiting is fine too).
-async function sendEmail({ to, subject, html, text }) {
+async function sendEmail({ to, subject, html, text, headers }) {
   const t = getTransporter();
   if (!t || !to) return { sent: false };
 
@@ -54,6 +54,7 @@ async function sendEmail({ to, subject, html, text }) {
       subject,
       html,
       text: text || html.replace(/<[^>]+>/g, " "),
+      ...(headers ? { headers } : {}),
     });
     return { sent: true };
   } catch (error) {
@@ -905,6 +906,272 @@ export async function sendNewProductFollowerEmail({
   });
 }
 
+// --- Added: account actions, order delivery, reviews, broadcasts -----------
+
+// User-supplied text (business names, review comments, admin broadcast copy)
+// goes through this before being dropped into HTML.
+function esc(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+const h1 = (text) => `<h1 style="margin:0 0 4px; font-size:20px; color:#111827;">${text}</h1>`;
+const p = (text) => `<p style="color:#4b5563; font-size:14px; line-height:1.6;">${text}</p>`;
+const small = (text) => `<p style="color:#6b7280; font-size:13px; line-height:1.6;">${text}</p>`;
+
+// Admin deleted an account (customer, business owner or marketer).
+export async function sendAccountDeletedEmail({ to, name, accountType }) {
+  const detail =
+    accountType === "business"
+      ? "Your store and its products have been removed from OJA247."
+      : accountType === "marketer"
+      ? "Your marketer account and its payout records have been removed."
+      : "Your customer account has been removed. Orders you've already placed stay on record with the stores you bought from.";
+  return sendEmail({
+    to,
+    subject: "Your OJA247 account has been deleted",
+    html: layout(
+      `${h1("Your account has been deleted")}
+       ${p(`Hi ${esc(name) || "there"}, an OJA247 administrator has deleted your account. ${detail}`)}
+       ${small("If you think this was a mistake, reply to this email or write to support and we'll look into it.")}`,
+      { preheader: "Your OJA247 account has been deleted" }
+    ),
+  });
+}
+
+// Admin edited a customer's profile details.
+export async function sendCustomerDetailsUpdatedEmail({ to, name, changes }) {
+  const list = (changes || []).map((c) => esc(c)).join(" and ");
+  return sendEmail({
+    to,
+    subject: "Your OJA247 account details were updated",
+    html: layout(
+      `${h1("Account details updated")}
+       ${p(`Hi ${esc(name) || "there"}, an OJA247 administrator updated your ${list}.`)}
+       ${small("If you didn't expect this change, reply to this email and we'll check it with you.")}
+       ${button("View my account", `${SITE_URL}/orders`)}`,
+      { preheader: "An admin updated your account details" }
+    ),
+  });
+}
+
+// A business's points-to-cash withdrawal was marked paid by an admin.
+export async function sendPointsWithdrawalPaidEmail({ to, businessName, amount, transferReference }) {
+  return sendEmail({
+    to,
+    subject: `Your ${NAIRA(amount)} points withdrawal has been paid`,
+    html: layout(
+      `${h1("Your withdrawal has been paid 💸")}
+       ${p(`Hi ${esc(businessName)}, we've sent <strong>${NAIRA(amount)}</strong> from your referral points to your payout account.`)}
+       ${transferReference ? small(`Transfer reference: <strong>${esc(transferReference)}</strong>`) : ""}
+       ${small("Transfers can take a little while to show in your bank app. If it hasn't arrived after one working day, reply to this email.")}
+       ${button("Open my dashboard", `${SITE_URL}/dashboard`)}`,
+      { preheader: `${NAIRA(amount)} is on its way to your account` }
+    ),
+  });
+}
+
+// Sent after a password reset completes. If the owner didn't do it, this is
+// the only warning they'd ever get.
+export async function sendPasswordChangedEmail({ to, name }) {
+  return sendEmail({
+    to,
+    subject: "Your OJA247 password was changed",
+    html: layout(
+      `${h1("Your password was changed")}
+       ${p(`Hi ${esc(name) || "there"}, the password on your OJA247 account was just changed.`)}
+       ${p("If that was you, there's nothing more to do.")}
+       ${small("If it wasn't you, reset your password straight away and write to support@oja247.store so we can secure your account.")}`,
+      { preheader: "Your OJA247 password was changed" }
+    ),
+  });
+}
+
+// Vendor: a customer left a review.
+export async function sendNewReviewVendorEmail({ to, businessName, customerName, rating, comment }) {
+  const stars = "★".repeat(rating) + "☆".repeat(Math.max(0, 5 - rating));
+  return sendEmail({
+    to,
+    subject: `New ${rating}-star review for ${businessName}`,
+    html: layout(
+      `${h1("You have a new review ⭐")}
+       ${p(`Hi ${esc(businessName)}, ${esc(customerName) || "a customer"} left you a review.`)}
+       <p style="font-size:20px; color:#f59e0b; margin:8px 0;">${stars}</p>
+       ${comment ? `<blockquote style="margin:12px 0; padding:10px 14px; border-left:3px solid #d1fae5; color:#374151; font-size:14px; line-height:1.6;">${esc(comment)}</blockquote>` : ""}
+       ${small("You can post a public reply from the Reviews tab of your dashboard.")}
+       ${button("Reply to this review", `${SITE_URL}/dashboard`)}`,
+      { preheader: `${rating} stars from ${customerName || "a customer"}` }
+    ),
+  });
+}
+
+// Customer: the vendor replied to their review.
+export async function sendReviewReplyCustomerEmail({ to, customerName, businessName, note }) {
+  return sendEmail({
+    to,
+    subject: `${businessName} replied to your review`,
+    html: layout(
+      `${h1("The store replied to your review")}
+       ${p(`Hi ${esc(customerName) || "there"}, <strong>${esc(businessName)}</strong> responded to the review you left:`)}
+       <blockquote style="margin:12px 0; padding:10px 14px; border-left:3px solid #d1fae5; color:#374151; font-size:14px; line-height:1.6;">${esc(note)}</blockquote>`,
+      { preheader: `${businessName} replied to your review` }
+    ),
+  });
+}
+
+// Vendor: an admin featured their store.
+export async function sendFeaturedEmail({ to, businessName }) {
+  return sendEmail({
+    to,
+    subject: `${businessName} is now a featured store on OJA247`,
+    html: layout(
+      `${h1("Your store is now featured 🎉")}
+       ${p(`Hi ${esc(businessName)}, our team has picked your store as a featured business, so it gets extra visibility to shoppers on OJA247.`)}
+       ${small("Keep your products and photos up to date to make the most of it.")}
+       ${button("Open my dashboard", `${SITE_URL}/dashboard`)}`,
+      { preheader: "Your store is now featured on OJA247" }
+    ),
+  });
+}
+
+// Customer + vendor: an admin settled an escalated dispute. `audience`
+// decides the wording.
+export async function sendDisputeAdminDecisionEmail({
+  to,
+  name,
+  businessName,
+  orderReference,
+  outcome,
+  note,
+  audience,
+}) {
+  const resolved = outcome === "resolved";
+  const lead = resolved
+    ? "marked the dispute as resolved"
+    : "closed the dispute as unresolved after reviewing it";
+  const who = audience === "vendor" ? `the dispute on order <strong>${esc(orderReference)}</strong>` : `your dispute with <strong>${esc(businessName)}</strong> on order <strong>${esc(orderReference)}</strong>`;
+  return sendEmail({
+    to,
+    subject: `Update on the dispute for order ${orderReference}`,
+    html: layout(
+      `${h1("Our team has reviewed the dispute")}
+       ${p(`Hi ${esc(name) || "there"}, after looking into it, OJA247 has ${lead} — ${who}.`)}
+       ${note ? `<blockquote style="margin:12px 0; padding:10px 14px; border-left:3px solid #e5e7eb; color:#374151; font-size:14px; line-height:1.6;">${esc(note)}</blockquote>` : ""}
+       ${small("If you have more information that changes the picture, reply to this email and we'll take another look.")}`,
+      { preheader: `Decision on the dispute for order ${orderReference}` }
+    ),
+  });
+}
+
+// --- Order delivery (vendor ships -> customer confirms) --------------------
+
+// Customer: a vendor marked their part of the order as sent out. The button
+// opens a confirmation page rather than confirming on click, so mail
+// scanners that pre-open links can't confirm receipt by accident.
+export async function sendOrderShippedEmail({ to, customerName, businessName, orderReference, confirmUrl }) {
+  return sendEmail({
+    to,
+    subject: `${businessName} has sent out your order ${orderReference}`,
+    html: layout(
+      `${h1("Your order is on its way 📦")}
+       ${p(`Hi ${esc(customerName) || "there"}, <strong>${esc(businessName)}</strong> has sent out your items from order <strong>${esc(orderReference)}</strong>.`)}
+       ${p("Once it reaches you, let us know so the order can be closed out.")}
+       ${button("I've received it", confirmUrl)}
+       ${small("If you don't confirm, we'll mark it as received automatically after a few days. Something wrong with the delivery? You can report a problem from your orders page.")}`,
+      { preheader: `${businessName} has sent out your order` }
+    ),
+  });
+}
+
+// Customer: nudge a few days after shipping, before auto-confirm kicks in.
+export async function sendReceiptReminderEmail({ to, customerName, businessName, orderReference, confirmUrl, daysUntilAuto }) {
+  return sendEmail({
+    to,
+    subject: `Did your order ${orderReference} arrive?`,
+    html: layout(
+      `${h1("Did your order arrive?")}
+       ${p(`Hi ${esc(customerName) || "there"}, <strong>${esc(businessName)}</strong> sent out order <strong>${esc(orderReference)}</strong> a few days ago.`)}
+       ${p("If it's with you, a quick confirmation closes it out.")}
+       ${button("Yes, I've received it", confirmUrl)}
+       ${small(`If we don't hear from you, we'll mark it as received in about ${daysUntilAuto} day${daysUntilAuto === 1 ? "" : "s"}. If something's wrong, report it from your orders page before then.`)}
+       ${button("Report a problem", `${SITE_URL}/report-problem`)}`,
+      { preheader: "Confirm your delivery or report a problem" }
+    ),
+  });
+}
+
+// Customer: we auto-marked it received because they never confirmed.
+export async function sendOrderAutoReceivedCustomerEmail({ to, customerName, businessName, orderReference }) {
+  return sendEmail({
+    to,
+    subject: `Order ${orderReference} marked as received`,
+    html: layout(
+      `${h1("Order marked as received")}
+       ${p(`Hi ${esc(customerName) || "there"}, we haven't heard back about the delivery from <strong>${esc(businessName)}</strong> on order <strong>${esc(orderReference)}</strong>, so we've marked it as received.`)}
+       ${small("If it never arrived or there's a problem with it, report it and we'll look into it.")}
+       ${button("Report a problem", `${SITE_URL}/report-problem`)}`,
+      { preheader: `Order ${orderReference} was marked as received` }
+    ),
+  });
+}
+
+// Vendor: the customer confirmed (or it was auto-confirmed).
+export async function sendOrderReceivedVendorEmail({ to, businessName, orderReference, customerName, auto }) {
+  return sendEmail({
+    to,
+    subject: auto ? `Order ${orderReference} auto-confirmed as received` : `Customer confirmed delivery of order ${orderReference}`,
+    html: layout(
+      `${h1(auto ? "Order auto-confirmed as received" : "Delivery confirmed ✅")}
+       ${p(
+         auto
+           ? `Hi ${esc(businessName)}, ${esc(customerName) || "your customer"} didn't respond after you sent out order <strong>${esc(orderReference)}</strong>, so it has been marked as received automatically.`
+           : `Hi ${esc(businessName)}, ${esc(customerName) || "your customer"} confirmed they received order <strong>${esc(orderReference)}</strong>.`
+       )}
+       ${small("Thanks for fulfilling it on time.")}`,
+      { preheader: `Order ${orderReference} is complete` }
+    ),
+  });
+}
+
+// --- Admin broadcasts ------------------------------------------------------
+
+// Turns the plain text an admin types into email HTML: escapes everything,
+// splits paragraphs on blank lines, keeps single line breaks, and swaps
+// {{name}} for the recipient's first name. No raw HTML ever gets through.
+export function renderBroadcastText(text, firstName) {
+  const personalised = String(text || "").replace(/\{\{\s*name\s*\}\}/gi, firstName || "there");
+  return personalised
+    .split(/\n{2,}/)
+    .map((para) => para.trim())
+    .filter(Boolean)
+    .map((para) => `<p style="color:#4b5563; font-size:14px; line-height:1.7; margin:0 0 14px;">${esc(para).replace(/\n/g, "<br />")}</p>`)
+    .join("");
+}
+
+export function renderBroadcastSubject(subject, firstName) {
+  return String(subject || "").replace(/\{\{\s*name\s*\}\}/gi, firstName || "there");
+}
+
+export async function sendBroadcastEmail({ to, subject, bodyText, firstName, ctaLabel, ctaUrl, unsubscribeUrl }) {
+  const footer = unsubscribeUrl
+    ? `<p style="color:#9ca3af; font-size:12px; line-height:1.6; margin:24px 0 0; border-top:1px solid #f1f2f4; padding-top:14px;">You're getting this because you have an OJA247 account. <a href="${unsubscribeUrl}" style="color:#6b7280;">Unsubscribe from announcements</a> &mdash; you'll still receive order and account emails.</p>`
+    : "";
+  return sendEmail({
+    to,
+    subject: renderBroadcastSubject(subject, firstName),
+    html: layout(
+      `${renderBroadcastText(bodyText, firstName)}${ctaLabel && ctaUrl ? button(esc(ctaLabel), ctaUrl) : ""}${footer}`,
+      { preheader: renderBroadcastSubject(subject, firstName) }
+    ),
+    headers: unsubscribeUrl
+      ? { "List-Unsubscribe": `<${unsubscribeUrl}>` }
+      : undefined,
+  });
+}
+
 export default {
   sendEmail,
   sendPasswordResetEmail,
@@ -933,5 +1200,18 @@ export default {
   sendDisputeEscalatedAdminEmail,
   sendVerificationReminderEmail,
   sendNewProductFollowerEmail,
+  sendAccountDeletedEmail,
+  sendCustomerDetailsUpdatedEmail,
+  sendPointsWithdrawalPaidEmail,
+  sendPasswordChangedEmail,
+  sendNewReviewVendorEmail,
+  sendReviewReplyCustomerEmail,
+  sendFeaturedEmail,
+  sendDisputeAdminDecisionEmail,
+  sendOrderShippedEmail,
+  sendReceiptReminderEmail,
+  sendOrderAutoReceivedCustomerEmail,
+  sendOrderReceivedVendorEmail,
+  sendBroadcastEmail,
   verifyEmailTransporter,
 };

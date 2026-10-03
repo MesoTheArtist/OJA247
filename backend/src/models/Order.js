@@ -19,6 +19,20 @@ const OrderVendorSchema = new mongoose.Schema(
     businessName: { type: String, default: "" },
     itemsSubtotal: { type: Number, required: true, min: 0 },
     deliveryFee: { type: Number, required: true, min: 0 },
+    // Delivery progress for THIS vendor's part of the order. One order can
+    // span several vendors, and each ships separately, so it lives here and
+    // not on the order. Orders created before this existed have no value;
+    // treat a missing one as "processing".
+    fulfillmentStatus: {
+      type: String,
+      enum: ["processing", "shipped", "received"],
+      default: "processing",
+    },
+    shippedAt: { type: Date, default: null },
+    receivedAt: { type: Date, default: null },
+    // True when the customer never confirmed and the daily job marked it.
+    autoReceived: { type: Boolean, default: false },
+    receiptReminderSentAt: { type: Date, default: null },
   },
   { _id: false }
 );

@@ -8,7 +8,14 @@ import {
   getMyOrders,
   handlePaystackWebhook,
 } from "../controllers/orderController.js";
+import {
+  markVendorShipped,
+  receiveOrderAsCustomer,
+  getReceiptInfo,
+  confirmReceiptByLink,
+} from "../controllers/fulfillmentController.js";
 import { protect, requireCustomer } from "../middleware/authMiddleware.js";
+import { authLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
 
@@ -37,5 +44,12 @@ router.get("/my-orders", protect, requireCustomer, getMyOrders);
 // Vendor's own orders — protect + ownership check inside getOrdersByBusiness
 // (see its comment) locks this to the business's own owner or an admin.
 router.get("/business/:businessId", protect, getOrdersByBusiness);
+
+// Delivery: vendor marks their part sent out; the customer confirms receipt
+// either logged in, or from the emailed link (guest checkout has no login).
+router.patch("/:reference/ship", protect, markVendorShipped);
+router.post("/:reference/receive", protect, requireCustomer, receiveOrderAsCustomer);
+router.get("/receipt-info", getReceiptInfo);
+router.post("/confirm-receipt", authLimiter, confirmReceiptByLink);
 
 export default router;

@@ -25,6 +25,8 @@ import ResetPasswordForm from "./pages/ResetPasswordForm";
 import CustomerAuthPage from "./pages/CustomerAuthPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
 import ReportProblemPage from "./pages/ReportProblemPage";
+import ConfirmReceiptPage from "./pages/ConfirmReceiptPage";
+import UnsubscribePage from "./pages/UnsubscribePage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 
 function App() {
@@ -57,6 +59,8 @@ function App() {
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/report-problem" element={<ReportProblemPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/confirm-receipt" element={<ConfirmReceiptPage />} />
+          <Route path="/unsubscribe" element={<UnsubscribePage />} />
           {/* Protected Routes */}
           <Route
             path="/dashboard/:businessId"

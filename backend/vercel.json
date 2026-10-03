@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/verification-reminder",
       "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/cron/auto-receive",
+      "schedule": "0 10 * * *"
     }
   ]
 }

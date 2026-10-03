@@ -34,6 +34,15 @@ import {
 } from "../controllers/adminController.js";
 import { getPayoutBatches, markPayoutBatchPaid } from "../controllers/payoutBatchController.js";
 import {
+  getAudienceCounts,
+  sendTestCampaign,
+  createCampaign,
+  sendCampaignBatch,
+  retryCampaign,
+  listCampaigns,
+  getCampaign,
+} from "../controllers/campaignController.js";
+import {
   getGrowthAnalytics,
   getSubscriptionBreakdown,
   getMarketerLeaderboard,
@@ -54,6 +63,16 @@ router.get("/analytics/growth", getGrowthAnalytics);
 router.get("/analytics/subscriptions", getSubscriptionBreakdown);
 router.get("/analytics/marketer-leaderboard", getMarketerLeaderboard);
 router.get("/analytics/recent-activity", getRecentActivity);
+
+// Occasion emails to customers / vendors / marketers. Static paths first so
+// "audience" and "test" aren't swallowed by /campaigns/:id.
+router.get("/campaigns/audience", getAudienceCounts);
+router.post("/campaigns/test", sendTestCampaign);
+router.get("/campaigns", listCampaigns);
+router.post("/campaigns", createCampaign);
+router.get("/campaigns/:id", getCampaign);
+router.post("/campaigns/:id/send-batch", sendCampaignBatch);
+router.post("/campaigns/:id/retry", retryCampaign);
 
 // Customers — separate from the generic /users list, with the counters
 // (orders, spend, follows, reviews, disputes) an admin needs to manage a

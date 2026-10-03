@@ -9,7 +9,7 @@ import {
   generateUniqueBusinessReferralCode,
   attributeReferral,
 } from "../services/referralService.js";
-import { sendVendorWelcomeEmail, sendPasswordResetEmail } from "../services/emailService.js";
+import { sendVendorWelcomeEmail, sendPasswordResetEmail, sendPasswordChangedEmail } from "../services/emailService.js";
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -463,6 +463,10 @@ export const resetPassword = async (req, res) => {
     user.resetPasswordTokenHash = null;
     user.resetPasswordExpires = null;
     await user.save();
+
+    sendPasswordChangedEmail({ to: user.email, name: "" }).catch((err) =>
+      console.error("Password-changed email failed:", err)
+    );
 
     res.json({ success: true, message: "Password reset successfully" });
   } catch (error) {
