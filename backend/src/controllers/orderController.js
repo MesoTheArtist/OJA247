@@ -366,7 +366,17 @@ export const handlePaystackWebhook = async (req, res) => {
     }
 
     const expectedSignature = crypto.createHmac("sha512", secret).update(req.rawBody).digest("hex");
-    if (expectedSignature !== signature) {
+    // timingSafeEqual over a plain !== — a signature check is exactly the
+    // kind of comparison where leaking "how many leading characters
+    // matched" via response timing matters, even if the practical risk
+    // here is low (network jitter, long HMAC). Needs equal-length buffers
+    // or it throws, so check that first — a length mismatch is already a
+    // definite no-match.
+    const expectedBuffer = Buffer.from(expectedSignature, "hex");
+    const actualBuffer = Buffer.from(signature, "hex");
+    const signatureValid =
+      expectedBuffer.length === actualBuffer.length && crypto.timingSafeEqual(expectedBuffer, actualBuffer);
+    if (!signatureValid) {
       console.error("Paystack webhook: signature mismatch");
       return res.sendStatus(401);
     }

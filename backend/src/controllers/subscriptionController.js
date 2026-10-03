@@ -324,7 +324,13 @@ export const handleSubscriptionWebhook = async (req, res) => {
     }
 
     const expectedSignature = crypto.createHmac("sha512", secret).update(req.rawBody).digest("hex");
-    if (expectedSignature !== signature) {
+    // Same timingSafeEqual fix as orderController's Paystack webhook — see
+    // the comment there for why, and why the length check comes first.
+    const expectedBuffer = Buffer.from(expectedSignature, "hex");
+    const actualBuffer = Buffer.from(signature, "hex");
+    const signatureValid =
+      expectedBuffer.length === actualBuffer.length && crypto.timingSafeEqual(expectedBuffer, actualBuffer);
+    if (!signatureValid) {
       console.error("Subscription webhook: signature mismatch");
       return res.sendStatus(401);
     }
