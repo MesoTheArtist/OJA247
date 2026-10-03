@@ -100,7 +100,19 @@ export const getBusiness = async (req, res) => {
     // only when the viewer is actually a logged-in customer.
     const followerCount = await Follow.countDocuments({ businessId: business._id });
 
-    res.json({ ...business.toObject(), followerCount });
+    // Platform-wide toggle, not business-specific data — safe on this public
+    // route. The vendor dashboard uses this same endpoint to load its own
+    // business, and needs to know whether subscription status currently
+    // affects visibility at all before it nudges an unsubscribed vendor to
+    // pay (see AccountAlertsPopup's "neverSubscribed" case) — no point
+    // warning them about invisibility while the kill switch is off.
+    const settings = await PlatformSettings.getSettings();
+
+    res.json({
+      ...business.toObject(),
+      followerCount,
+      enforceSubscriptionVisibility: settings.enforceSubscriptionVisibility,
+    });
   } catch (error) {
     res.status(500).json({ message: "Error fetching business" });
   }

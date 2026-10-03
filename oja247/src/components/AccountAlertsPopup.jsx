@@ -12,6 +12,7 @@ function AccountAlertsPopup({
   needsVerification,
   subExpired,
   subExpiringSoon,
+  neverSubscribed,
   daysUntilSubExpiry,
   onGoToVerification,
   onGoToSubscription,
@@ -23,7 +24,7 @@ function AccountAlertsPopup({
     const shownKey = (type) => `oja247_alert_shown_${businessId}_${type}`;
     const next = [];
 
-    if ((subExpired || subExpiringSoon) && !sessionStorage.getItem(shownKey("subscription"))) {
+    if ((subExpired || subExpiringSoon || neverSubscribed) && !sessionStorage.getItem(shownKey("subscription"))) {
       next.push("subscription");
     }
     if (needsVerification && !sessionStorage.getItem(shownKey("docs"))) {
@@ -33,7 +34,7 @@ function AccountAlertsPopup({
     setQueue(next);
     setActive(next[0] || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessId, needsVerification, subExpired, subExpiringSoon]);
+  }, [businessId, needsVerification, subExpired, subExpiringSoon, neverSubscribed]);
 
   const dismiss = () => {
     if (!active) return;
@@ -49,7 +50,7 @@ function AccountAlertsPopup({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 relative">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative">
         <button
           type="button"
           onClick={dismiss}
@@ -61,7 +62,11 @@ function AccountAlertsPopup({
 
         <div
           className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${
-            isSubscription ? (subExpired ? "bg-red-100 text-red-600" : "bg-yellow-100 text-yellow-700") : "bg-yellow-100 text-yellow-700"
+            isSubscription
+              ? subExpired || neverSubscribed
+                ? "bg-red-100 text-red-600"
+                : "bg-yellow-100 text-yellow-700"
+              : "bg-yellow-100 text-yellow-700"
           }`}
         >
           {isSubscription ? <AlertTriangle size={24} /> : <FileWarning size={24} />}
@@ -70,10 +75,16 @@ function AccountAlertsPopup({
         {isSubscription ? (
           <>
             <h3 className="text-lg font-bold text-gray-900 mb-2">
-              {subExpired ? "Your subscription has expired" : "Your subscription is expiring soon"}
+              {neverSubscribed
+                ? "Your store isn't visible to customers yet"
+                : subExpired
+                ? "Your subscription has expired"
+                : "Your subscription is expiring soon"}
             </h3>
             <p className="text-sm text-gray-600 mb-6">
-              {subExpired
+              {neverSubscribed
+                ? "Subscribing is what puts your store in customer search and on the Explore page. Right now it's set up but hidden — subscribe to go live."
+                : subExpired
                 ? "Your store is currently hidden from customer search because your subscription period has ended. Renew now to bring it back — it goes live again immediately after payment."
                 : `Your subscription expires in ${daysUntilSubExpiry} day${daysUntilSubExpiry === 1 ? "" : "s"}. Renew before then so your store stays visible to customers without interruption.`}
             </p>
@@ -86,7 +97,7 @@ function AccountAlertsPopup({
                 }}
                 className="flex-1 bg-green-600 text-white font-semibold py-2.5 rounded-xl hover:bg-green-700 transition"
               >
-                {subExpired ? "Renew now" : "Renew subscription"}
+                {neverSubscribed ? "Subscribe now" : subExpired ? "Renew now" : "Renew subscription"}
               </button>
               <button
                 type="button"
