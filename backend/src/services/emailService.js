@@ -570,6 +570,22 @@ export async function sendSubscriptionExpiredEmail({ to, businessName }) {
   });
 }
 
+export async function sendNeverSubscribedReminderEmail({ to, businessName }) {
+  return sendEmail({
+    to,
+    subject: "Your store isn't showing up in customer search",
+    html: layout(
+      `
+      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Your store isn't visible to customers yet</h1>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, your store on OJA247 is set up but it won't show up in customer search or the Explore page until you subscribe.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Subscribe any time — your store goes live right after payment.</p>
+      ${button("Subscribe now", `${SITE_URL}/dashboard`)}
+      `,
+      { preheader: "Subscribe to put your store in front of customers" }
+    ),
+  });
+}
+
 // --- Marketer --------------------------------------------------------------
 
 export async function sendMarketerWelcomeEmail({ to, name, referralCode }) {
@@ -904,6 +920,7 @@ export default {
   sendSubscriptionReceiptEmail,
   sendSubscriptionExpiringEmail,
   sendSubscriptionExpiredEmail,
+  sendNeverSubscribedReminderEmail,
   sendMarketerWelcomeEmail,
   sendMarketerConversionEmail,
   sendMarketerPayoutPaidEmail,

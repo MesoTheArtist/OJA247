@@ -68,6 +68,12 @@ const BusinessSchema = new mongoose.Schema(
     // successful subscription payment (see subscriptionController.js).
     subscriptionReminderSentAt: { type: Date, default: null },
     subscriptionExpiredEmailSentAt: { type: Date, default: null },
+    // Separate from the two above: those only fire for a business that HAD
+    // a subscription (subscriptionExpiresAt set). A business that's never
+    // subscribed at all falls through both — see
+    // subscriptionExpiryCronController's third pass, and
+    // NEVER_SUBSCRIBED_REMINDER_INTERVAL_DAYS there for the re-nag cadence.
+    neverSubscribedReminderSentAt: { type: Date, default: null },
 
     // --- Referral (new) ---
     // This business's OWN code, for referring other businesses (business-owner track)
