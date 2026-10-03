@@ -3,52 +3,232 @@ import { Mail, Send, RefreshCw, Users, Store, UserCog } from "lucide-react";
 import axiosInstance from "../services/api";
 
 // Ready-made starting points. {{name}} becomes each person's first name
-// (or "there" if we don't have one). Edit freely after picking one.
+// (or "there" if we don't have one), filled in per recipient when sent.
+// __MONTH__, __YEAR__ and __CURYEAR__ are filled in with today's month /
+// the coming New Year / this year the moment you pick the preset. Edit
+// freely after picking one. Anything in [square brackets] is a blank for you
+// to fill in, and the page warns you if any are left.
+//
+// "when" is only a hint shown in the list. The Muslim holidays (Eid-el-Fitr,
+// Eid-el-Kabir, Eid-el-Maulud) are declared by the Federal Government after
+// the moon is sighted, and Easter moves every year, so check the official
+// announcement for the date.
+const SHOP_URL = "https://oja247.store/explore";
+
 const PRESETS = [
-  { id: "custom", label: "Write my own", subject: "", body: "" },
+  { id: "custom", group: "", label: "Write my own", subject: "", body: "" },
+
+  // --- Nigerian public holidays ---
+  {
+    id: "new-year",
+    group: "Public holidays",
+    label: "New Year's Day",
+    when: "Jan 1",
+    subject: "Happy New Year __YEAR__ from OJA247 🎉",
+    body: "Hi {{name}},\n\nHappy New Year! Thank you for being part of OJA247. We're excited about what's coming in __YEAR__ and glad to have you with us.\n\nHere's to a great year ahead.",
+  },
+  {
+    id: "good-friday",
+    group: "Public holidays",
+    label: "Good Friday",
+    when: "Date varies (Mar/Apr)",
+    subject: "Wishing you a peaceful Good Friday",
+    body: "Hi {{name}},\n\nWishing you a quiet, reflective Good Friday. From all of us at OJA247, we hope you have a peaceful day with your loved ones.",
+  },
+  {
+    id: "easter",
+    group: "Public holidays",
+    label: "Easter (Sunday & Monday)",
+    when: "Date varies (Mar/Apr)",
+    subject: "Happy Easter from OJA247 🐣",
+    body: "Hi {{name}},\n\nHappy Easter from everyone at OJA247! We hope the weekend brings you joy, good food and time with the people you love.\n\nThank you for being part of our community.",
+  },
+  {
+    id: "eid-fitr",
+    group: "Public holidays",
+    label: "Eid-el-Fitr",
+    when: "Date varies (moon sighting)",
+    subject: "Eid-el-Fitr Mubarak from OJA247 🌙",
+    body: "Hi {{name}},\n\nEid Mubarak! We wish you and your loved ones a joyful Eid-el-Fitr filled with peace, blessings and good company.\n\nThank you for being part of OJA247.",
+  },
+  {
+    id: "workers-day",
+    group: "Public holidays",
+    label: "Workers' Day",
+    when: "May 1",
+    subject: "Happy Workers' Day from OJA247",
+    body: "Hi {{name}},\n\nHappy Workers' Day! Today we celebrate everyone who works hard, especially the business owners on OJA247 who keep this marketplace alive.\n\nEnjoy the public holiday and get some well-earned rest.",
+  },
+  {
+    id: "democracy-day",
+    group: "Public holidays",
+    label: "Democracy Day",
+    when: "Jun 12",
+    subject: "Happy Democracy Day from OJA247 🇳🇬",
+    body: "Hi {{name}},\n\nHappy Democracy Day! Today marks Nigeria's return to democratic rule, and we're proud to be part of this country and its people.\n\nWe wish you a restful public holiday.",
+  },
+  {
+    id: "eid-kabir",
+    group: "Public holidays",
+    label: "Eid-el-Kabir",
+    when: "Date varies (moon sighting)",
+    subject: "Eid-el-Kabir Mubarak from OJA247 🐏",
+    body: "Hi {{name}},\n\nEid-el-Kabir Mubarak! We wish you and your family a blessed celebration filled with peace, generosity and joy.\n\nThank you for being part of OJA247.",
+  },
+  {
+    id: "maulud",
+    group: "Public holidays",
+    label: "Eid-el-Maulud (Prophet's birthday)",
+    when: "Date varies (moon sighting)",
+    subject: "Eid-el-Maulud greetings from OJA247",
+    body: "Hi {{name}},\n\nWishing our Muslim community a peaceful and blessed Eid-el-Maulud. We hope the day brings you and your family joy and reflection.",
+  },
+  {
+    id: "independence",
+    group: "Public holidays",
+    label: "Independence Day",
+    when: "Oct 1",
+    subject: "Happy Independence Day from OJA247 🇳🇬",
+    body: "Hi {{name}},\n\nHappy Independence Day, Nigeria! We're proud to support Nigerian businesses and the people who shop with them, and thank you for being part of that.\n\nEnjoy the holiday.",
+  },
   {
     id: "christmas",
-    label: "Christmas",
+    group: "Public holidays",
+    label: "Christmas Day",
+    when: "Dec 25",
     subject: "Merry Christmas from OJA247 🎄",
     body: "Hi {{name}},\n\nMerry Christmas from all of us at OJA247! Thank you for being part of our community this year.\n\nWe wish you and your family joy, rest and a wonderful festive season.",
   },
   {
-    id: "new-year",
-    label: "New Year",
-    subject: "Happy New Year from OJA247 🎉",
-    body: "Hi {{name}},\n\nHappy New Year! Thank you for being part of OJA247. We're excited about what's coming and glad to have you with us.\n\nHere's to a great year ahead.",
+    id: "boxing-day",
+    group: "Public holidays",
+    label: "Boxing Day",
+    when: "Dec 26",
+    subject: "Happy Boxing Day from OJA247",
+    body: "Hi {{name}},\n\nWe hope your Christmas was a wonderful one. Enjoy the rest of the holiday with family and friends.\n\nFrom everyone at OJA247.",
+  },
+
+  // --- Other widely celebrated days ---
+  {
+    id: "new-month",
+    group: "Celebrations & seasons",
+    label: "Happy New Month",
+    when: "1st of every month",
+    subject: "Happy New Month! __MONTH__ is here 🎉",
+    body: "Hi {{name}},\n\nHappy new month! May __MONTH__ bring you good sales, good health and good news.\n\nFrom all of us at OJA247.",
   },
   {
-    id: "eid",
-    label: "Eid",
-    subject: "Eid Mubarak from OJA247",
-    body: "Hi {{name}},\n\nEid Mubarak from everyone at OJA247! We wish you and your loved ones peace, joy and blessings.",
+    id: "ramadan",
+    group: "Celebrations & seasons",
+    label: "Start of Ramadan",
+    when: "Date varies (moon sighting)",
+    subject: "Ramadan Kareem from OJA247 🌙",
+    body: "Hi {{name}},\n\nWishing everyone observing Ramadan a blessed month of reflection, patience and peace. Ramadan Kareem from all of us at OJA247.",
   },
   {
-    id: "independence",
-    label: "Independence Day",
-    subject: "Happy Independence Day from OJA247 🇳🇬",
-    body: "Hi {{name}},\n\nHappy Independence Day! We're proud to support Nigerian businesses and the people who shop with them. Thank you for being part of that.",
+    id: "valentines",
+    group: "Celebrations & seasons",
+    label: "Valentine's Day",
+    when: "Feb 14",
+    subject: "Happy Valentine's Day from OJA247 ❤️",
+    body: "Hi {{name}},\n\nHappy Valentine's Day! Looking for something special for someone you love? You'll find gifts from local businesses across Nigeria on OJA247.",
+    ctaLabel: "Browse gifts",
+    ctaUrl: SHOP_URL,
   },
+  {
+    id: "childrens-day",
+    group: "Celebrations & seasons",
+    label: "Children's Day",
+    when: "May 27",
+    subject: "Happy Children's Day from OJA247 🎈",
+    body: "Hi {{name}},\n\nHappy Children's Day! It's a good day to treat the little ones in your life. Browse stores across OJA247 for clothes, toys and treats.",
+    ctaLabel: "Browse stores",
+    ctaUrl: SHOP_URL,
+  },
+  {
+    id: "mothers-day",
+    group: "Celebrations & seasons",
+    label: "Mother's Day",
+    when: "Varies by year (May)",
+    subject: "Happy Mother's Day from OJA247 💐",
+    body: "Hi {{name}},\n\nHappy Mother's Day to all the mothers in our community! If you're looking for a thoughtful gift for the mother in your life, local businesses on OJA247 have plenty of ideas.",
+    ctaLabel: "Find a gift",
+    ctaUrl: SHOP_URL,
+  },
+  {
+    id: "fathers-day",
+    group: "Celebrations & seasons",
+    label: "Father's Day",
+    when: "Varies by year (June)",
+    subject: "Happy Father's Day from OJA247 👔",
+    body: "Hi {{name}},\n\nHappy Father's Day to all the fathers in our community! Looking for a gift for the dad in your life? Take a look at what local businesses on OJA247 have to offer.",
+    ctaLabel: "Find a gift",
+    ctaUrl: SHOP_URL,
+  },
+  {
+    id: "black-friday",
+    group: "Celebrations & seasons",
+    label: "Black Friday",
+    when: "Day after US Thanksgiving (Nov)",
+    subject: "Black Friday weekend on OJA247",
+    body: "Hi {{name}},\n\nIt's Black Friday weekend! Many stores on OJA247 run special offers around now, so it's a good time to browse and see what you find.",
+    ctaLabel: "Start browsing",
+    ctaUrl: SHOP_URL,
+  },
+  {
+    id: "year-end",
+    group: "Celebrations & seasons",
+    label: "Year-end thank you",
+    when: "Late December",
+    subject: "Thank you for __CURYEAR__ from OJA247",
+    body: "Hi {{name}},\n\nAs __CURYEAR__ comes to a close, we want to say thank you for being part of OJA247 this year. Whether you shopped, sold or shared us with a friend, you helped us grow.\n\nWe wish you a restful end to the year and a great start to the next.",
+  },
+
+  // --- Platform notices ---
   {
     id: "maintenance",
+    group: "Platform notices",
     label: "Maintenance notice",
     subject: "Scheduled maintenance on OJA247",
     body: "Hi {{name}},\n\nOJA247 will be briefly unavailable for scheduled maintenance on [date] from [start time] to [end time].\n\nNothing you need to do. Orders and payments already in progress won't be affected. Thanks for your patience.",
   },
   {
     id: "feature",
+    group: "Platform notices",
     label: "New feature",
     subject: "New on OJA247: [feature name]",
     body: "Hi {{name}},\n\nWe've just launched [feature name]. [One or two sentences on what it does and why it helps.]\n\nWe'd love to hear what you think.",
   },
   {
     id: "promo",
+    group: "Platform notices",
     label: "Promotion / sale",
     subject: "[Offer] on OJA247 this week",
     body: "Hi {{name}},\n\n[Describe the offer, who it's for, and when it ends.]\n\nDon't miss it.",
   },
+  {
+    id: "thanks",
+    group: "Platform notices",
+    label: "General thank you",
+    subject: "Thank you from OJA247",
+    body: "Hi {{name}},\n\nJust a quick note to say thank you for being part of OJA247. Your support helps local businesses grow, and we're grateful for it.",
+  },
 ];
+
+// Fills the date-based blanks the moment a preset is picked, so the text
+// reads correctly today (e.g. the right month for "Happy New Month").
+function fillDateTokens(text) {
+  const now = new Date();
+  const month = now.toLocaleString("en-NG", { month: "long" });
+  // In December the "New Year" message is for the year about to start.
+  const newYear = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
+  return String(text)
+    .replace(/__MONTH__/g, month)
+    .replace(/__YEAR__/g, String(newYear))
+    .replace(/__CURYEAR__/g, String(now.getFullYear()));
+}
+
+const PRESET_GROUPS = ["Public holidays", "Celebrations & seasons", "Platform notices"];
 
 const AUDIENCE_OPTIONS = [
   { id: "customers", label: "Customers", icon: Users },
@@ -118,8 +298,12 @@ const CampaignAdminTab = ({ showToast }) => {
     setPreset(id);
     const p = PRESETS.find((x) => x.id === id);
     if (p && id !== "custom") {
-      setSubject(p.subject);
-      setBody(p.body);
+      setSubject(fillDateTokens(p.subject));
+      setBody(fillDateTokens(p.body));
+      // Shopping-themed presets bring a button; everything else clears it
+      // so a previous preset's button never rides along by accident.
+      setCtaLabel(p.ctaLabel || "");
+      setCtaUrl(p.ctaUrl || "");
     }
   };
 
@@ -265,12 +449,18 @@ const CampaignAdminTab = ({ showToast }) => {
         <select
           value={preset}
           onChange={(e) => applyPreset(e.target.value)}
-          className="w-full sm:w-72 mb-4 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          className="w-full sm:w-96 max-w-full mb-4 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
         >
-          {PRESETS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
+          <option value="custom">Write my own</option>
+          {PRESET_GROUPS.map((group) => (
+            <optgroup key={group} label={group}>
+              {PRESETS.filter((p) => p.group === group).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                  {p.when ? ` · ${p.when}` : ""}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
 
