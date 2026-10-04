@@ -493,6 +493,16 @@ const LandingPage = () => {
           </motion.button>
         </motion.div>
 
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.6 }}
+          onClick={() => navigate("/join")}
+          className="relative z-10 block mx-auto mt-5 text-sm text-gray-500 hover:text-gray-700 underline underline-offset-2 transition"
+        >
+          Not a business? Join OJA247
+        </motion.button>
+
         {/* Stats */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}

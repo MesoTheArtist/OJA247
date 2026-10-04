@@ -25,6 +25,7 @@ import ResetPasswordForm from "./pages/ResetPasswordForm";
 import CustomerAuthPage from "./pages/CustomerAuthPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
 import ReportProblemPage from "./pages/ReportProblemPage";
+import JoinPage from "./pages/JoinPage";
 import ConfirmReceiptPage from "./pages/ConfirmReceiptPage";
 import UnsubscribePage from "./pages/UnsubscribePage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
@@ -58,6 +59,7 @@ function App() {
           <Route path="/account" element={<CustomerAuthPage />} />
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/report-problem" element={<ReportProblemPage />} />
+          <Route path="/join" element={<JoinPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/confirm-receipt" element={<ConfirmReceiptPage />} />
           <Route path="/unsubscribe" element={<UnsubscribePage />} />
