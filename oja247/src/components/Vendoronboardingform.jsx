@@ -218,6 +218,80 @@ const styles = `
   border-radius: 8px;
   padding: 0.75rem;
 }
+
+.vof-steps {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.vof-step-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  background: #eef2ef;
+  color: #8b9490;
+}
+
+.vof-step-dot.vof-step-done {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.vof-step-dot.vof-step-current {
+  background: #f2c94c;
+  color: #5c4a06;
+}
+
+.vof-step-line {
+  flex: 1;
+  height: 2px;
+  background: #eef2ef;
+}
+
+.vof-step-line.vof-step-done {
+  background: #16a34a;
+}
+
+.vof-step-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #5c6560;
+  margin: -0.75rem 0 1.5rem;
+}
+
+.vof-step-nav {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.vof-step-nav .vof-submit {
+  flex: 1;
+}
+
+.vof-btn-back {
+  flex: 1;
+  padding: 0.85rem;
+  background: #ffffff;
+  color: #33403a;
+  border: 1px solid #d6e0d8;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.vof-btn-back:hover {
+  background: #f7faf8;
+}
 `;
 
 export default function VendorOnboardingForm({ onSubmitted, existing = null } = {}) {
@@ -253,6 +327,54 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
   // form; "Update details" opens the form with everything prefilled so
   // adding a document never means retyping what they already gave us.
   const [editing, setEditing] = useState(false);
+
+  // Three steps, one per fieldset below — About / Get paid / Verify. Reset
+  // to the first step whenever the form (re)opens for a fresh or repeat
+  // submission, so re-editing never starts halfway through.
+  const [step, setStep] = useState(0);
+  const [stepError, setStepError] = useState(null);
+  const STEPS = ['About your business', 'Get paid', 'Verify your identity'];
+
+  // What has to be true before leaving each step. Doesn't duplicate
+  // handleSubmit's own checks — those still run as the final safety net —
+  // this just stops someone advancing past a step with something missing,
+  // so a problem shows up next to the field that needs it instead of as a
+  // generic error after pressing submit on the last screen.
+  function stepValidationError(i) {
+    if (i === 0) {
+      if (!form.business_name.trim()) return 'Add your business name.';
+      if (!form.contact_email.trim()) return 'Add a contact email.';
+      if (!form.contact_phone.trim()) return 'Add a contact phone number.';
+      return null;
+    }
+    if (i === 1) {
+      if (!form.bank_code) return 'Select your bank.';
+      if (form.account_number.length !== 10) return 'Enter your 10-digit account number.';
+      if (resolvingAccount) return 'Still checking your account — give it a second.';
+      if (!accountName) return accountError || 'We need to confirm this account before continuing.';
+      return null;
+    }
+    if (i === 2) {
+      if (!nin) return 'NIN is required to list on OJA247.';
+      return null;
+    }
+    return null;
+  }
+
+  function goNext() {
+    const problem = stepValidationError(step);
+    if (problem) {
+      setStepError(problem);
+      return;
+    }
+    setStepError(null);
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  }
+
+  function goBack() {
+    setStepError(null);
+    setStep((s) => Math.max(s - 1, 0));
+  }
 
   useEffect(() => {
     if (!existing) return;
@@ -353,13 +475,18 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
     e.preventDefault();
     setSubmitError(null);
 
-    if (!accountName) {
-      setSubmitError('Please enter a valid account number so we can confirm the account name.');
-      return;
-    }
-    if (!nin) {
-      setSubmitError('NIN is required to list on OJA247.');
-      return;
+    // Belt-and-braces: goNext already stops anyone reaching the last step
+    // with step 0/1 incomplete, but handleSubmit can still fire directly
+    // (e.g. pressing Enter in a field), so re-check everything, not just
+    // this step, and send them back to whichever step actually has the
+    // problem rather than a generic message.
+    for (let i = 0; i < STEPS.length; i += 1) {
+      const problem = stepValidationError(i);
+      if (problem) {
+        setStep(i);
+        setStepError(problem);
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -490,6 +617,24 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
         </p>
       </header>
 
+      <div className="vof-steps">
+        {STEPS.map((label, i) => (
+          <React.Fragment key={label}>
+            <div
+              className={`vof-step-dot ${i < step ? 'vof-step-done' : ''} ${i === step ? 'vof-step-current' : ''}`}
+              aria-current={i === step ? 'step' : undefined}
+            >
+              {i < step ? '✓' : i + 1}
+            </div>
+            {i < STEPS.length - 1 && <div className={`vof-step-line ${i < step ? 'vof-step-done' : ''}`} />}
+          </React.Fragment>
+        ))}
+      </div>
+      <p className="vof-step-label">
+        Step {step + 1} of {STEPS.length} — {STEPS[step]}
+      </p>
+
+      {step === 0 && (
       <fieldset>
         <legend>About your business</legend>
 
@@ -536,7 +681,9 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
           />
         </label>
       </fieldset>
+      )}
 
+      {step === 1 && (
       <fieldset>
         <legend>Get paid</legend>
 
@@ -581,7 +728,9 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
           {accountError && <span className="vof-error">{accountError}</span>}
         </div>
       </fieldset>
+      )}
 
+      {step === 2 && (
       <fieldset>
         <legend>Verify your identity</legend>
 
@@ -626,12 +775,29 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
           {selfieFile && <span className="vof-filename">{selfieFile.name}</span>}
         </label>
       </fieldset>
+      )}
 
-      {submitError && <p className="vof-error vof-submit-error">{submitError}</p>}
+      {stepError && <p className="vof-error vof-submit-error">{stepError}</p>}
+      {step === STEPS.length - 1 && submitError && (
+        <p className="vof-error vof-submit-error">{submitError}</p>
+      )}
 
-      <button type="submit" className="vof-submit" disabled={submitting}>
-        {submitting ? (existing ? 'Saving…' : 'Setting up your store…') : existing ? 'Save changes' : 'Set up my store'}
-      </button>
+      <div className="vof-step-nav">
+        {step > 0 && (
+          <button type="button" className="vof-btn-back" onClick={goBack}>
+            Back
+          </button>
+        )}
+        {step < STEPS.length - 1 ? (
+          <button type="button" className="vof-submit" onClick={goNext}>
+            Continue
+          </button>
+        ) : (
+          <button type="submit" className="vof-submit" disabled={submitting}>
+            {submitting ? (existing ? 'Saving…' : 'Setting up your store…') : existing ? 'Save changes' : 'Set up my store'}
+          </button>
+        )}
+      </div>
     </form>
   );
 }
