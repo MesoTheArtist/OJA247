@@ -1,8 +1,23 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Check } from "lucide-react";
 import Logo from "../assets/OJA247 VX1.png";
+
+// Registration is three short steps instead of one 16-field page. All the
+// data still lives in a single formData object, so going back never loses
+// anything, and the same register() call fires at the end.
+const STEPS = [
+  { n: 1, label: "Account", title: "Create your account", hint: "You'll use this to log in to your dashboard." },
+  { n: 2, label: "Business", title: "About your business", hint: "This is what customers see on your store." },
+  { n: 3, label: "Stand out", title: "Make your store stand out", hint: "All optional. You can change your logo and banner later from your dashboard." },
+];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const inputClass =
+  "w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base";
+const labelClass = "block text-sm font-semibold text-gray-700 mb-2";
 
 const BusinessForm = () => {
   const navigate = useNavigate();
@@ -10,6 +25,8 @@ const BusinessForm = () => {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [step, setStep] = useState(1);
+  const cardRef = useRef(null);
 
   const [formData, setFormData] = useState({
     // Auth fields
@@ -42,6 +59,12 @@ const BusinessForm = () => {
   const [bannerPreview, setBannerPreview] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Bring the top of the card back into view whenever the step changes or an
+  // error appears — on a phone the Continue button is far below the banner.
+  useEffect(() => {
+    cardRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, [step, error]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -107,22 +130,63 @@ const BusinessForm = () => {
     });
   };
 
+  // Returns an error message for a step, or "" when it's complete. Step 3 is
+  // all optional.
+  const validateStep = (n) => {
+    if (n === 1) {
+      if (!EMAIL_RE.test(formData.email.trim())) return "Please enter a valid email address.";
+      if (formData.password.length < 6) return "Password must be at least 6 characters!";
+      if (formData.password !== formData.confirmPassword) return "Passwords do not match!";
+    }
+    if (n === 2) {
+      if (!formData.name.trim()) return "Please enter your business name.";
+      if (!formData.description.trim()) return "Please add a short description of your business.";
+      if (!formData.category) return "Please choose a category.";
+      if (!formData.location.trim()) return "Please enter your location.";
+      if (!formData.contact.trim()) return "Please enter a contact number.";
+    }
+    return "";
+  };
+
+  const goNext = () => {
+    const problem = validateStep(step);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    setError("");
+    setStep((s) => Math.min(STEPS.length, s + 1));
+  };
+
+  const goBack = () => {
+    setError("");
+    setStep((s) => Math.max(1, s - 1));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // On steps 1-2 the main button (and Enter in a field) is "Continue", not
+    // "register" — never register half a form.
+    if (step < STEPS.length) {
+      goNext();
+      return;
+    }
+
     setError("");
+
+    // Final check of everything, sending the person back to whichever step
+    // is actually incomplete.
+    for (const n of [1, 2]) {
+      const problem = validateStep(n);
+      if (problem) {
+        setError(problem);
+        setStep(n);
+        return;
+      }
+    }
+
     setLoading(true);
-
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match!");
-      setLoading(false);
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters!");
-      setLoading(false);
-      return;
-    }
 
     const businessData = {
       name: formData.name,
@@ -148,15 +212,19 @@ const BusinessForm = () => {
       navigate(`/dashboard/${result.business._id}`);
     } else {
       setError(result.message);
+      // "email already registered" and referral-code problems belong to step 1.
+      if (/email|referral/i.test(result.message || "")) setStep(1);
     }
 
     setLoading(false);
   };
 
+  const current = STEPS[step - 1];
+
   return (
     <div className="min-h-screen bg-gray-50 py-6 sm:py-12">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
-        <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-8">
+        <div ref={cardRef} className="bg-white rounded-2xl shadow-lg p-4 sm:p-8 scroll-mt-4">
           <div className="flex justify-center mb-6">
             <img src={Logo} alt="OJA247" className="w-28" />
           </div>
@@ -167,51 +235,82 @@ const BusinessForm = () => {
             Join OJA247 and reach thousands of customers
           </p>
 
+          {/* Progress */}
+          <ol className="grid grid-cols-3 gap-2 mb-8" aria-label="Registration progress">
+            {STEPS.map((s) => {
+              const done = s.n < step;
+              const isCurrent = s.n === step;
+              return (
+                <li key={s.n} className="flex flex-col items-center text-center min-w-0">
+                  <div className="flex items-center w-full">
+                    <span className={`flex-1 h-0.5 ${s.n === 1 ? "opacity-0" : done || isCurrent ? "bg-green-600" : "bg-gray-200"}`} />
+                    <button
+                      type="button"
+                      onClick={() => done && setStep(s.n)}
+                      disabled={!done}
+                      aria-label={done ? `Back to step ${s.n}: ${s.label}` : `Step ${s.n}: ${s.label}`}
+                      aria-current={isCurrent ? "step" : undefined}
+                      className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold transition ${
+                        done
+                          ? "bg-green-600 text-white hover:bg-green-700"
+                          : isCurrent
+                          ? "bg-green-600 text-white ring-4 ring-green-100"
+                          : "bg-gray-100 text-gray-400"
+                      }`}
+                    >
+                      {done ? <Check size={16} /> : s.n}
+                    </button>
+                    <span className={`flex-1 h-0.5 ${s.n === STEPS.length ? "opacity-0" : done ? "bg-green-600" : "bg-gray-200"}`} />
+                  </div>
+                  <span className={`mt-2 text-xs sm:text-sm font-medium truncate max-w-full ${isCurrent ? "text-green-700" : "text-gray-500"}`}>
+                    {s.label}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+            <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm break-words">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Account Information Section */}
-            <div className="border-b pb-6">
-              <h3 className="text-lg sm:text-xl font-bold mb-4 text-gray-900">
-                Account Information
-              </h3>
+          <form onSubmit={handleSubmit} noValidate className="space-y-6">
+            <div>
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900">{current.title}</h3>
+              <p className="text-sm text-gray-500 mt-1">{current.hint}</p>
+            </div>
 
+            {/* Step 1: account */}
+            {step === 1 && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Email Address *
-                  </label>
+                  <label className={labelClass}>Email Address *</label>
                   <input
                     type="email"
                     name="email"
+                    autoComplete="email"
                     placeholder="your@email.com"
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base"
+                    className={inputClass}
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    You'll use this to login to your dashboard
-                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Password *
-                    </label>
+                    <label className={labelClass}>Password *</label>
                     <div className="relative">
                       <input
                         type={showPassword ? "text" : "password"}
                         name="password"
+                        autoComplete="new-password"
                         placeholder="••••••••"
                         value={formData.password}
                         onChange={handleChange}
-                        className="w-full p-3 pr-11 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base"
+                        className={`${inputClass} pr-11`}
                         required
                         minLength={6}
                       />
@@ -228,104 +327,85 @@ const BusinessForm = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Confirm Password *
-                    </label>
+                    <label className={labelClass}>Confirm Password *</label>
                     <div className="relative">
                       <input
                         type={showConfirmPassword ? "text" : "password"}
                         name="confirmPassword"
+                        autoComplete="new-password"
                         placeholder="••••••••"
                         value={formData.confirmPassword}
                         onChange={handleChange}
-                        className="w-full p-3 pr-11 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base"
+                        className={`${inputClass} pr-11`}
                         required
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword((prev) => !prev)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                        aria-label={
-                          showConfirmPassword ? "Hide password" : "Show password"
-                        }
+                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                         tabIndex={-1}
                       >
-                        {showConfirmPassword ? (
-                          <EyeOff size={18} />
-                        ) : (
-                          <Eye size={18} />
-                        )}
+                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Referral Code (Optional)
-                  </label>
+                  <label className={labelClass}>Referral Code (Optional)</label>
                   <input
                     type="text"
                     name="referralCodeUsed"
                     placeholder="e.g., MKT-A1B2C3"
                     value={formData.referralCodeUsed}
                     onChange={handleChange}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base uppercase"
+                    className={`${inputClass} uppercase`}
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Were you referred by a marketer or another business? Enter their code here.
                   </p>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Business Information Section */}
-            <div className="border-b pb-6">
-              <h3 className="text-lg sm:text-xl font-bold mb-4 text-gray-900">
-                Business Information
-              </h3>
-
+            {/* Step 2: business */}
+            {step === 2 && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Business Name *
-                  </label>
+                  <label className={labelClass}>Business Name *</label>
                   <input
                     type="text"
                     name="name"
                     placeholder="e.g., Mama Chinedu Kitchen"
                     value={formData.name}
                     onChange={handleChange}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base"
+                    className={inputClass}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Description *
-                  </label>
+                  <label className={labelClass}>Description *</label>
                   <textarea
                     name="description"
                     placeholder="Tell us about your business..."
                     value={formData.description}
                     onChange={handleChange}
                     rows="3"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base"
+                    className={inputClass}
                     required
                   />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Category *
-                    </label>
+                    <label className={labelClass}>Category *</label>
                     <select
                       name="category"
                       value={formData.category}
                       onChange={handleChange}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base"
+                      className={inputClass}
                       required
                     >
                       <option value="">Select a category</option>
@@ -340,47 +420,41 @@ const BusinessForm = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Location *
-                    </label>
+                    <label className={labelClass}>Location *</label>
                     <input
                       type="text"
                       name="location"
                       placeholder="e.g., Lagos"
                       value={formData.location}
                       onChange={handleChange}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base"
+                      className={inputClass}
                       required
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Contact Number *
-                  </label>
+                  <label className={labelClass}>Contact Number *</label>
                   <input
-                    type="text"
+                    type="tel"
                     name="contact"
+                    autoComplete="tel"
                     placeholder="e.g., +234 800 000 0000"
                     value={formData.contact}
                     onChange={handleChange}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base"
+                    className={inputClass}
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    WhatsApp number recommended
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">WhatsApp number recommended</p>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Branding Section */}
-            <div className="border-b pb-6">
-              <h3 className="text-lg sm:text-xl font-bold mb-4 text-gray-900">
-                Branding (Optional)
-              </h3>
-
+            {/* Step 3: optional extras */}
+            {step === 3 && (
+              <div className="space-y-8">
+                <div>
+                  <h4 className="text-base font-bold text-gray-900 mb-3">Branding</h4>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -442,14 +516,10 @@ const BusinessForm = () => {
                   )}
                 </div>
               </div>
-            </div>
+                </div>
 
-            {/* Social Links Section */}
-            <div className="border-b pb-6">
-              <h3 className="text-lg sm:text-xl font-bold mb-4 text-gray-900">
-                Social Media (Optional)
-              </h3>
-
+                <div>
+                  <h4 className="text-base font-bold text-gray-900 mb-3">Social media</h4>
               <div className="space-y-4">
                 <input
                   type="url"
@@ -484,14 +554,10 @@ const BusinessForm = () => {
                   className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base"
                 />
               </div>
-            </div>
+                </div>
 
-            {/* Highlights Section */}
-            <div className="pb-6">
-              <h3 className="text-lg sm:text-xl font-bold mb-4 text-gray-900">
-                Business Highlights (Optional)
-              </h3>
-
+                <div>
+                  <h4 className="text-base font-bold text-gray-900 mb-3">Business highlights</h4>
               <div className="flex flex-col sm:flex-row gap-2 mb-4">
                 <input
                   type="text"
@@ -531,43 +597,74 @@ const BusinessForm = () => {
                   ))}
                 </div>
               )}
-            </div>
+                </div>
+              </div>
+            )}
 
-            {/* Submit Button Section */}
+            {/* Navigation. Both the Continue and Register buttons submit the
+                form, so pressing Enter in a field does the same thing as
+                clicking the main button; handleSubmit decides whether that
+                means "next step" or "register". */}
             <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
-              <button
-                type="button"
-                onClick={() => navigate("/")}
-                className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className={`w-full flex-1 py-3 rounded-lg font-bold text-white transition-colors ${
-                  loading
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                } shadow-lg`}
-              >
-                {loading ? "Registering..." : "Register Business"}
-              </button>
+              {step === 1 ? (
+                <button
+                  key="cancel"
+                  type="button"
+                  onClick={() => navigate("/")}
+                  className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+              ) : (
+                <button
+                  key="back"
+                  type="button"
+                  onClick={goBack}
+                  disabled={loading}
+                  className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-60"
+                >
+                  Back
+                </button>
+              )}
+
+              {step < STEPS.length ? (
+                <button
+                  key="continue"
+                  type="submit"
+                  className="w-full flex-1 py-3 rounded-lg font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg transition-colors"
+                >
+                  Continue
+                </button>
+              ) : (
+                <button
+                  key="submit"
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full flex-1 py-3 rounded-lg font-bold text-white transition-colors ${
+                    loading
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                  } shadow-lg`}
+                >
+                  {loading ? "Registering..." : "Register Business"}
+                </button>
+              )}
             </div>
 
-            {/* Login Link */}
-            <div className="text-center pt-4 border-t">
-              <p className="text-xs sm:text-sm text-gray-600">
-                Already have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => navigate("/login")}
-                  className="text-green-600 font-semibold hover:text-green-700"
-                >
-                  Login here
-                </button>
-              </p>
-            </div>
+            {step === 1 && (
+              <div className="text-center pt-4 border-t">
+                <p className="text-xs sm:text-sm text-gray-600">
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => navigate("/login")}
+                    className="text-green-600 font-semibold hover:text-green-700"
+                  >
+                    Login here
+                  </button>
+                </p>
+              </div>
+            )}
           </form>
         </div>
       </div>
