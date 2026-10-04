@@ -78,13 +78,18 @@ async function buildRecipients(audiences) {
   return [...byEmail.values()];
 }
 
-function validateContent({ subject, body, ctaLabel, ctaUrl }) {
+function validateContent({ subject, body, ctaLabel, ctaUrl, imageUrl }) {
   if (!subject || !String(subject).trim()) return "A subject is required.";
   if (String(subject).length > 150) return "Subject is too long (150 characters max).";
   if (!body || !String(body).trim()) return "The message body is required.";
   if (String(body).length > 5000) return "The message is too long (5000 characters max).";
   if (ctaUrl && !/^https:\/\//i.test(String(ctaUrl))) return "The button link must start with https://";
   if (ctaUrl && !String(ctaLabel || "").trim()) return "Add a label for the button, or clear the link.";
+  // Not a strict URL-format check the way ctaUrl gets — imageUrl comes from
+  // the existing upload flow (Cloudinary), not free typing, so the only
+  // real risk is someone hand-editing the request; https:// is enough of
+  // a guard against that without duplicating Cloudinary's own validation.
+  if (imageUrl && !/^https:\/\//i.test(String(imageUrl))) return "The image link looks invalid.";
   return null;
 }
 
@@ -92,6 +97,7 @@ const summarise = (c) => ({
   _id: c._id,
   occasion: c.occasion,
   subject: c.subject,
+  imageUrl: c.imageUrl,
   audiences: c.audiences,
   status: c.status,
   pausedReason: c.pausedReason,
@@ -136,6 +142,7 @@ export const sendTestCampaign = async (req, res) => {
       subject: `[Test] ${req.body.subject}`,
       bodyText: req.body.body,
       firstName: firstNameOf(req.user.fullName) || "there",
+      imageUrl: req.body.imageUrl,
       ctaLabel: req.body.ctaLabel,
       ctaUrl: req.body.ctaUrl,
       unsubscribeUrl: unsubscribeUrlFor("user", req.user._id),
@@ -154,10 +161,10 @@ export const sendTestCampaign = async (req, res) => {
 // Freezes the recipient list. Nothing is sent until send-batch is called.
 export const createCampaign = async (req, res) => {
   try {
-    const { occasion, subject, body, ctaLabel, ctaUrl } = req.body || {};
+    const { occasion, subject, body, ctaLabel, ctaUrl, imageUrl } = req.body || {};
     const audiences = (req.body?.audiences || []).filter((a) => AUDIENCES.includes(a));
 
-    const problem = validateContent({ subject, body, ctaLabel, ctaUrl });
+    const problem = validateContent({ subject, body, ctaLabel, ctaUrl, imageUrl });
     if (problem) return res.status(400).json({ message: problem });
     if (audiences.length === 0) return res.status(400).json({ message: "Pick at least one audience." });
 
@@ -172,6 +179,7 @@ export const createCampaign = async (req, res) => {
       body: String(body).trim(),
       ctaLabel: ctaLabel ? String(ctaLabel).trim() : "",
       ctaUrl: ctaUrl ? String(ctaUrl).trim() : "",
+      imageUrl: imageUrl ? String(imageUrl).trim() : "",
       audiences,
       recipients,
       totalRecipients: recipients.length,
@@ -234,6 +242,7 @@ export const sendCampaignBatch = async (req, res) => {
             subject: campaign.subject,
             bodyText: campaign.body,
             firstName: firstNameOf(r.name),
+            imageUrl: campaign.imageUrl,
             ctaLabel: campaign.ctaLabel,
             ctaUrl: campaign.ctaUrl,
             unsubscribeUrl: unsubscribeUrlFor(r.kind, r.uid),

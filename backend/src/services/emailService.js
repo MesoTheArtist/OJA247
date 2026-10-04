@@ -1155,15 +1155,22 @@ export function renderBroadcastSubject(subject, firstName) {
   return String(subject || "").replace(/\{\{\s*name\s*\}\}/gi, firstName || "there");
 }
 
-export async function sendBroadcastEmail({ to, subject, bodyText, firstName, ctaLabel, ctaUrl, unsubscribeUrl }) {
+export async function sendBroadcastEmail({ to, subject, bodyText, firstName, imageUrl, ctaLabel, ctaUrl, unsubscribeUrl }) {
   const footer = unsubscribeUrl
     ? `<p style="color:#9ca3af; font-size:12px; line-height:1.6; margin:24px 0 0; border-top:1px solid #f1f2f4; padding-top:14px;">You're getting this because you have an OJA247 account. <a href="${unsubscribeUrl}" style="color:#6b7280;">Unsubscribe from announcements</a> &mdash; you'll still receive order and account emails.</p>`
+    : "";
+  // Flyer image, if any, goes first — above the message text, same as a
+  // physical flyer leads with the graphic. imageUrl is a Cloudinary URL
+  // from the ordinary upload flow (see campaignController.validateContent),
+  // not raw HTML, so no further escaping is needed for it.
+  const image = imageUrl
+    ? `<img src="${imageUrl}" alt="" style="max-width:100%; border-radius:12px; margin:0 0 16px; display:block;" />`
     : "";
   return sendEmail({
     to,
     subject: renderBroadcastSubject(subject, firstName),
     html: layout(
-      `${renderBroadcastText(bodyText, firstName)}${ctaLabel && ctaUrl ? button(esc(ctaLabel), ctaUrl) : ""}${footer}`,
+      `${image}${renderBroadcastText(bodyText, firstName)}${ctaLabel && ctaUrl ? button(esc(ctaLabel), ctaUrl) : ""}${footer}`,
       { preheader: renderBroadcastSubject(subject, firstName) }
     ),
     headers: unsubscribeUrl

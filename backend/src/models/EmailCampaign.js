@@ -25,6 +25,9 @@ const EmailCampaignSchema = new mongoose.Schema(
     body: { type: String, required: true, maxlength: 5000 },
     ctaLabel: { type: String, default: "", maxlength: 40 },
     ctaUrl: { type: String, default: "", maxlength: 500 },
+    // A Cloudinary URL from the ordinary /api/upload/single flow — a flyer
+    // image, rendered inline above the message text. Optional.
+    imageUrl: { type: String, default: "", maxlength: 500 },
     audiences: [{ type: String, enum: ["customers", "vendors", "marketers"] }],
     recipients: [RecipientSchema],
     // Index of the next recipient to look at. Moved atomically when a batch

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Mail, Send, RefreshCw, Users, Store, UserCog } from "lucide-react";
 import axiosInstance from "../services/api";
+import ImageUpload from "./ImageUpload";
 
 // Ready-made starting points. {{name}} becomes each person's first name
 // (or "there" if we don't have one), filled in per recipient when sent.
@@ -257,6 +258,7 @@ const CampaignAdminTab = ({ showToast }) => {
   const [body, setBody] = useState("");
   const [ctaLabel, setCtaLabel] = useState("");
   const [ctaUrl, setCtaUrl] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [history, setHistory] = useState([]);
   const [testing, setTesting] = useState(false);
   const [running, setRunning] = useState(null); // { id, subject, sent, failed, total, status }
@@ -304,10 +306,15 @@ const CampaignAdminTab = ({ showToast }) => {
       // so a previous preset's button never rides along by accident.
       setCtaLabel(p.ctaLabel || "");
       setCtaUrl(p.ctaUrl || "");
+      // No preset defines a flyer image today, so switching presets always
+      // clears whatever image was attached — same reasoning as the CTA
+      // button just above: a leftover image from a different occasion
+      // shouldn't silently ride along.
+      setImageUrl(p.imageUrl || "");
     }
   };
 
-  const content = () => ({ subject, body, ctaLabel, ctaUrl });
+  const content = () => ({ subject, body, ctaLabel, ctaUrl, imageUrl });
   const contentProblem = () => {
     if (!subject.trim()) return "Add a subject.";
     if (!body.trim()) return "Write the message.";
@@ -486,6 +493,28 @@ const CampaignAdminTab = ({ showToast }) => {
           <code>{"{{name}}"}</code> becomes each person's first name. Plain text only, so formatting codes show as typed.
         </p>
 
+        <div className="mb-4">
+          <label className="block text-sm font-semibold text-gray-700 mb-1">
+            Flyer image <span className="font-normal text-gray-400">(optional)</span>
+          </label>
+          {imageUrl ? (
+            <div className="relative inline-block">
+              <img src={imageUrl} alt="" className="max-h-40 rounded-xl border border-gray-200" />
+              <button
+                type="button"
+                onClick={() => setImageUrl("")}
+                aria-label="Remove image"
+                className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gray-800 text-white text-sm leading-none"
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <ImageUpload onImagesUploaded={(urls) => setImageUrl(urls[0] || "")} />
+          )}
+          <p className="text-xs text-gray-400 mt-1">Shown at the top of the email, above the message.</p>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -521,6 +550,7 @@ const CampaignAdminTab = ({ showToast }) => {
         {(subject || body) && (
           <div className="mb-5 rounded-xl border border-gray-100 bg-gray-50 p-4">
             <p className="text-xs uppercase tracking-wide text-gray-400 mb-2">Preview for “{sampleName}”</p>
+            {imageUrl && <img src={imageUrl} alt="" className="max-h-48 rounded-xl mb-3" />}
             <p className="font-semibold text-gray-900 mb-3 break-words">{subject.replace(/\{\{\s*name\s*\}\}/gi, sampleName)}</p>
             {previewParas.map((para, i) => (
               <p key={i} className="text-sm text-gray-600 mb-2 whitespace-pre-line break-words">
