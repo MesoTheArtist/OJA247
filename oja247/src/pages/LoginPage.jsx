@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Logo from '../assets/OJA247 VX1.png';
+import { renderGoogleButton } from '../utils/googleButton';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -95,6 +96,7 @@ const LoginPage = () => {
     // silently never render the button in that common case. Poll briefly
     // instead, stop as soon as it's ready.
     let intervalId;
+    let stopButton = () => {};
     let attempts = 0;
     const maxAttempts = 40; // ~10s at 250ms — generous for a slow connection
 
@@ -113,10 +115,9 @@ const LoginPage = () => {
 
       const btnContainer = document.getElementById('google-signin-button');
       if (btnContainer) {
-        window.google.accounts.id.renderButton(btnContainer, {
+        stopButton = renderGoogleButton(btnContainer, {
           theme: 'outline',
           size: 'large',
-          width: 320,
           text: 'continue_with',
         });
       }
@@ -125,7 +126,10 @@ const LoginPage = () => {
     tryRender(); // in case it's already loaded (e.g. fast connection, cached script)
     intervalId = setInterval(tryRender, 250);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(intervalId);
+      stopButton();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

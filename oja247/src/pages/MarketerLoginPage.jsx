@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import marketerApi from "../services/marketerApi";
 import Logo from "../assets/OJA247 VX1.png";
+import { renderGoogleButton } from '../utils/googleButton';
 
 const MarketerLoginPage = () => {
   const navigate = useNavigate();
@@ -57,6 +58,7 @@ const MarketerLoginPage = () => {
   // loaded yet on first render.
   useEffect(() => {
     let intervalId;
+    let stopButton = () => {};
     let attempts = 0;
     const maxAttempts = 40; // ~10s at 250ms
 
@@ -75,10 +77,9 @@ const MarketerLoginPage = () => {
 
       const btnContainer = document.getElementById("marketer-google-signin-button");
       if (btnContainer) {
-        window.google.accounts.id.renderButton(btnContainer, {
+        stopButton = renderGoogleButton(btnContainer, {
           theme: "outline",
           size: "large",
-          width: 320,
           text: "continue_with",
         });
       }
@@ -87,7 +88,10 @@ const MarketerLoginPage = () => {
     tryRender();
     intervalId = setInterval(tryRender, 250);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(intervalId);
+      stopButton();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
