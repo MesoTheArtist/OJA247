@@ -6,6 +6,7 @@ import User from "../models/User.js";
 import Follow from "../models/Follow.js";
 import { isValidCustomReferralCode, isBusinessReferralCodeTaken } from "../services/referralService.js";
 import { sendBusinessReferralCodeChangedEmail } from "../services/emailService.js";
+import { sanitizeSocialLinks, sanitizeHighlights } from "../services/businessProfile.js";
 
 // Looks up the business owner's login email — Business itself only stores
 // a public contact phone, not an email. Same pattern as the identically-
@@ -162,6 +163,19 @@ export const updateBusiness = async (req, res) => {
         sanitizedUpdates[field] = updates[field];
       }
     });
+
+    // Social links end up as <a href> on the storefront, so only plain web
+    // addresses are allowed through; highlights are trimmed and capped.
+    if (sanitizedUpdates.socialLinks !== undefined) {
+      const links = sanitizeSocialLinks(sanitizedUpdates.socialLinks);
+      if (links.error) return res.status(400).json({ message: links.error });
+      sanitizedUpdates.socialLinks = links.value;
+    }
+    if (sanitizedUpdates.highlights !== undefined) {
+      const highlights = sanitizeHighlights(sanitizedUpdates.highlights);
+      if (highlights.error) return res.status(400).json({ message: highlights.error });
+      sanitizedUpdates.highlights = highlights.value;
+    }
 
     // If the vendor supplied a custom slug, normalize + guarantee it's unique
     // (excluding their own current business from the collision check).

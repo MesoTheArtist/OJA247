@@ -38,7 +38,10 @@ const BusinessDashboard = () => {
     deliveryFeeInState: "",
     deliveryFeeOutState: "",
     slug: "",
+    socialLinks: { facebook: "", instagram: "", twitter: "", website: "" },
+    highlights: [],
   });
+  const [highlightInput, setHighlightInput] = useState("");
 
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -68,21 +71,34 @@ const BusinessDashboard = () => {
     }
   };
 
+  // Loads the edit form from the saved business. Also used by Cancel, so
+  // abandoned edits don't reappear the next time the form is opened.
+  const resetEditForm = (b) => {
+    if (!b) return;
+    setEditForm({
+      name: b.name || "",
+      description: b.description || "",
+      category: b.category || "",
+      location: b.location || "",
+      contact: b.contact || "",
+      logo: b.logo || "",
+      banner: b.banner || "",
+      deliveryFeeInState: b.deliveryFeeInState ?? "",
+      deliveryFeeOutState: b.deliveryFeeOutState ?? "",
+      slug: b.slug || "",
+      socialLinks: {
+        facebook: b.socialLinks?.facebook || "",
+        instagram: b.socialLinks?.instagram || "",
+        twitter: b.socialLinks?.twitter || "",
+        website: b.socialLinks?.website || "",
+      },
+      highlights: Array.isArray(b.highlights) ? b.highlights : [],
+    });
+    setHighlightInput("");
+  };
+
   useEffect(() => {
-    if (business) {
-      setEditForm({
-        name: business.name || "",
-        description: business.description || "",
-        category: business.category || "",
-        location: business.location || "",
-        contact: business.contact || "",
-        logo: business.logo || "",
-        banner: business.banner || "",
-        deliveryFeeInState: business.deliveryFeeInState ?? "",
-        deliveryFeeOutState: business.deliveryFeeOutState ?? "",
-        slug: business.slug || "",
-      });
-    }
+    resetEditForm(business);
   }, [business]);
 
   useEffect(() => {
@@ -168,8 +184,32 @@ const BusinessDashboard = () => {
 
   const handleEditFieldChange = (event) => {
     const { name, value } = event.target;
+    if (name.startsWith("socialLinks.")) {
+      const key = name.split(".")[1];
+      setEditForm((prev) => ({ ...prev, socialLinks: { ...prev.socialLinks, [key]: value } }));
+      return;
+    }
     setEditForm((prev) => ({ ...prev, [name]: value }));
   };
+
+  const MAX_HIGHLIGHTS = 10;
+  const addHighlight = () => {
+    const text = highlightInput.trim();
+    if (!text) return;
+    if (editForm.highlights.some((h) => h.toLowerCase() === text.toLowerCase())) {
+      setHighlightInput("");
+      return;
+    }
+    if (editForm.highlights.length >= MAX_HIGHLIGHTS) {
+      setFormError(`You can add up to ${MAX_HIGHLIGHTS} highlights.`);
+      return;
+    }
+    setFormError("");
+    setEditForm((prev) => ({ ...prev, highlights: [...prev.highlights, text] }));
+    setHighlightInput("");
+  };
+  const removeHighlight = (index) =>
+    setEditForm((prev) => ({ ...prev, highlights: prev.highlights.filter((_, i) => i !== index) }));
 
   const handleEditImageUpload = (event) => {
     const { name, files } = event.target;
@@ -204,8 +244,8 @@ const BusinessDashboard = () => {
         ...editForm,
         deliveryFeeInState: Number(editForm.deliveryFeeInState) || 0,
         deliveryFeeOutState: Number(editForm.deliveryFeeOutState) || 0,
-        socialLinks: business.socialLinks || {},
-        highlights: business.highlights || [],
+        socialLinks: editForm.socialLinks,
+        highlights: editForm.highlights,
       });
 
       setBusiness(response.data);
@@ -734,6 +774,52 @@ const BusinessDashboard = () => {
                   </div>
                 </div>
 
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Social links</label>
+                    {Object.values(business.socialLinks || {}).some(Boolean) ? (
+                      <ul className="mt-2 space-y-1.5">
+                        {[
+                          ["facebook", "Facebook"],
+                          ["instagram", "Instagram"],
+                          ["twitter", "Twitter / X"],
+                          ["website", "Website"],
+                        ]
+                          .filter(([key]) => business.socialLinks?.[key])
+                          .map(([key, label]) => (
+                            <li key={key} className="text-sm min-w-0">
+                              <span className="text-gray-500">{label}: </span>
+                              <a
+                                href={business.socialLinks[key]}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-green-700 hover:underline break-all"
+                              >
+                                {business.socialLinks[key]}
+                              </a>
+                            </li>
+                          ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-1 text-gray-500">No social links added yet.</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Highlights</label>
+                    {business.highlights?.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {business.highlights.map((h, i) => (
+                          <span key={`${h}-${i}`} className="text-xs bg-green-50 text-green-700 px-2.5 py-1 rounded-full break-words max-w-full">
+                            {h}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-gray-500">No highlights added yet.</p>
+                    )}
+                  </div>
+                </div>
+
                 <div className="mt-8 flex justify-end">
                   <button
                     type="button"
@@ -898,12 +984,89 @@ const BusinessDashboard = () => {
                   </div>
                 </div>
 
+                <div className="border-t border-gray-100 pt-6">
+                  <h3 className="text-base font-bold text-gray-900 mb-1">Social links</h3>
+                  <p className="text-xs text-gray-400 mb-3">Shown as icons on your store page. Leave blank to hide one.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      ["facebook", "Facebook", "https://facebook.com/yourpage"],
+                      ["instagram", "Instagram", "https://instagram.com/yourhandle"],
+                      ["twitter", "Twitter / X", "https://x.com/yourhandle"],
+                      ["website", "Website", "https://yourwebsite.com"],
+                    ].map(([key, label, placeholder]) => (
+                      <div key={key} className="min-w-0">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                        <input
+                          type="url"
+                          inputMode="url"
+                          name={`socialLinks.${key}`}
+                          value={editForm.socialLinks[key]}
+                          onChange={handleEditFieldChange}
+                          placeholder={placeholder}
+                          className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-100 pt-6">
+                  <h3 className="text-base font-bold text-gray-900 mb-1">Highlights</h3>
+                  <p className="text-xs text-gray-400 mb-3">
+                    Short selling points, like "Fast delivery". The first 3 show on your Explore card. Up to {MAX_HIGHLIGHTS}.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={highlightInput}
+                      onChange={(e) => setHighlightInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addHighlight();
+                        }
+                      }}
+                      maxLength={60}
+                      placeholder="e.g. Fast delivery"
+                      className="w-full sm:flex-1 min-w-0 rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={addHighlight}
+                      className="w-full sm:w-auto px-5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-medium transition"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {editForm.highlights.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {editForm.highlights.map((h, i) => (
+                        <span
+                          key={`${h}-${i}`}
+                          className="inline-flex items-center gap-1.5 max-w-full text-sm bg-green-50 text-green-700 pl-3 pr-2 py-1 rounded-full"
+                        >
+                          <span className="break-words min-w-0">{h}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeHighlight(i)}
+                            aria-label={`Remove ${h}`}
+                            className="shrink-0 w-5 h-5 rounded-full text-green-700 hover:bg-green-100 flex items-center justify-center leading-none"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
                   <button
                     type="button"
                     onClick={() => {
                       setIsEditing(false);
                       setFormError("");
+                      resetEditForm(business);
                     }}
                     className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50"
                   >

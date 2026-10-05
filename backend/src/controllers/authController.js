@@ -10,6 +10,7 @@ import {
   attributeReferral,
 } from "../services/referralService.js";
 import { sendVendorWelcomeEmail, sendPasswordResetEmail, sendPasswordChangedEmail } from "../services/emailService.js";
+import { sanitizeSocialLinks, sanitizeHighlights } from "../services/businessProfile.js";
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -51,6 +52,15 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: "Registration failed: this email is already registered." });
     }
 
+    // Same cleaning as profile edits: links must be plain web addresses.
+    const cleanLinks = sanitizeSocialLinks(businessData.socialLinks);
+    if (cleanLinks.error) {
+      return res.status(400).json({ message: `Registration failed: ${cleanLinks.error}` });
+    }
+    const cleanHighlights = sanitizeHighlights(
+      Array.isArray(businessData.highlights) ? businessData.highlights : []
+    );
+
     const normalizedBusinessData = {
       ...businessData,
       name: String(businessData.name).trim(),
@@ -60,14 +70,8 @@ export const register = async (req, res) => {
       contact: String(businessData.contact).trim(),
       logo: businessData.logo || "",
       banner: businessData.banner || "",
-      socialLinks: {
-        facebook: businessData.socialLinks?.facebook || "",
-        instagram: businessData.socialLinks?.instagram || "",
-        twitter: businessData.socialLinks?.twitter || "",
-        website: businessData.socialLinks?.website || "",
-        threads: businessData.socialLinks?.threads || ""
-      },
-      highlights: Array.isArray(businessData.highlights) ? businessData.highlights.filter(Boolean) : []
+      socialLinks: cleanLinks.value,
+      highlights: cleanHighlights.value
     };
 
     console.log("Creating business...");
