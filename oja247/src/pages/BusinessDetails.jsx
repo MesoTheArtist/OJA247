@@ -2,6 +2,7 @@ import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getBusinessById, getProductsByBusiness, getFollowStatus, followBusiness, unfollowBusiness } from "../services/api";
 import { useCart } from "../context/CartContext";
+import { useDialog } from "../components/DialogProvider";
 import { useAuth } from "../context/AuthContext";
 import Loader from "../components/Loader";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
@@ -75,7 +76,23 @@ function BusinessDetails() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, isCustomer } = useAuth();
-  const { addToCart, itemCount } = useCart();
+  const { addToCart, startNewCartWith, itemCount } = useCart();
+  const { confirm } = useDialog();
+
+  // A cart holds one store's items only. If the shopper is adding from a
+  // different store, ask before replacing what's in their cart.
+  const handleAddToCart = async (product) => {
+    const result = addToCart(product, business);
+    if (result.ok) return;
+
+    const switchStores = await confirm({
+      title: "Start a new cart?",
+      message: `Your cart has items from ${result.currentStoreName}. Each order can only be from one store, so adding this will empty your current cart.`,
+      confirmLabel: "Start new cart",
+      cancelLabel: "Keep my cart",
+    });
+    if (switchStores) startNewCartWith(product, business);
+  };
   const [business, setBusiness] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -726,7 +743,7 @@ function BusinessDetails() {
 
                   <button
                     type="button"
-                    onClick={() => addToCart(product, business)}
+                    onClick={() => handleAddToCart(product)}
                     disabled={!product.inStock}
                     className={`flex items-center justify-center gap-2 w-full text-center py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
                       product.inStock

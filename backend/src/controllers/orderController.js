@@ -253,6 +253,16 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({ message: "Missing required order fields" });
     }
 
+    // One store per order — each vendor has their own storefront, there is no
+    // shared basket. Enforced here as well as in the cart so an old saved cart
+    // or a hand-made request can't create a multi-vendor order.
+    const storeIds = new Set((items || []).map((item) => String(item.businessId || "")));
+    if (storeIds.size > 1) {
+      return res.status(400).json({
+        message: "An order can only include items from one store. Please check out one store at a time.",
+      });
+    }
+
     const existingOrder = await Order.findOne({ reference });
     if (existingOrder) {
       const { subaccounts, missing } = await buildPaystackSplit(existingOrder.vendors);

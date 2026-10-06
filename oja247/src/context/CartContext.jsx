@@ -14,10 +14,32 @@ export function CartProvider({ children }) {
     localStorage.setItem("cart", JSON.stringify(cart));
   }, [cart]);
 
-  // `business` is optional but should be passed whenever available —
-  // it's used at checkout to calculate per-vendor delivery fees.
-  // Expected shape: { _id, name, location, deliveryFeeInState, deliveryFeeOutState }
+  // Which store a cart line belongs to. Same lookup Checkout uses.
+  const storeOf = (item) => (item?.business || item?.businessId)?._id || null;
+
+  // A cart holds items from ONE store only — OJA247 gives each vendor their
+  // own storefront, it isn't a shared basket across sellers.
+  // The store the cart currently belongs to (null when empty).
+  const cartStore = useMemo(() => {
+    const first = cart[0];
+    if (!first) return null;
+    const b = first.business || first.businessId;
+    return { _id: b?._id || null, name: b?.name || "another store" };
+  }, [cart]);
+
+  // `business` should be passed whenever available — it's used at checkout
+  // to calculate delivery fees. Expected shape:
+  // { _id, name, location, deliveryFeeInState, deliveryFeeOutState }
+  // Returns { ok: true } when added, or { ok: false, reason: "other-store",
+  // currentStoreName } when the cart already holds another store's items
+  // (nothing is changed — the caller decides whether to start a new cart).
   const addToCart = (product, business = null) => {
+    const incomingStore = business?._id || (product.business || product.businessId)?._id || null;
+
+    if (cart.length > 0 && String(storeOf(cart[0]) || "") !== String(incomingStore || "")) {
+      return { ok: false, reason: "other-store", currentStoreName: cartStore?.name };
+    }
+
     setCart((prev) => {
       const existing = prev.find((item) => item._id === product._id);
 
@@ -31,6 +53,13 @@ export function CartProvider({ children }) {
 
       return [...prev, { ...product, business, quantity: 1 }];
     });
+    return { ok: true };
+  };
+
+  // Empties the cart and starts a new one with this item — used after the
+  // customer agrees to switch stores.
+  const startNewCartWith = (product, business = null) => {
+    setCart([{ ...product, business, quantity: 1 }]);
   };
 
   const removeFromCart = (productId) => {
@@ -73,6 +102,8 @@ export function CartProvider({ children }) {
         cart,
         cartItems: cart, // alias — CartPage/Checkout destructure `cartItems`
         addToCart,
+        startNewCartWith,
+        cartStore,
         removeFromCart,
         updateQuantity,
         clearCart,
