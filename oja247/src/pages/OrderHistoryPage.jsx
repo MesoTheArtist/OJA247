@@ -10,6 +10,7 @@ import VerifyEmailBanner from "../components/VerifyEmailBanner";
 import { getDisputeEligibility } from "../utils/disputes";
 import { getReviewableVendors } from "../components/ReviewForm";
 import { REVIEWABLE_ORDER_STATUSES } from "../utils/reviews";
+import { useDialog } from "../components/DialogProvider";
 
 const STATUS_STYLES = {
   paid: "bg-green-100 text-green-700",
@@ -42,6 +43,7 @@ const OrderHistoryPage = () => {
   const [disputeOrder, setDisputeOrder] = useState(null);
   const [reviewOrder, setReviewOrder] = useState(null);
   const [confirmingKey, setConfirmingKey] = useState(null);
+  const { notify } = useDialog();
 
   useEffect(() => {
     if (authLoading) return;
@@ -81,7 +83,11 @@ const OrderHistoryPage = () => {
       await axiosInstance.post(`/api/orders/${order.reference}/receive`, { businessId: vendor.businessId });
       await fetchOrders();
     } catch (err) {
-      window.alert(err.response?.data?.message || "Couldn't confirm delivery. Please try again.");
+      await notify({
+        title: "Couldn't confirm delivery",
+        message: err.response?.data?.message || "Something went wrong. Please try again.",
+        tone: "error",
+      });
     } finally {
       setConfirmingKey(null);
     }

@@ -52,8 +52,17 @@ export const markVendorShipped = async (req, res) => {
     const order = await Order.findOne({ reference });
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    const vendor = (order.vendors || []).find((v) => v.businessId === businessId);
-    if (!vendor) return res.status(400).json({ message: "That business isn't part of this order" });
+    const vendor = (order.vendors || []).find((v) => String(v.businessId) === businessId);
+    if (!vendor) {
+      // The vendor order list is built from order ITEMS, so it also shows
+      // orders placed before per-vendor tracking existed (empty vendors[]).
+      const hasItems = (order.items || []).some((i) => String(i.businessId) === businessId);
+      return res.status(400).json({
+        message: hasItems
+          ? "This order was placed before delivery tracking was added, so it can't be marked as sent out here."
+          : "That business isn't part of this order.",
+      });
+    }
 
     // "disputed" is still a paid order: it flips to that as soon as ONE vendor
     // on a multi-vendor order is disputed, and the other vendors still need
@@ -90,8 +99,8 @@ export const markVendorShipped = async (req, res) => {
 
 // Shared by the logged-in button and the emailed link.
 async function confirmReceived(order, businessId) {
-  const vendor = (order.vendors || []).find((v) => v.businessId === businessId);
-  if (!vendor) return { ok: false, code: 400, message: "That business isn't part of this order" };
+  const vendor = (order.vendors || []).find((v) => String(v.businessId) === String(businessId));
+  if (!vendor) return { ok: false, code: 400, message: "That business isn't part of this order." };
 
   const current = statusOf(vendor);
   if (current === "received") return { ok: true, already: true, vendor };
@@ -153,7 +162,7 @@ export const getReceiptInfo = async (req, res) => {
     if (!parsed) return res.status(400).json({ message: "This link is invalid or has expired." });
 
     const order = await Order.findOne({ reference: parsed.orderReference });
-    const vendor = order?.vendors?.find((v) => v.businessId === parsed.businessId);
+    const vendor = order?.vendors?.find((v) => String(v.businessId) === String(parsed.businessId));
     if (!order || !vendor) return res.status(404).json({ message: "Order not found." });
 
     res.json({

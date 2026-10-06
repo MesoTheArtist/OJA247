@@ -4,12 +4,15 @@ import "./index.css";
 import App from "./App.jsx";
 import { AuthProvider } from "./context/AuthContext";
 import { CartProvider } from "./context/CartContext";
+import { DialogProvider } from "./components/DialogProvider";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <AuthProvider>
       <CartProvider>
-        <App />
+        <DialogProvider>
+          <App />
+        </DialogProvider>
       </CartProvider>
     </AuthProvider>
   </StrictMode>

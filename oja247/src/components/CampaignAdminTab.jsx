@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Mail, Send, RefreshCw, Users, Store, UserCog } from "lucide-react";
 import axiosInstance from "../services/api";
 import ImageUpload from "./ImageUpload";
+import { useDialog } from "./DialogProvider";
 
 // Ready-made starting points. {{name}} becomes each person's first name
 // (or "there" if we don't have one), filled in per recipient when sent.
@@ -251,6 +252,7 @@ const errMsg = (err, fallback) => err?.response?.data?.message || fallback;
 // happens a few recipients at a time (the backend caps each batch and the
 // day's total), and this page keeps asking for the next batch until done.
 const CampaignAdminTab = ({ showToast }) => {
+  const { confirm } = useDialog();
   const [audience, setAudience] = useState({ customers: true, vendors: false, marketers: false });
   const [counts, setCounts] = useState(null);
   const [preset, setPreset] = useState("custom");
@@ -373,9 +375,11 @@ const CampaignAdminTab = ({ showToast }) => {
     if (problem) return showToast(problem, "error");
     if (selected.length === 0) return showToast("Pick at least one audience.", "error");
 
-    const ok = window.confirm(
-      `Send "${subject}" to about ${recipientEstimate} ${recipientEstimate === 1 ? "person" : "people"}?\n\nThis can't be undone once it starts.`
-    );
+    const ok = await confirm({
+      title: "Send this announcement?",
+      message: `"${subject}" will go to about ${recipientEstimate} ${recipientEstimate === 1 ? "person" : "people"}.\n\nThis can't be undone once it starts.`,
+      confirmLabel: "Send it",
+    });
     if (!ok) return;
 
     try {

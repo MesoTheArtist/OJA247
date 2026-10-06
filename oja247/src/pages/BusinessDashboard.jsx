@@ -12,6 +12,7 @@ import VendorDisputesTab from "../components/VendorDisputesTab.jsx";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { LogOut, ShoppingBag, Clock, CheckCircle2, XCircle, Copy, Check, Share2, Truck } from "lucide-react";
+import { useDialog } from "../components/DialogProvider";
 import Loader from "../components/Loader";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
 
@@ -47,6 +48,7 @@ const BusinessDashboard = () => {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState("");
   const [shippingRef, setShippingRef] = useState(null);
+  const { confirm, notify } = useDialog();
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [ordersFetched, setOrdersFetched] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -124,16 +126,22 @@ const BusinessDashboard = () => {
   const vendorPartOf = (order) => order.vendors?.find((v) => v.businessId === businessId);
 
   const markShipped = async (order) => {
-    const ok = window.confirm(
-      `Mark order ${order.reference} as sent out?\n\n${order.customer?.fullName || "The customer"} will be emailed so they can confirm when it arrives.`
-    );
+    const ok = await confirm({
+      title: "Mark as sent out?",
+      message: `${order.customer?.fullName || "The customer"} will be emailed so they can confirm when order ${order.reference} arrives.`,
+      confirmLabel: "Yes, it's sent out",
+    });
     if (!ok) return;
     setShippingRef(order.reference);
     try {
       const res = await axiosInstance.patch(`/api/orders/${order.reference}/ship`, { businessId });
       setOrders((prev) => prev.map((o) => (o._id === res.data.order._id ? res.data.order : o)));
     } catch (error) {
-      window.alert(error.response?.data?.message || "Couldn't update the order. Please try again.");
+      await notify({
+        title: "Couldn't update the order",
+        message: error.response?.data?.message || "Something went wrong. Please try again.",
+        tone: "error",
+      });
     } finally {
       setShippingRef(null);
     }
@@ -634,6 +642,15 @@ const BusinessDashboard = () => {
                               const delivery = mine?.fulfillmentStatus || "processing";
                               const payable = order.status === "paid" || order.status === "disputed";
                               if (!payable) return <span className="text-sm text-gray-400">—</span>;
+                              // Orders placed before delivery tracking existed have no entry
+                              // for this business, so there's nothing to update.
+                              if (!mine) {
+                                return (
+                                  <span className="text-xs text-gray-400" title="Placed before delivery tracking was added">
+                                    Not tracked
+                                  </span>
+                                );
+                              }
                               if (delivery === "received") {
                                 return (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
