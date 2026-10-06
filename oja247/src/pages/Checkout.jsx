@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
+import PaystackPop from "@paystack/inline-js";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../services/api";
 import { useCart } from "../context/CartContext";
@@ -9,7 +10,6 @@ const VAT_RATE = 0.075; // Nigeria standard VAT
 function Checkout() {
   const navigate = useNavigate();
   const { cartItems, subtotal, clearCart } = useCart();
-  const paystackPublicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -22,25 +22,6 @@ function Checkout() {
   });
 
   const [deliveryMethod, setDeliveryMethod] = useState("delivery");
-  const [paystackReady, setPaystackReady] = useState(false);
-
-  useEffect(() => {
-    const existingScript = document.querySelector("script[src='https://js.paystack.co/v1/inline.js']");
-
-    if (existingScript) {
-      if (window.PaystackPop) {
-        setPaystackReady(true);
-      }
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = "https://js.paystack.co/v1/inline.js";
-    script.async = true;
-    script.onload = () => setPaystackReady(true);
-    script.onerror = () => setPaystackReady(false);
-    document.body.appendChild(script);
-  }, []);
 
   // Group cart items by business, so each vendor's delivery fee can be
   // calculated independently based on the buyer's state.
@@ -132,15 +113,9 @@ function Checkout() {
       return;
     }
 
-    if (!paystackPublicKey) {
-      alert("Paystack public key is missing. Add VITE_PAYSTACK_PUBLIC_KEY to your .env file.");
-      return;
-    }
-
-    const amountInKobo = Math.round(total * 100);
     const reference = `oja247-${Date.now()}`;
 
-    let split = null;
+    let accessCode = null;
     try {
       const { data } = await axiosInstance.post("/api/orders", {
         reference,
@@ -176,62 +151,47 @@ function Checkout() {
         deliveryMethod,
       });
 
-      split = data.split;
+      accessCode = data.accessCode;
     } catch (error) {
       console.error("Order creation error:", error);
       alert(error.response?.data?.message || "We could not create your order. Please try again.");
       return;
     }
 
-    if (!paystackReady || !window.PaystackPop) {
-      alert("Paystack is still loading. Please wait a moment and try again.");
+    if (!accessCode) {
+      alert("We could not start your payment. Please try again.");
       return;
     }
 
-    const handler = window.PaystackPop.setup({
-      key: paystackPublicKey,
-      email: formData.email,
-      amount: amountInKobo,
-      currency: "NGN",
-      ref: reference,
-      // Pays each vendor's subaccount immediately as part of this transaction —
-      // the platform's service fee + VAT stay behind since they're not in the split.
-      ...(split?.subaccounts?.length > 0 ? { split } : {}),
-      metadata: {
-        custom_fields: [
-          { display_name: "Full Name", variable_name: "full_name", value: formData.fullName },
-          { display_name: "Phone", variable_name: "phone", value: formData.phone },
-          { display_name: "Address", variable_name: "address", value: formData.address },
-          { display_name: "City", variable_name: "city", value: formData.city },
-          { display_name: "State", variable_name: "state", value: formData.state },
-          { display_name: "Delivery Method", variable_name: "delivery_method", value: deliveryMethod },
-          { display_name: "Order Note", variable_name: "order_note", value: formData.note || "" },
-        ],
-      },
-      callback: function (response) {
-        (async function () {
-          try {
-            const verificationResponse = await axiosInstance.post(`/api/orders/verify/${response.reference}`);
+    // The server already started this payment with the vendor split attached,
+    // so the popup only has to finish it.
+    const popup = new PaystackPop();
+    popup.resumeTransaction(accessCode, {
+      onSuccess: async (transaction) => {
+        const paidReference = transaction?.reference || reference;
+        try {
+          const verificationResponse = await axiosInstance.post(`/api/orders/verify/${paidReference}`);
 
-            if (verificationResponse.data?.order?.paymentStatus === "paid") {
-              clearCart();
-              navigate(`/payment-status?status=success&reference=${response.reference}`);
-              return;
-            }
-          } catch (error) {
-            console.error("Payment verification error:", error);
+          if (verificationResponse.data?.order?.paymentStatus === "paid") {
+            clearCart();
+            navigate(`/payment-status?status=success&reference=${paidReference}`);
+            return;
           }
+        } catch (error) {
+          console.error("Payment verification error:", error);
+        }
 
-          navigate(`/payment-status?status=failure&reference=${response.reference}`);
-        })();
+        navigate(`/payment-status?status=failure&reference=${paidReference}`);
       },
-      onClose: function () {
+      onCancel: () => {
         console.log("Paystack checkout closed by user");
         navigate(`/payment-status?status=failure&reference=${reference}`);
       },
+      onError: (error) => {
+        console.error("Paystack popup error:", error);
+        alert("The payment window could not load. Please try again.");
+      },
     });
-
-    handler.openIframe();
   };
 
   return (

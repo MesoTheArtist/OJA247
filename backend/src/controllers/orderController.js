@@ -183,6 +183,56 @@ async function buildPaystackSplit(orderVendors) {
   return { subaccounts, missing };
 }
 
+// Starts the Paystack transaction on the SERVER so the split is guaranteed to
+// be attached (the browser popup used to receive it and could silently drop
+// it). Returns the access_code the browser uses to open the payment popup.
+async function initializePaystackTransaction({ email, total, reference, split, customer, deliveryMethod }) {
+  const secret = process.env.PAYSTACK_SECRET_KEY;
+  if (!secret) {
+    throw new Error("Paystack secret key is not configured on the backend");
+  }
+
+  const body = {
+    email,
+    amount: Math.round(Number(total) * 100), // kobo
+    currency: "NGN",
+    reference,
+    metadata: {
+      custom_fields: [
+        { display_name: "Full Name", variable_name: "full_name", value: customer?.fullName || "" },
+        { display_name: "Phone", variable_name: "phone", value: customer?.phone || "" },
+        { display_name: "Address", variable_name: "address", value: customer?.address || "" },
+        { display_name: "City", variable_name: "city", value: customer?.city || "" },
+        { display_name: "State", variable_name: "state", value: customer?.state || "" },
+        { display_name: "Delivery Method", variable_name: "delivery_method", value: deliveryMethod || "" },
+        { display_name: "Order Note", variable_name: "order_note", value: customer?.note || "" },
+      ],
+    },
+  };
+  if (split?.subaccounts?.length > 0) {
+    body.split = split;
+  }
+
+  const response = await fetch("https://api.paystack.co/transaction/initialize", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || !data?.status || !data?.data?.access_code) {
+    console.error("Paystack initialize failed:", response.status, JSON.stringify(data));
+    const err = new Error(data?.message || "Paystack could not start this payment");
+    err.paystack = true;
+    throw err;
+  }
+
+  return data.data.access_code;
+}
+
 export const createOrder = async (req, res) => {
   try {
     const {
@@ -194,6 +244,7 @@ export const createOrder = async (req, res) => {
       vat,
       deliveryFee,
       deliveryBreakdown,
+      vendors: vendorsFromClient,
       total,
       deliveryMethod,
     } = req.body;
@@ -216,27 +267,38 @@ export const createOrder = async (req, res) => {
       return res.status(200).json({
         message: "Order already exists",
         order: existingOrder,
-        split: { type: "flat", bearer_type: "account", subaccounts },
       });
     }
 
-    // Build the per-vendor breakdown the Order model expects (vendors[]),
-    // from what Checkout.jsx sends as deliveryBreakdown ([{businessId, businessName, fee}]).
-    // itemsSubtotal is derived here since the frontend doesn't currently send it per vendor.
-    const vendors = Array.isArray(deliveryBreakdown)
-      ? deliveryBreakdown.map((v) => {
-          const vendorItemsSubtotal = (items || [])
-            .filter((item) => (item.businessId || null) === (v.businessId || null))
-            .reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
-
-          return {
-            businessId: v.businessId || null,
-            businessName: v.businessName || "",
-            itemsSubtotal: vendorItemsSubtotal,
-            deliveryFee: Number(v.fee || 0),
-          };
-        })
+    // Build the per-vendor breakdown the Order model expects (vendors[]).
+    // Checkout.jsx sends `vendors` ([{businessId, businessName, deliveryFee}]);
+    // older clients sent `deliveryBreakdown` ([{businessId, businessName, fee}]).
+    // Accept either. itemsSubtotal is always derived here from the items, so
+    // the amount routed to a vendor never comes from a client-supplied number.
+    const vendorSource = Array.isArray(vendorsFromClient) && vendorsFromClient.length > 0
+      ? vendorsFromClient
+      : Array.isArray(deliveryBreakdown)
+      ? deliveryBreakdown
       : [];
+
+    const vendors = vendorSource.map((v) => {
+      const vendorItemsSubtotal = (items || [])
+        .filter((item) => String(item.businessId || "") === String(v.businessId || ""))
+        .reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
+
+      return {
+        businessId: v.businessId || null,
+        businessName: v.businessName || "",
+        itemsSubtotal: vendorItemsSubtotal,
+        deliveryFee: Number(v.deliveryFee ?? v.fee ?? 0),
+      };
+    });
+
+    if (vendors.length === 0) {
+      return res.status(400).json({
+        message: "We could not work out which vendors this order belongs to. Please refresh and try again.",
+      });
+    }
 
     // Belt-and-suspenders on top of the public listing filter: isHidden
     // (set on ban — see adminController.js toggleUserBan, and previously
@@ -268,6 +330,24 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    let accessCode;
+    try {
+      accessCode = await initializePaystackTransaction({
+        email: customer.email,
+        total,
+        reference,
+        split: { type: "flat", bearer_type: "account", subaccounts },
+        customer,
+        deliveryMethod,
+      });
+    } catch (initError) {
+      return res.status(502).json({
+        message: initError.paystack
+          ? `Payment could not be started: ${initError.message}`
+          : "Payment could not be started. Please try again.",
+      });
+    }
+
     const order = await Order.create({
       reference,
       customer,
@@ -286,7 +366,7 @@ export const createOrder = async (req, res) => {
     res.status(201).json({
       message: "Order created",
       order,
-      split: { type: "flat", bearer_type: "account", subaccounts },
+      accessCode,
     });
   } catch (error) {
     console.error("Create order error:", error);
