@@ -88,9 +88,9 @@ export const getMarketerDashboard = async (req, res) => {
 // On-demand version of the weekly batch job — pulls this marketer's
 // "pending" payouts into a batch right now instead of waiting for Monday's
 // cron, and emails an admin so it actually gets paid promptly. Still a
-// manual bank transfer either way (Paystack Transfers are blocked until the
-// Preapproved-tier review finishes) — this just skips the wait for the
-// weekly sweep, it doesn't make the payment itself instant.
+// manual bank transfer either way (payouts aren't automated yet) — this just
+// skips the wait for the weekly sweep, it doesn't make the payment itself
+// instant.
 export const requestMarketerWithdrawal = async (req, res) => {
   try {
     const marketerId = req.marketer._id;

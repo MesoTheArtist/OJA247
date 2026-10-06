@@ -153,9 +153,8 @@ const AdminDashboard = () => {
 
   // Marketer payout batches — this week's frozen ("batched") payouts,
   // grouped by marketer with bank details, awaiting a manual bank
-  // transfer + confirmation here. See payoutBatchController.js: your
-  // Paystack account is still Preapproved-tier, so this can't be an
-  // automatic Transfer yet.
+  // transfer + confirmation here. See payoutBatchController.js: payouts
+  // aren't automated yet, so an admin pays each batch by hand.
   const [payoutBatches, setPayoutBatches] = useState([]);
   const [payoutBatchesLoading, setPayoutBatchesLoading] = useState(false);
   const [markingBatchPaidId, setMarkingBatchPaidId] = useState(null);
@@ -1597,8 +1596,8 @@ const AdminDashboard = () => {
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
                   This week's frozen marketer payouts, grouped by marketer. Pay manually (bank transfer or
-                  Paystack dashboard — Transfers are blocked until the Preapproved-tier review finishes), then
-                  mark paid here. The marketer gets an email confirmation automatically.
+                  Paystack dashboard), then mark paid here. The marketer gets an email confirmation
+                  automatically.
                 </p>
               </div>
               {payoutBatchesLoading ? (

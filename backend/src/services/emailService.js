@@ -150,7 +150,7 @@ export async function sendMarketerWithdrawalRequestEmail({ marketerName, markete
       <div style="background:#f0fdf4; border-radius:10px; padding:18px; text-align:center; margin:20px 0;">
         <p style="margin:0; font-size:28px; font-weight:800; color:#16a34a;">₦${amount.toLocaleString()}</p>
       </div>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Your Paystack account is still on the Preapproved tier, so this needs a manual bank transfer — please review and pay it in the admin panel's payout batches, then mark it paid.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Marketer payouts are paid by hand for now — please review and pay it in the admin panel's payout batches, then mark it paid.</p>
       ${button("Review payout batches", `${SITE_URL}/admin`)}
       `,
       { preheader: `${marketerName} requested a ₦${amount.toLocaleString()} withdrawal` }

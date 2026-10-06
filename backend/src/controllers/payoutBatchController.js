@@ -4,13 +4,12 @@ import { sendMarketerPayoutPaidEmail } from "../services/emailService.js";
 
 // GET /api/cron/payout-batch  (called weekly by Vercel Cron — see vercel.json)
 // Groups every "pending" MarketerPayout row into this week's batch.
-// Deliberately does NOT move money — your Paystack account is still on the
-// "Preapproved" tier, which blocks live Transfers until compliance is done
-// (see /areas/oja247.md). This just freezes the list + totals so an admin
-// can review and pay manually (bank transfer or Paystack dashboard) via
-// /api/admin/payout-batches, then confirm with markPayoutBatchPaid below.
-// Once your Paystack account is fully Approved, swap the manual "mark paid"
-// step for an automatic Paystack Transfer call — the batching logic itself
+// Deliberately does NOT move money: payouts are paid by hand for now. This
+// just freezes the list + totals so an admin can review and pay manually
+// (bank transfer or Paystack dashboard) via /api/admin/payout-batches, then
+// confirm with markPayoutBatchPaid below. The Paystack account is now fully
+// approved, so the manual "mark paid" step can later be swapped for an
+// automatic Paystack Transfer call — the batching logic itself
 // doesn't need to change.
 export const runWeeklyPayoutBatch = async (req, res) => {
   try {
