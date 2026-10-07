@@ -51,3 +51,22 @@ export const generalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// Bank details shown at checkout. Public by necessity (a guest has to see
+// where to pay), so this just stops someone scraping every vendor's account.
+export const paymentDetailsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests. Please try again in a few minutes." },
+});
+
+// Placing a bank-transfer order or re-uploading a receipt.
+export const directOrderLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many attempts. Please try again in a few minutes." },
+});

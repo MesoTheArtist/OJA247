@@ -20,7 +20,9 @@ const VendorSchema = new mongoose.Schema(
     accountNumber: { type: String, required: true },
     accountName: { type: String, required: true }, // confirmed via Paystack's resolve-account endpoint
     bankNameMatch: { type: Boolean, default: false },
-    subaccountCode: { type: String, required: true }, // used at checkout to build the split
+    // Legacy: Paystack subaccounts were used for checkout splits before
+    // orders moved to direct bank transfer. New vendors do not get one.
+    subaccountCode: { type: String, default: "" },
     subaccountId: { type: String, default: "" },
 
     // Set automatically when a bank-detail change fails the name-match

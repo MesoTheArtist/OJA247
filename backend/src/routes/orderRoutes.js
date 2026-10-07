@@ -14,12 +14,28 @@ import {
   getReceiptInfo,
   confirmReceiptByLink,
 } from "../controllers/fulfillmentController.js";
+import {
+  getPaymentDetails,
+  createDirectOrder,
+  confirmTransferPayment,
+  rejectTransferPayment,
+  resubmitReceipt,
+  handleReceiptUpload,
+} from "../controllers/directOrderController.js";
 import { protect, requireCustomer } from "../middleware/authMiddleware.js";
-import { authLimiter } from "../middleware/rateLimiters.js";
+import { authLimiter, paymentDetailsLimiter, directOrderLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
 
 router.post("/", createOrder);
+
+// Direct bank transfer: the customer pays the vendor's own bank account,
+// uploads a receipt, and the vendor confirms or rejects it.
+router.get("/payment-details/:businessId", paymentDetailsLimiter, getPaymentDetails);
+router.post("/direct", directOrderLimiter, handleReceiptUpload, createDirectOrder);
+router.post("/:reference/receipt", directOrderLimiter, handleReceiptUpload, resubmitReceipt);
+router.patch("/:reference/payment/confirm", protect, confirmTransferPayment);
+router.patch("/:reference/payment/reject", protect, rejectTransferPayment);
 router.post("/verify/:reference", verifyOrderPayment);
 // Public — Paystack calls this directly, verified via signature, not a user token
 router.post("/webhook", handlePaystackWebhook);

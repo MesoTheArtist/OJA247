@@ -8,12 +8,13 @@ import { sendVendorNewOrderWhatsApp } from "../services/whatsappService.js";
 import { withActiveDisputeVendors } from "../services/disputeOrderStatus.js";
 import { linkGuestOrders } from "../services/orderLinking.js";
 import { withReviewedVendors } from "../services/reviewEligibility.js";
+import { withReceiptLinks } from "../services/receiptStorage.js";
 
 // Shared by /verify and the webhook — idempotent, safe to call twice for the
 // same reference (e.g. if the customer's browser confirms AND the webhook
 // fires). Only ever transitions an order into "paid" once, and only sends
 // the confirmation/notification emails on that one transition.
-async function markOrderPaid(reference) {
+export async function markOrderPaid(reference, { notifyVendors = true } = {}) {
   const existing = await Order.findOne({ reference });
   if (!existing) return null;
   if (existing.status === "paid") return existing; // already processed, no-op
@@ -64,6 +65,10 @@ async function markOrderPaid(reference) {
     deliveryMethod: order.deliveryMethod,
     address: fullAddress,
   });
+
+  // Bank-transfer orders already told the vendor when they were placed, so
+  // the confirm step passes notifyVendors:false to avoid a second alert.
+  if (!notifyVendors) return order;
 
   const businessIds = order.vendors.map((v) => v.businessId).filter(Boolean);
   const vendorRecords = await Vendor.find({ businessId: { $in: businessIds } }).select(
@@ -558,7 +563,11 @@ export const getOrderByReference = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    res.json({ order });
+    // This lookup is public (reference only), so never include the payment
+    // receipts: they can show the customer's name and bank details.
+    const publicOrder = order.toObject();
+    delete publicOrder.paymentReceipts;
+    res.json({ order: publicOrder });
   } catch (error) {
     console.error("Get order error:", error);
     res.status(500).json({ message: "Error fetching order" });
@@ -586,7 +595,8 @@ export const getOrdersByBusiness = async (req, res) => {
       createdAt: -1,
     });
 
-    res.json(orders);
+    // Signed, private links to each payment receipt so the vendor can open them.
+    res.json(orders.map(withReceiptLinks));
   } catch (error) {
     console.error("Get orders by business error:", error);
     res.status(500).json({ message: "Error fetching business orders" });

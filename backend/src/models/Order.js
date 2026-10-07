@@ -76,14 +76,57 @@ const OrderSchema = new mongoose.Schema(
       // platform doesn't process refunds itself (see the disputes phased
       // plan doc), so "refunded" here is a record-keeping label set by
       // whoever resolves the dispute, not a trigger for any payment action.
-      enum: ["pending", "paid", "failed", "cancelled", "disputed", "refunded"],
+      // awaiting_confirmation / payment_rejected belong to bank-transfer
+      // orders: the customer paid the vendor's own bank account and uploaded
+      // a receipt, and the vendor has not yet confirmed (or has turned down)
+      // that payment. Nothing downstream treats these as paid.
+      enum: [
+        "pending",
+        "paid",
+        "failed",
+        "cancelled",
+        "disputed",
+        "refunded",
+        "awaiting_confirmation",
+        "payment_rejected",
+      ],
       default: "pending",
     },
     paymentStatus: {
       type: String,
-      enum: ["pending", "paid", "failed", "cancelled"],
+      enum: ["pending", "paid", "failed", "cancelled", "awaiting_confirmation", "payment_rejected"],
       default: "pending",
     },
+    // "paystack" is every order placed before direct bank transfer existed.
+    paymentMethod: {
+      type: String,
+      enum: ["paystack", "bank_transfer"],
+      default: "paystack",
+    },
+    // Bank-transfer proof. Receipts are stored privately on Cloudinary
+    // (authenticated delivery), so only a signed link works — never a public URL.
+    paymentReceipts: [
+      {
+        publicId: { type: String, required: true },
+        resourceType: { type: String, default: "image" },
+        format: { type: String, default: "" },
+        originalName: { type: String, default: "" },
+        uploadedAt: { type: Date, default: Date.now },
+        _id: false,
+      },
+    ],
+    // Every time the vendor turned a payment down, newest last.
+    paymentRejections: [
+      {
+        reason: { type: String, required: true },
+        rejectedAt: { type: Date, default: Date.now },
+        _id: false,
+      },
+    ],
+    paymentConfirmedAt: { type: Date, default: null },
+    // For the daily follow-up job on unconfirmed bank-transfer orders.
+    lastVendorReminderAt: { type: Date, default: null },
+    adminNonComplianceAlertedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

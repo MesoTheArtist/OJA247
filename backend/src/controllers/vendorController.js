@@ -295,24 +295,9 @@ export const onboardVendor = async (req, res) => {
       Boolean(existingVendor) &&
       (existingVendor.bankCode !== bank_code || existingVendor.accountNumber !== account_number);
 
-    if (!subaccountCode) {
-      const subaccount = await createPaystackSubaccount({
-        businessName: business_name,
-        bankCode: bank_code,
-        accountNumber: account_number,
-      });
-      subaccountCode = subaccount.subaccount_code;
-      subaccountId = subaccount.id ? String(subaccount.id) : "";
-    } else if (bankChanged) {
-      // Repoint the live subaccount at the new bank so checkout splits
-      // actually follow the change — previously this was silently skipped,
-      // leaving payouts routed to the old bank indefinitely.
-      await updatePaystackSubaccount(subaccountCode, {
-        businessName: business_name,
-        bankCode: bank_code,
-        accountNumber: account_number,
-      });
-    }
+    // Orders are paid straight to the vendor's own bank account now, so no
+    // Paystack subaccount is created (or repointed) any more. Vendors who
+    // already have one keep the stored code; it is simply unused.
 
     // Auto re-verification on bank change: a changed bank account only
     // keeps receiving live payouts if the new account name still matches
