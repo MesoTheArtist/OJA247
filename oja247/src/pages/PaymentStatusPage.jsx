@@ -71,6 +71,37 @@ function PaymentStatusPage() {
     payment_rejected: "Payment not confirmed",
   };
 
+  // The WhatsApp message the customer sends the seller: everything the seller
+  // needs to find the payment and send the order, formatted with WhatsApp's
+  // *bold* markers so it reads clearly in the chat.
+  const naira = (n) => `₦${Number(n || 0).toLocaleString("en-NG")}`;
+  const buildWhatsAppMessage = () => {
+    if (!order) return "";
+    const c = order.customer || {};
+    const lines = [
+      `Hello ${sellerName}, I just placed an order on OJA247 and paid by bank transfer.`,
+      "",
+      `*ORDER ${reference}*`,
+      ...(order.items || []).map(
+        (item, i) => `${i + 1}. ${item.name} x${item.quantity} - ${naira(item.price * item.quantity)}`
+      ),
+      "",
+      `Items: ${naira(order.subtotal)}`,
+      order.deliveryMethod === "pickup" ? "Delivery: Pickup (no fee)" : `Delivery fee: ${naira(order.deliveryFee)}`,
+      `*Total paid: ${naira(order.total)}*`,
+      "",
+      order.deliveryMethod === "pickup" ? "*PICKUP ORDER*" : "*DELIVER TO*",
+      `Name: ${c.fullName || ""}`,
+      `Phone: ${c.phone || ""}`,
+    ];
+    if (order.deliveryMethod !== "pickup") {
+      lines.push(`Address: ${[c.address, c.city, c.state].filter(Boolean).join(", ")}`);
+    }
+    if (c.note) lines.push(`Note: ${c.note}`);
+    lines.push("", "I am sending my payment receipt in this chat. Please confirm my payment. Thank you!");
+    return lines.join("\n");
+  };
+
   const handleReupload = async (e) => {
     e.preventDefault();
     setUploadMessage({ type: "", text: "" });
@@ -308,16 +339,20 @@ function PaymentStatusPage() {
             )}
 
             {(isAwaiting || isRejected) && order?.sellerWhatsapp && (
-              <a
-                href={`https://wa.me/${order.sellerWhatsapp}?text=${encodeURIComponent(
-                  `Hello ${sellerName}, I placed order ${reference} on OJA247 for ₦${Number(order.total || 0).toLocaleString()} and paid by bank transfer. Please confirm my payment.`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-3 mb-6 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors"
-              >
-                Message {sellerName} on WhatsApp
-              </a>
+              <div className="mb-6">
+                <a
+                  href={`https://wa.me/${order.sellerWhatsapp}?text=${encodeURIComponent(buildWhatsAppMessage())}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors"
+                >
+                  Send order details to {sellerName} on WhatsApp
+                </a>
+                <p className="mt-3 text-xs text-gray-500 max-w-sm mx-auto">
+                  Tip: when WhatsApp opens, tap the attach (paperclip) icon and add a photo or PDF of your payment
+                  receipt, so the seller can confirm faster.
+                </p>
+              </div>
             )}
 
             {isRejected && (
