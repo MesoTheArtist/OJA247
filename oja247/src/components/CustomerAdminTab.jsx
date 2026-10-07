@@ -21,7 +21,7 @@ const SearchField = ({ value, onChange }) => (
 // counters (orders, spend, follows, reviews, disputes) an admin actually
 // needs, plus a drill-in for full detail and account-level actions.
 const CustomerAdminTab = ({ showToast }) => {
-  const { confirm } = useDialog();
+  const { confirm, prompt } = useDialog();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -68,9 +68,13 @@ const CustomerAdminTab = ({ showToast }) => {
   }, [customers, search, sortBy]);
 
   const deleteCustomer = async (customer) => {
-    const ok = window.prompt(
-      `This permanently deletes ${customer.email}'s account. Their orders stay (just unlinked) but this cannot be undone.\n\nType the email to confirm:`
-    );
+    const ok = await prompt({
+      title: "Delete this account?",
+      message: `This permanently deletes ${customer.email}'s account. Their orders stay (just unlinked) but this cannot be undone.\n\nType the email to confirm:`,
+      placeholder: customer.email,
+      confirmLabel: "Delete account",
+      tone: "danger",
+    });
     if ((ok || "").trim().toLowerCase() !== (customer.email || "").trim().toLowerCase()) {
       if (ok !== null) showToast?.("Email didn't match — nothing was deleted", "error");
       return;

@@ -18,7 +18,7 @@ const SectionTitle = ({ icon, label, count }) => {
 // email verified (a support tool for when the confirmation email fails to
 // deliver, or ownership was proven some other way).
 const CustomerDetailModal = ({ customerId, onClose, onChanged }) => {
-  const { confirm } = useDialog();
+  const { confirm, notify, prompt } = useDialog();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -103,11 +103,15 @@ const CustomerDetailModal = ({ customerId, onClose, onChanged }) => {
   const deleteAccount = async () => {
     if (!data) return;
     const { customer } = data;
-    const ok = window.prompt(
-      `This permanently deletes ${customer.email}'s account. Their orders stay (just unlinked, so the vendor's records are untouched) but this cannot be undone.\n\nType the email to confirm:`
-    );
+    const ok = await prompt({
+      title: "Delete this account?",
+      message: `This permanently deletes ${customer.email}'s account. Their orders stay (just unlinked, so the vendor's records are untouched) but this cannot be undone.\n\nType the email to confirm:`,
+      placeholder: customer.email,
+      confirmLabel: "Delete account",
+      tone: "danger",
+    });
     if ((ok || "").trim().toLowerCase() !== (customer.email || "").trim().toLowerCase()) {
-      if (ok !== null) alert("Email didn't match — nothing was deleted.");
+      if (ok !== null) notify({ title: "Email didn't match", message: "Nothing was deleted.", tone: "error" });
       return;
     }
     setBusy(true);

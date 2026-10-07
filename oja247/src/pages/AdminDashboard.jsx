@@ -102,7 +102,7 @@ const formatChartDate = (isoDate) => {
 };
 
 const AdminDashboard = () => {
-  const { confirm } = useDialog();
+  const { confirm, prompt } = useDialog();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -551,7 +551,14 @@ const AdminDashboard = () => {
     let notes = "";
 
     if (decision === "rejected") {
-      const input = window.prompt(`Reason for rejecting ${businessName}'s verification? (shown to the vendor)`);
+      const input = await prompt({
+        title: "Reject verification?",
+        message: `Reason for rejecting ${businessName}'s verification? (shown to the vendor)`,
+        placeholder: "Write the reason here",
+        multiline: true,
+        confirmLabel: "Reject",
+        tone: "danger",
+      });
       if (input === null) return; // cancelled
       notes = input;
     } else {

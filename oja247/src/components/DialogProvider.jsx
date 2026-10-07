@@ -6,6 +6,8 @@ import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 //   const { confirm, notify } = useDialog();
 //   if (!(await confirm({ title: "Delete product?", message: "...", tone: "danger" }))) return;
 //   await notify({ title: "Couldn't save", message: err.message, tone: "error" });
+//   const reason = await prompt({ title: "Reject?", message: "Why?", multiline: true });
+//   // reason is the typed text (maybe ""), or null if the person cancelled
 //
 // Both return promises, so call sites read like the native versions with an
 // `await` added. Dialogs queue up if several are requested at once.
@@ -42,6 +44,11 @@ export function DialogProvider({ children }) {
     [enqueue]
   );
 
+  const prompt = useCallback(
+    (options = {}) => enqueue({ kind: "prompt", tone: "default", ...options }),
+    [enqueue]
+  );
+
   const close = useCallback((value) => {
     setQueue((q) => {
       if (q[0]) q[0].resolve(value);
@@ -50,7 +57,7 @@ export function DialogProvider({ children }) {
   }, []);
 
   return (
-    <DialogContext.Provider value={{ confirm, notify }}>
+    <DialogContext.Provider value={{ confirm, notify, prompt }}>
       {children}
       {current && <DialogView key={current.id} dialog={current} onClose={close} />}
     </DialogContext.Provider>
@@ -58,21 +65,27 @@ export function DialogProvider({ children }) {
 }
 
 function DialogView({ dialog, onClose }) {
-  const { kind, tone, title, message, confirmLabel, cancelLabel } = dialog;
+  const { kind, tone, title, message, confirmLabel, cancelLabel, placeholder, defaultValue, multiline } = dialog;
   const style = TONES[tone] || TONES.default;
   const Icon = style.icon;
   const isConfirm = kind === "confirm";
+  const isPrompt = kind === "prompt";
+  const hasCancel = isConfirm || isPrompt;
+  const [value, setValue] = useState(defaultValue || "");
+  const inputRef = useRef(null);
   const primaryRef = useRef(null);
   const cancelRef = useRef(null);
   const previouslyFocused = useRef(null);
 
-  // The thing to dismiss with: false for a confirm, undefined for a notice.
-  const dismissValue = isConfirm ? false : undefined;
+  // The thing to dismiss with: false for a confirm, null for a prompt (so the
+  // caller can tell "cancelled" from "typed nothing"), undefined for a notice.
+  const dismissValue = isConfirm ? false : isPrompt ? null : undefined;
 
   useEffect(() => {
     previouslyFocused.current = document.activeElement;
     // Destructive confirms start on Cancel so Enter can't delete by accident.
-    (tone === "danger" && cancelRef.current ? cancelRef.current : primaryRef.current)?.focus();
+    if (isPrompt) inputRef.current?.focus();
+    else (tone === "danger" && cancelRef.current ? cancelRef.current : primaryRef.current)?.focus();
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -113,7 +126,7 @@ function DialogView({ dialog, onClose }) {
           </span>
           <div className="min-w-0 flex-1">
             <h2 id="dialog-title" className="text-base font-bold text-gray-900 break-words">
-              {title || (isConfirm ? "Are you sure?" : "Notice")}
+              {title || (isConfirm ? "Are you sure?" : isPrompt ? "Enter a value" : "Notice")}
             </h2>
             {message && (
               <p id="dialog-message" className="mt-1.5 text-sm text-gray-600 whitespace-pre-line break-words">
@@ -123,12 +136,44 @@ function DialogView({ dialog, onClose }) {
           </div>
         </div>
 
+        {isPrompt && (
+          <div className="mt-4">
+            {multiline ? (
+              <textarea
+                ref={inputRef}
+                rows={3}
+                value={value}
+                placeholder={placeholder}
+                aria-labelledby="dialog-title"
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) onClose(value);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            ) : (
+              <input
+                ref={inputRef}
+                type="text"
+                value={value}
+                placeholder={placeholder}
+                aria-labelledby="dialog-title"
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onClose(value);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            )}
+          </div>
+        )}
+
         <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5">
-          {isConfirm && (
+          {hasCancel && (
             <button
               ref={cancelRef}
               type="button"
-              onClick={() => onClose(false)}
+              onClick={() => onClose(dismissValue)}
               className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition"
             >
               {cancelLabel || "Cancel"}
@@ -137,10 +182,10 @@ function DialogView({ dialog, onClose }) {
           <button
             ref={primaryRef}
             type="button"
-            onClick={() => onClose(isConfirm ? true : undefined)}
+            onClick={() => onClose(isConfirm ? true : isPrompt ? value : undefined)}
             className={`w-full sm:w-auto px-5 py-2.5 rounded-xl text-white font-semibold transition ${style.button}`}
           >
-            {confirmLabel || (isConfirm ? "Confirm" : "OK")}
+            {confirmLabel || (isConfirm ? "Confirm" : isPrompt ? "Submit" : "OK")}
           </button>
         </div>
       </div>
@@ -155,6 +200,8 @@ const nativeFallback = {
   notify: async ({ title, message } = {}) => {
     window.alert([title, message].filter(Boolean).join("\n\n"));
   },
+  prompt: async ({ title, message, defaultValue } = {}) =>
+    window.prompt([title, message].filter(Boolean).join("\n\n"), defaultValue || ""),
 };
 
 export function useDialog() {
