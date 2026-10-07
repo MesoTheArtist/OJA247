@@ -189,8 +189,10 @@ export const createDirectOrder = async (req, res) => {
     try {
       receipt = await uploadReceipt(req.file.buffer, req.file.originalname);
     } catch (uploadError) {
+      // Cloudinary sometimes throws a plain string (e.g. "Must supply api_key"),
+      // so fall back to the value itself when there is no .message.
       console.error("Receipt upload failed:", {
-        message: uploadError?.message,
+        message: uploadError?.message ?? String(uploadError),
         http_code: uploadError?.http_code,
         hasCloudName: Boolean(process.env.CLOUDINARY_CLOUD_NAME),
         hasApiKey: Boolean(process.env.CLOUDINARY_API_KEY),
