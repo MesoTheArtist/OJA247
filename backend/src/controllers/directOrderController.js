@@ -177,7 +177,25 @@ export const createDirectOrder = async (req, res) => {
       return res.status(409).json({ message: "This order was already placed." });
     }
 
-    const receipt = await uploadReceipt(req.file.buffer, req.file.originalname);
+    // Upload first, on its own, so a Cloudinary problem is logged with its
+    // real cause (missing keys, rejected options) instead of the generic
+    // "could not place your order" message. No order exists yet, so nothing
+    // is left half-created.
+    let receipt;
+    try {
+      receipt = await uploadReceipt(req.file.buffer, req.file.originalname);
+    } catch (uploadError) {
+      console.error("Receipt upload failed:", {
+        message: uploadError?.message,
+        http_code: uploadError?.http_code,
+        hasCloudName: Boolean(process.env.CLOUDINARY_CLOUD_NAME),
+        hasApiKey: Boolean(process.env.CLOUDINARY_API_KEY),
+        hasApiSecret: Boolean(process.env.CLOUDINARY_API_SECRET),
+      });
+      return res.status(502).json({
+        message: "We couldn't save your receipt. Please try again in a moment.",
+      });
+    }
 
     const order = await Order.create({
       reference,
