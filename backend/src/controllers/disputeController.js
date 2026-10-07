@@ -1,11 +1,14 @@
 import Order from "../models/Order.js";
-import Dispute, { DISPUTE_WINDOW_DAYS, SELF_RESOLVE_WINDOW_DAYS } from "../models/Dispute.js";
+import Dispute, { DISPUTE_WINDOW_DAYS, SELF_RESOLVE_WINDOW_DAYS, UNCONFIRMED_PAYMENT_DAYS } from "../models/Dispute.js";
 import User from "../models/User.js";
 import { ACTIVE_DISPUTE_STATUSES, settleOrderAfterResolution } from "../services/disputeOrderStatus.js";
 import {
   sendDisputeFiledVendorEmail,
   sendDisputeFiledCustomerEmail,
   sendDisputeResolvedCustomerEmail,
+  sendDisputeEscalatedVendorEmail,
+  sendDisputeEscalatedCustomerEmail,
+  sendDisputeEscalatedAdminEmail,
 } from "../services/emailService.js";
 
 export async function getOwnerEmail(businessId) {
@@ -42,17 +45,48 @@ export const fileDispute = async (req, res) => {
     // several vendors, and a dispute against one vendor flips the whole
     // order to "disputed", which must not lock the customer out of
     // disputing the others. Duplicates are blocked per vendor below.
-    if (order.status !== "paid" && order.status !== "disputed") {
-      return res.status(400).json({
-        message: `This order can't be disputed (status: ${order.status}).`,
-      });
-    }
+    //
+    // One exception: a bank-transfer order the vendor has left unanswered for
+    // UNCONFIRMED_PAYMENT_DAYS can be disputed with reason
+    // "payment_not_confirmed". That order is not paid, there is no 5-day
+    // window (such orders never expire), and the order status is left alone
+    // so the vendor can still confirm it.
+    const unconfirmedTransfer =
+      order.paymentMethod === "bank_transfer" && order.status === "awaiting_confirmation";
 
-    const windowEnd = new Date(order.createdAt.getTime() + DISPUTE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-    if (new Date() > windowEnd) {
-      return res.status(400).json({
-        message: `The ${DISPUTE_WINDOW_DAYS}-day window to dispute this order has passed.`,
-      });
+    if (unconfirmedTransfer) {
+      const lastReceiptAt = (order.paymentReceipts || []).reduce(
+        (latest, r) => Math.max(latest, new Date(r.uploadedAt || 0).getTime()),
+        0
+      );
+      const waitingSince = Math.max(order.createdAt.getTime(), lastReceiptAt);
+      const waitedMs = Date.now() - waitingSince;
+      if (waitedMs < UNCONFIRMED_PAYMENT_DAYS * 24 * 60 * 60 * 1000) {
+        return res.status(400).json({
+          message: `The vendor has ${UNCONFIRMED_PAYMENT_DAYS} days to confirm your payment. You can file a dispute if they haven't answered by then.`,
+        });
+      }
+      if (reason !== "payment_not_confirmed") {
+        return res.status(400).json({
+          message: "For an order the vendor has not confirmed, the reason must be that the payment was not confirmed.",
+        });
+      }
+    } else {
+      if (reason === "payment_not_confirmed") {
+        return res.status(400).json({ message: "This reason only applies to an order still waiting for the vendor to confirm payment." });
+      }
+      if (order.status !== "paid" && order.status !== "disputed") {
+        return res.status(400).json({
+          message: `This order can't be disputed (status: ${order.status}).`,
+        });
+      }
+
+      const windowEnd = new Date(order.createdAt.getTime() + DISPUTE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+      if (new Date() > windowEnd) {
+        return res.status(400).json({
+          message: `The ${DISPUTE_WINDOW_DAYS}-day window to dispute this order has passed.`,
+        });
+      }
     }
 
     const vendorOnOrder = order.vendors.find((v) => v.businessId === businessId);
@@ -105,6 +139,9 @@ export const fileDispute = async (req, res) => {
       evidence: Array.isArray(evidence)
         ? evidence.map((url) => ({ url, uploadedBy: "customer" }))
         : [],
+      // The vendor already ignored this order for days, so skip the 7-day
+      // self-resolve window and put it straight in front of the admin.
+      ...(unconfirmedTransfer ? { status: "escalated", escalatedAt: new Date() } : {}),
     });
 
     // Order-level status only flips to "disputed" if it isn't already in
@@ -118,6 +155,33 @@ export const fileDispute = async (req, res) => {
     // Notifications — fire-and-forget, matches the rest of the codebase's
     // pattern (a broken mail server shouldn't fail the dispute filing).
     const vendorEmail = await getOwnerEmail(businessId);
+
+    // A dispute on an unconfirmed transfer starts out already escalated, so
+    // everyone gets the "escalated" emails instead of the self-resolve ones.
+    if (unconfirmedTransfer) {
+      if (vendorEmail) {
+        sendDisputeEscalatedVendorEmail({
+          to: vendorEmail,
+          businessName: vendorOnOrder.businessName,
+          orderReference: order.reference,
+          reason,
+        }).catch((err) => console.error("Dispute-escalated vendor email failed:", err));
+      }
+      sendDisputeEscalatedCustomerEmail({
+        to: order.customer.email,
+        customerName: order.customer.fullName,
+        businessName: vendorOnOrder.businessName,
+        orderReference: order.reference,
+      }).catch((err) => console.error("Dispute-escalated customer email failed:", err));
+      sendDisputeEscalatedAdminEmail({
+        businessName: vendorOnOrder.businessName,
+        orderReference: order.reference,
+        reason,
+        disputeId: dispute._id,
+      }).catch((err) => console.error("Dispute-escalated admin email failed:", err));
+      return res.status(201).json({ dispute });
+    }
+
     if (vendorEmail) {
       const selfResolveDeadline = new Date(
         dispute.createdAt.getTime() + SELF_RESOLVE_WINDOW_DAYS * 24 * 60 * 60 * 1000

@@ -7,6 +7,11 @@ import mongoose from "mongoose";
 // than one from order date.
 export const DISPUTE_WINDOW_DAYS = 5;
 
+// A bank-transfer order the vendor has left unanswered this long can be
+// disputed by the customer (reason "payment_not_confirmed"), and the admin is
+// emailed at the same point. Also mirrored in oja247/src/utils/disputes.js.
+export const UNCONFIRMED_PAYMENT_DAYS = 3;
+
 // How long a vendor gets to resolve a dispute directly with the customer
 // before it's eligible to auto-escalate to admin. This is a hard timeout,
 // not a soft expectation — the platform has no way to compel a vendor to
@@ -61,7 +66,7 @@ const DisputeSchema = new mongoose.Schema(
 
     reason: {
       type: String,
-      enum: ["item_not_received", "wrong_item", "damaged", "not_as_described", "other"],
+      enum: ["item_not_received", "wrong_item", "damaged", "not_as_described", "payment_not_confirmed", "other"],
       required: true,
     },
     description: { type: String, required: true },

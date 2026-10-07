@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import axiosInstance from "../services/api";
 import ImageUpload from "./ImageUpload";
-import { SELF_RESOLVE_WINDOW_DAYS, getDisputableVendors } from "../utils/disputes";
+import { SELF_RESOLVE_WINDOW_DAYS, getDisputableVendors, isAwaitingTransfer } from "../utils/disputes";
 
 const REASONS = [
   { value: "item_not_received", label: "I never received it" },
@@ -16,11 +16,18 @@ const REASONS = [
 // the order — the backend uses it (with the reference) to verify the
 // person filing is the buyer, for guests and signed-in customers alike.
 const DisputeForm = ({ order, email, onDone }) => {
+  // A bank-transfer order the vendor never confirmed has one possible reason
+  // and goes straight to the OJA247 team (no vendor self-resolve window).
+  const unconfirmed = isAwaitingTransfer(order);
+  const reasons = unconfirmed
+    ? [{ value: "payment_not_confirmed", label: "The vendor hasn't confirmed my payment" }]
+    : REASONS;
+
   // Vendors that already have an active dispute on this order are left out.
   const vendors = getDisputableVendors(order);
   const [businessId, setBusinessId] = useState(vendors[0]?.businessId || "");
   const [itemIds, setItemIds] = useState([]);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState(unconfirmed ? "payment_not_confirmed" : "");
   const [description, setDescription] = useState("");
   const [evidence, setEvidence] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -69,8 +76,9 @@ const DisputeForm = ({ order, email, onDone }) => {
         <CheckCircle2 className="mx-auto text-green-500 mb-3" size={44} />
         <h3 className="text-lg font-bold text-gray-900 mb-2">Dispute filed</h3>
         <p className="text-sm text-gray-600 mb-6 max-w-sm mx-auto">
-          We've emailed you a confirmation and told {filedWith}. They have {SELF_RESOLVE_WINDOW_DAYS} days to sort
-          it out with you directly. If they don't, it goes to our team for review.
+          {unconfirmed
+            ? `We've emailed you a confirmation and told ${filedWith}. Because they haven't answered, your dispute has gone straight to our team. We can't return money paid to a vendor's own account, but we'll follow up with the vendor.`
+            : `We've emailed you a confirmation and told ${filedWith}. They have ${SELF_RESOLVE_WINDOW_DAYS} days to sort it out with you directly. If they don't, it goes to our team for review.`}
         </p>
         <button
           onClick={() => onDone(true)}
@@ -109,7 +117,7 @@ const DisputeForm = ({ order, email, onDone }) => {
         </div>
       )}
 
-      {vendorItems.length > 0 && (
+      {!unconfirmed && vendorItems.length > 0 && (
         <fieldset>
           <legend className="text-sm font-semibold text-gray-800 mb-1.5">
             Which items? <span className="font-normal text-gray-500">Leave empty if it's the whole order.</span>
@@ -137,7 +145,7 @@ const DisputeForm = ({ order, email, onDone }) => {
       <div>
         <label className="block text-sm font-semibold text-gray-800 mb-1.5">What went wrong?</label>
         <div className="space-y-2">
-          {REASONS.map((r) => (
+          {reasons.map((r) => (
             <label
               key={r.value}
               className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition ${
@@ -168,7 +176,11 @@ const DisputeForm = ({ order, email, onDone }) => {
           onChange={(e) => setDescription(e.target.value)}
           rows={4}
           maxLength={2000}
-          placeholder="When did it arrive, what's wrong, and what have you already tried with the vendor?"
+          placeholder={
+            unconfirmed
+              ? "When did you pay, how much, and what have you already tried with the vendor?"
+              : "When did it arrive, what's wrong, and what have you already tried with the vendor?"
+          }
           className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
         />
       </div>

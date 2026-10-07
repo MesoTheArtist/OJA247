@@ -19,6 +19,8 @@ const STATUS_STYLES = {
   cancelled: "bg-gray-100 text-gray-600",
   disputed: "bg-orange-100 text-orange-700",
   refunded: "bg-blue-100 text-blue-700",
+  awaiting_confirmation: "bg-amber-100 text-amber-700",
+  payment_rejected: "bg-red-100 text-red-700",
 };
 
 const STATUS_LABELS = {
@@ -28,6 +30,8 @@ const STATUS_LABELS = {
   cancelled: "Cancelled",
   disputed: "Under review",
   refunded: "Refunded",
+  awaiting_confirmation: "Waiting for seller to confirm payment",
+  payment_rejected: "Payment not confirmed",
 };
 
 // Order history for a logged-in customer. requireCustomer on the route
@@ -187,6 +191,34 @@ const OrderHistoryPage = () => {
                     </div>
                   </div>
 
+                  {order.status === "awaiting_confirmation" && (
+                    <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      The seller has your receipt and will confirm your payment. We will email you as soon as they do.
+                    </div>
+                  )}
+
+                  {order.status === "payment_rejected" && (
+                    <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-wide text-red-500 font-semibold mb-1">
+                        Reason from the seller
+                      </p>
+                      <p className="text-sm text-red-900 whitespace-pre-wrap">
+                        {order.paymentRejections?.[order.paymentRejections.length - 1]?.reason ||
+                          "The seller did not give a reason."}
+                      </p>
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/payment-status?status=rejected&reference=${encodeURIComponent(order.reference)}&email=${encodeURIComponent(order.customer?.email || "")}`
+                          )
+                        }
+                        className="mt-3 inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-semibold"
+                      >
+                        Upload a new receipt
+                      </button>
+                    </div>
+                  )}
+
                   {["paid", "disputed"].includes(order.status) &&
                     (order.vendors || [])
                       .filter((v) => v.fulfillmentStatus === "shipped" || v.fulfillmentStatus === "received")
@@ -248,7 +280,7 @@ const OrderHistoryPage = () => {
                           onClick={() => setDisputeOrder(order)}
                           className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-orange-600 transition"
                         >
-                          <LifeBuoy size={15} /> Report a problem
+                          <LifeBuoy size={15} /> {getDisputeEligibility(order).unconfirmed ? "Vendor not responding" : "Report a problem"}
                         </button>
                       )}
                     </div>

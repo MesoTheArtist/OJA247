@@ -7,6 +7,7 @@ const REASON_LABELS = {
   wrong_item: "Wrong item",
   damaged: "Arrived damaged",
   not_as_described: "Not as described",
+  payment_not_confirmed: "Payment not confirmed",
   other: "Other",
 };
 

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { LifeBuoy } from "lucide-react";
 import axiosInstance from "../services/api";
 import DisputeForm from "../components/DisputeForm";
-import { getDisputeEligibility, DISPUTE_WINDOW_DAYS } from "../utils/disputes";
+import { getDisputeEligibility, DISPUTE_WINDOW_DAYS, UNCONFIRMED_PAYMENT_DAYS } from "../utils/disputes";
 
 // Guest route for filing a dispute. The bare-reference order endpoint is
 // deliberately not enough to act on an order, so this asks for the order
@@ -99,7 +99,11 @@ const ReportProblemPage = () => {
   } else if (!eligibility.eligible) {
     const windowPassed = Date.now() > new Date(order.createdAt).getTime() + DISPUTE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
     let message;
-    if (order.status !== "paid" && order.status !== "disputed") {
+    if (eligibility.unconfirmed && eligibility.daysUntil > 0) {
+      message = `The vendor has ${UNCONFIRMED_PAYMENT_DAYS} days to confirm your payment for order ${order.reference}. If they haven't answered, you can file a dispute here in ${eligibility.daysUntil} day${eligibility.daysUntil === 1 ? "" : "s"}.`;
+    } else if (eligibility.unconfirmed) {
+      message = `There's already an open dispute with the vendor on order ${order.reference}. We'll email you as it moves along.`;
+    } else if (order.status !== "paid" && order.status !== "disputed") {
       message = `Order ${order.reference} can't be disputed${order.status === "refunded" ? " — it's already marked refunded" : ""}.`;
     } else if (windowPassed) {
       message = `The ${DISPUTE_WINDOW_DAYS}-day window to dispute order ${order.reference} has passed. You can still contact the vendor directly.`;
@@ -111,7 +115,7 @@ const ReportProblemPage = () => {
     body = (
       <>
         <p className="text-sm text-gray-500 mb-5">
-          Order {order.reference} · {eligibility.daysLeft} day{eligibility.daysLeft === 1 ? "" : "s"} left to dispute
+          Order {order.reference}{eligibility.unconfirmed ? " · payment not confirmed by the vendor" : ` · ${eligibility.daysLeft} day${eligibility.daysLeft === 1 ? "" : "s"} left to dispute`}
         </p>
         <DisputeForm order={order} email={email.trim()} onDone={(filed) => (filed ? setFinished(true) : setOrder(null))} />
       </>
