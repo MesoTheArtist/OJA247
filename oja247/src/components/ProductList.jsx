@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getProductsByBusiness, updateProduct, deleteProduct } from '../services/api';
+import { useDialog } from './DialogProvider';
 
 const ProductList = ({ businessId }) => {
+  const { confirm } = useDialog();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -23,9 +25,13 @@ const ProductList = ({ businessId }) => {
   };
 
   const handleDelete = async (productId) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Delete product?',
+      message: 'Are you sure you want to delete this product?',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await deleteProduct(productId);

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { X, ShoppingBag, LifeBuoy, Star, Heart, BadgeCheck, Ban, CheckCircle2, Pencil, Check, Trash2 } from "lucide-react";
 import axiosInstance from "../services/api";
+import { useDialog } from "./DialogProvider";
 
 const SectionTitle = ({ icon, label, count }) => {
   const Icon = icon;
@@ -17,6 +18,7 @@ const SectionTitle = ({ icon, label, count }) => {
 // email verified (a support tool for when the confirmation email fails to
 // deliver, or ownership was proven some other way).
 const CustomerDetailModal = ({ customerId, onClose, onChanged }) => {
+  const { confirm } = useDialog();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -59,7 +61,14 @@ const CustomerDetailModal = ({ customerId, onClose, onChanged }) => {
   const toggleBan = async () => {
     if (!data) return;
     const { customer } = data;
-    if (!window.confirm(`${customer.banned ? "Unban" : "Ban"} customer "${customer.email}"?`)) return;
+    const banning = !customer.banned;
+    const ok = await confirm({
+      title: banning ? "Ban customer?" : "Unban customer?",
+      message: `${banning ? "Ban" : "Unban"} customer "${customer.email}"?`,
+      confirmLabel: banning ? "Ban" : "Unban",
+      tone: banning ? "danger" : "default",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await axiosInstance.patch(`/api/admin/users/${customer._id}/ban`, { banned: !customer.banned });
@@ -114,8 +123,12 @@ const CustomerDetailModal = ({ customerId, onClose, onChanged }) => {
 
   const verifyEmail = async () => {
     if (!data) return;
-    if (!window.confirm(`Manually mark ${data.customer.email} as verified? Only do this if you've confirmed ownership some other way.`))
-      return;
+    const ok = await confirm({
+      title: "Mark email as verified?",
+      message: `Manually mark ${data.customer.email} as verified? Only do this if you've confirmed ownership some other way.`,
+      confirmLabel: "Mark verified",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const res = await axiosInstance.patch(`/api/admin/customers/${data.customer._id}/verify-email`);

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Users, Search, BadgeCheck, Ban, Eye, Trash2 } from "lucide-react";
 import axiosInstance from "../services/api";
 import CustomerDetailModal from "./CustomerDetailModal";
+import { useDialog } from "./DialogProvider";
 
 const SearchField = ({ value, onChange }) => (
   <div className="relative w-full sm:w-72">
@@ -20,6 +21,7 @@ const SearchField = ({ value, onChange }) => (
 // counters (orders, spend, follows, reviews, disputes) an admin actually
 // needs, plus a drill-in for full detail and account-level actions.
 const CustomerAdminTab = ({ showToast }) => {
+  const { confirm } = useDialog();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -84,7 +86,14 @@ const CustomerAdminTab = ({ showToast }) => {
   };
 
   const toggleBan = async (customer) => {
-    if (!window.confirm(`${customer.banned ? "Unban" : "Ban"} customer "${customer.email}"?`)) return;
+    const banning = !customer.banned;
+    const ok = await confirm({
+      title: banning ? "Ban customer?" : "Unban customer?",
+      message: `${banning ? "Ban" : "Unban"} customer "${customer.email}"?`,
+      confirmLabel: banning ? "Ban" : "Unban",
+      tone: banning ? "danger" : "default",
+    });
+    if (!ok) return;
     setBanningId(customer._id);
     try {
       await axiosInstance.patch(`/api/admin/users/${customer._id}/ban`, { banned: !customer.banned });

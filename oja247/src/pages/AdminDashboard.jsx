@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
 import CustomerAdminTab from "../components/CustomerAdminTab.jsx";
 import CampaignAdminTab from "../components/CampaignAdminTab.jsx";
+import { useDialog } from "../components/DialogProvider";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
 import {
   Users,
@@ -101,6 +102,7 @@ const formatChartDate = (isoDate) => {
 };
 
 const AdminDashboard = () => {
+  const { confirm } = useDialog();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -396,7 +398,13 @@ const AdminDashboard = () => {
   };
 
   const deleteMarketer = async (id, name) => {
-    if (!window.confirm(`Delete ${name}? This removes their account and payout records permanently.`)) return;
+    const ok = await confirm({
+      title: "Delete marketer?",
+      message: `Delete ${name}? This removes their account and payout records permanently.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await axiosInstance.delete(`/api/admin/marketers/${id}`);
       setMarketers((prev) => prev.filter((m) => m._id !== id));
@@ -483,13 +491,13 @@ const AdminDashboard = () => {
   };
 
   const deleteBusiness = async (id, name) => {
-    if (
-      !window.confirm(
-        `Delete "${name}" and all its products?\n\nThis action cannot be undone!`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Delete business?",
+      message: `Delete "${name}" and all its products?\n\nThis action cannot be undone!`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
 
     try {
       await axiosInstance.delete(`/api/admin/businesses/${id}`);
@@ -501,9 +509,13 @@ const AdminDashboard = () => {
   };
 
   const deleteProduct = async (id, name) => {
-    if (!window.confirm(`Delete product "${name}"?`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Delete product?",
+      message: `Delete product "${name}"?`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
 
     try {
       await axiosInstance.delete(`/api/products/${id}`);
@@ -515,11 +527,14 @@ const AdminDashboard = () => {
   };
 
   const toggleUserBan = async (id, currentStatus, email) => {
-    if (
-      !window.confirm(`${currentStatus ? "Unban" : "Ban"} user "${email}"?`)
-    ) {
-      return;
-    }
+    const banning = !currentStatus;
+    const ok = await confirm({
+      title: banning ? "Ban user?" : "Unban user?",
+      message: `${banning ? "Ban" : "Unban"} user "${email}"?`,
+      confirmLabel: banning ? "Ban" : "Unban",
+      tone: banning ? "danger" : "default",
+    });
+    if (!ok) return;
 
     try {
       await axiosInstance.patch(`/api/admin/users/${id}/ban`, {
@@ -539,8 +554,13 @@ const AdminDashboard = () => {
       const input = window.prompt(`Reason for rejecting ${businessName}'s verification? (shown to the vendor)`);
       if (input === null) return; // cancelled
       notes = input;
-    } else if (!window.confirm(`Approve ${businessName}'s vendor verification?`)) {
-      return;
+    } else {
+      const ok = await confirm({
+        title: "Approve vendor?",
+        message: `Approve ${businessName}'s vendor verification?`,
+        confirmLabel: "Approve",
+      });
+      if (!ok) return;
     }
 
     try {
