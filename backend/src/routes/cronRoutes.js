@@ -4,6 +4,7 @@ import { runSubscriptionExpiryCheck } from "../controllers/subscriptionExpiryCro
 import { runDisputeEscalationCheck } from "../controllers/disputeCronController.js";
 import { runVerificationReminderCheck } from "../controllers/verificationReminderCronController.js";
 import { runAutoReceiveCheck } from "../controllers/receiptCronController.js";
+import { runTransferFollowUpCheck } from "../controllers/transferFollowUpCronController.js";
 
 const router = express.Router();
 
@@ -14,5 +15,6 @@ router.get("/subscription-expiry", runSubscriptionExpiryCheck);
 router.get("/dispute-escalation", runDisputeEscalationCheck);
 router.get("/verification-reminder", runVerificationReminderCheck);
 router.get("/auto-receive", runAutoReceiveCheck);
+router.get("/transfer-follow-up", runTransferFollowUpCheck);
 
 export default router;

@@ -745,6 +745,7 @@ const DISPUTE_REASON_LABELS = {
   wrong_item: "Wrong item received",
   damaged: "Item arrived damaged",
   not_as_described: "Not as described",
+  payment_not_confirmed: "Payment not confirmed by the vendor",
   other: "Other",
 };
 
@@ -1179,6 +1180,100 @@ export async function sendBroadcastEmail({ to, subject, bodyText, firstName, ima
   });
 }
 
+
+// ---------------------------------------------------------------------------
+// Direct bank-transfer orders
+// ---------------------------------------------------------------------------
+
+// To the vendor the moment a customer places an order and uploads a receipt —
+// before anything is confirmed. Its whole job is to get them to check their
+// own bank and then confirm or reject in the dashboard.
+export async function sendVendorTransferOrderEmail({
+  to,
+  businessName,
+  customerName,
+  reference,
+  items,
+  total,
+  dashboardUrl,
+  resubmitted = false,
+}) {
+  return sendEmail({
+    to,
+    subject: resubmitted
+      ? `New receipt uploaded: check your bank, order ${reference}`
+      : `New order: check your bank and confirm, ${reference}`,
+    html: layout(
+      `
+      ${h1(resubmitted ? "A new receipt was uploaded" : "New order: check your bank")}
+      ${p(`Hi ${esc(businessName)}, ${esc(customerName || "a customer")} ${resubmitted ? "uploaded a new payment receipt for" : "placed"} an order and says they have paid <strong>${NAIRA(total)}</strong> into your bank account.`)}
+
+      <div style="background:#f9fafb; border-radius:10px; padding:16px 18px; margin:20px 0;">
+        <p style="margin:0 0 2px; font-size:12px; color:#9ca3af; text-transform:uppercase; letter-spacing:0.05em;">Order reference</p>
+        <p style="margin:0; font-size:15px; font-weight:700; color:#111827; font-family:monospace;">${esc(reference)}</p>
+      </div>
+
+      ${orderItemsTable(items)}
+
+      <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 16px; margin:20px 0;">
+        <p style="margin:0; font-size:13px; color:#92400e; line-height:1.6;">
+          <strong>Check your own bank first.</strong> A receipt is only a screenshot or PDF and can be faked.
+          Only tap <em>Payment received</em> once the money is really in your account. If it is not,
+          tap <em>Reject</em> and tell the customer why.
+        </p>
+      </div>
+
+      ${button("Open the order and confirm", dashboardUrl)}
+      ${small("You will get a reminder once a day until you confirm or reject this order.")}
+      `,
+      { preheader: `${customerName || "A customer"} says they paid ${NAIRA(total)} for order ${reference}. Check your bank and confirm.` }
+    ),
+  });
+}
+
+// To the customer right after they place a bank-transfer order.
+export async function sendCustomerTransferOrderReceivedEmail({ to, customerName, businessName, reference, total, statusUrl }) {
+  return sendEmail({
+    to,
+    subject: `We received your order: waiting for ${businessName} to confirm payment (${reference})`,
+    html: layout(
+      `
+      ${h1("Order received")}
+      ${p(`Hi ${esc(customerName || "there")}, thanks for your order from <strong>${esc(businessName)}</strong>. You paid <strong>${NAIRA(total)}</strong> by bank transfer, and the seller now needs to confirm the money reached their account.`)}
+      <div style="background:#f9fafb; border-radius:10px; padding:16px 18px; margin:20px 0;">
+        <p style="margin:0 0 2px; font-size:12px; color:#9ca3af; text-transform:uppercase; letter-spacing:0.05em;">Order reference</p>
+        <p style="margin:0; font-size:15px; font-weight:700; color:#111827; font-family:monospace;">${esc(reference)}</p>
+      </div>
+      ${p("We will email you again as soon as the seller confirms your payment, or if they need something from you.")}
+      ${button("Check my order", statusUrl)}
+      `,
+      { preheader: `Your order ${reference} is waiting for ${businessName} to confirm your payment.` }
+    ),
+  });
+}
+
+// To the customer when the vendor turns a payment down, with their reason.
+export async function sendPaymentRejectedCustomerEmail({ to, customerName, businessName, reference, reason, statusUrl }) {
+  return sendEmail({
+    to,
+    subject: `${businessName} could not confirm your payment (${reference})`,
+    html: layout(
+      `
+      ${h1("Your payment was not confirmed")}
+      ${p(`Hi ${esc(customerName || "there")}, <strong>${esc(businessName)}</strong> could not confirm the payment for order <strong>${esc(reference)}</strong>.`)}
+      <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:14px 16px; margin:20px 0;">
+        <p style="margin:0 0 4px; font-size:12px; color:#b91c1c; text-transform:uppercase; letter-spacing:0.05em;">Reason from the seller</p>
+        <p style="margin:0; font-size:14px; color:#7f1d1d; line-height:1.6; white-space:pre-wrap;">${esc(reason)}</p>
+      </div>
+      ${p("If you have already paid, you can upload a new or clearer receipt on the same order. The seller will be told straight away.")}
+      ${button("Upload a new receipt", statusUrl)}
+      ${small("If you cannot sort it out with the seller, you can file a dispute on the order from your order page.")}
+      `,
+      { preheader: `${businessName} could not confirm your payment for ${reference}.` }
+    ),
+  });
+}
+
 export default {
   sendEmail,
   sendPasswordResetEmail,
@@ -1191,6 +1286,9 @@ export default {
   sendOrderConfirmationEmail,
   sendOrderPaymentFailedEmail,
   sendVendorNewOrderEmail,
+  sendVendorTransferOrderEmail,
+  sendCustomerTransferOrderReceivedEmail,
+  sendPaymentRejectedCustomerEmail,
   sendSubscriptionReceiptEmail,
   sendSubscriptionExpiringEmail,
   sendSubscriptionExpiredEmail,
@@ -1222,3 +1320,48 @@ export default {
   sendBroadcastEmail,
   verifyEmailTransporter,
 };
+// Daily nudge to the vendor while a bank-transfer order is still waiting on
+// them. Same job as the first email: check your own bank, then confirm or reject.
+export async function sendVendorTransferReminderEmail({ to, businessName, reference, total, daysWaiting, dashboardUrl }) {
+  const waiting = daysWaiting >= 1 ? `${daysWaiting} day${daysWaiting === 1 ? "" : "s"}` : "a while";
+  return sendEmail({
+    to,
+    subject: `Reminder: order ${reference} is waiting for your confirmation`,
+    html: layout(
+      `
+      ${h1("A customer is waiting on you")}
+      ${p(`Hi ${esc(businessName)}, order <strong>${esc(reference)}</strong> for <strong>${NAIRA(total)}</strong> has been waiting for your answer for ${waiting}. The customer says they have paid you directly and cannot get their order moving until you respond.`)}
+
+      <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 16px; margin:20px 0;">
+        <p style="margin:0; font-size:13px; color:#92400e; line-height:1.6;">
+          Check your own bank. If the money is there, tap <em>Payment received</em>.
+          If it is not, tap <em>Reject</em> and tell the customer why.
+        </p>
+      </div>
+
+      ${button("Open the order and respond", dashboardUrl)}
+      ${small("You will keep getting one reminder a day until you confirm or reject this order. Orders that stay unanswered for several days are flagged to the OJA247 team.")}
+      `,
+      { preheader: `Order ${reference} (${NAIRA(total)}) is still waiting for you to confirm payment.` }
+    ),
+  });
+}
+
+// To the admin once a vendor has left a bank-transfer order unanswered for
+// several days. OJA247 cannot move the money, so this is a heads-up to follow
+// up with the vendor (and a signal for the ban decision if it keeps happening).
+export async function sendAdminUnconfirmedTransferEmail({ businessName, vendorEmail, reference, total, daysWaiting, customerName, customerEmail }) {
+  return sendEmail({
+    to: ADMIN_EMAIL,
+    subject: `Vendor not responding: ${businessName}, order ${reference}`,
+    html: layout(
+      `
+      ${h1("A vendor has not responded to an order")}
+      ${p(`<strong>${esc(businessName)}</strong> (${esc(vendorEmail || "no email on file")}) has left order <strong>${esc(reference)}</strong> for <strong>${NAIRA(total)}</strong> unanswered for <strong>${daysWaiting} days</strong>, despite daily reminders.`)}
+      ${p(`Customer: ${esc(customerName || "—")} (${esc(customerEmail || "—")}). They paid the vendor's own bank account, so OJA247 cannot refund them. The useful next step is to contact the vendor. Repeated cases are a reason to consider a ban.`)}
+      ${button("Open the admin dashboard", `${SITE_URL}/admin`)}
+      `,
+      { preheader: `${businessName} has not answered order ${reference} for ${daysWaiting} days.` }
+    ),
+  });
+}
