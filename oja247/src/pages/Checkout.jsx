@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../services/api";
 import { useCart } from "../context/CartContext";
+import { useDialog } from "../components/DialogProvider";
 
 const MAX_RECEIPT_BYTES = 4 * 1024 * 1024; // the host rejects requests over ~4.5 MB
 
@@ -33,6 +34,7 @@ function makeReference() {
 }
 
 function Checkout() {
+  const { notify } = useDialog();
   const navigate = useNavigate();
   const { cartItems, subtotal, clearCart } = useCart();
 
@@ -177,7 +179,7 @@ function Checkout() {
     e.preventDefault();
 
     if (deliveryMethod === "delivery" && !formData.state.trim()) {
-      alert("Please enter your state so we can calculate delivery fees.");
+      notify({ title: "State needed", message: "Please enter your state so we can calculate delivery fees." });
       return;
     }
     if (hasMultipleStores) return;
@@ -199,7 +201,7 @@ function Checkout() {
   const handleReceiptChange = (e) => {
     const file = e.target.files?.[0] || null;
     if (file && file.size > MAX_RECEIPT_BYTES) {
-      alert("That file is too big. Please upload a receipt under 4 MB.");
+      notify({ title: "File too big", message: "Please upload a receipt under 4 MB.", tone: "error" });
       e.target.value = "";
       setReceiptFile(null);
       return;
@@ -210,7 +212,7 @@ function Checkout() {
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
     if (!receiptFile) {
-      alert("Please upload your payment receipt before placing the order.");
+      notify({ title: "Receipt needed", message: "Please upload your payment receipt before placing the order." });
       return;
     }
 
@@ -251,7 +253,9 @@ function Checkout() {
       );
     } catch (error) {
       console.error("Order creation error:", error);
-      alert(describeOrderError(error));
+      // Not awaited on purpose: the button must come back as soon as the
+      // request ends, not only after the customer closes the dialog.
+      notify({ title: "We could not place your order", message: describeOrderError(error), tone: "error" });
     } finally {
       setSubmitting(false);
     }
