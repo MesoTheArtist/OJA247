@@ -4,7 +4,7 @@ import Vendor from "../models/Vendor.js";
 import Business from "../models/Business.js";
 import TaxLedger from "../models/TaxLedger.js";
 import { sendOrderConfirmationEmail, sendVendorNewOrderEmail, sendOrderPaymentFailedEmail } from "../services/emailService.js";
-import { sendVendorNewOrderWhatsApp } from "../services/whatsappService.js";
+import { sendVendorNewOrderWhatsApp, toE164Nigeria } from "../services/whatsappService.js";
 import { withActiveDisputeVendors } from "../services/disputeOrderStatus.js";
 import { linkGuestOrders } from "../services/orderLinking.js";
 import { withReviewedVendors } from "../services/reviewEligibility.js";
@@ -567,6 +567,21 @@ export const getOrderByReference = async (req, res) => {
     // receipts: they can show the customer's name and bank details.
     const publicOrder = order.toObject();
     delete publicOrder.paymentReceipts;
+
+    // For a bank-transfer order still waiting on the seller, give the page the
+    // seller's WhatsApp number (digits only, as wa.me wants) so the customer
+    // can message them. Only the number, nothing else from the vendor record,
+    // and only while the payment is unconfirmed.
+    if (
+      publicOrder.paymentMethod === "bank_transfer" &&
+      ["awaiting_confirmation", "payment_rejected"].includes(publicOrder.status)
+    ) {
+      const businessId = publicOrder.vendors?.[0]?.businessId;
+      const vendor = businessId ? await Vendor.findOne({ businessId }) : null;
+      const e164 = toE164Nigeria(vendor?.contactWhatsapp || vendor?.contactPhone);
+      if (e164) publicOrder.sellerWhatsapp = e164.replace(/\D/g, "");
+    }
+
     res.json({ order: publicOrder });
   } catch (error) {
     console.error("Get order error:", error);

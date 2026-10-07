@@ -307,6 +307,19 @@ function PaymentStatusPage() {
               </motion.div>
             )}
 
+            {(isAwaiting || isRejected) && order?.sellerWhatsapp && (
+              <a
+                href={`https://wa.me/${order.sellerWhatsapp}?text=${encodeURIComponent(
+                  `Hello ${sellerName}, I placed order ${reference} on OJA247 for ₦${Number(order.total || 0).toLocaleString()} and paid by bank transfer. Please confirm my payment.`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-3 mb-6 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors"
+              >
+                Message {sellerName} on WhatsApp
+              </a>
+            )}
+
             {isRejected && (
               <div className="rounded-2xl bg-red-50 border border-red-100 p-5 text-left mb-6">
                 <p className="text-xs uppercase tracking-wide text-red-500 font-semibold mb-1">
