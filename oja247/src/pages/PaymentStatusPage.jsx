@@ -19,6 +19,13 @@ function PaymentStatusPage() {
 
   const status = searchParams.get("status");
   const reference = searchParams.get("reference");
+  const emailFromLink = searchParams.get("email") || "";
+
+  // Re-upload of a receipt after the seller rejected a bank-transfer payment.
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [confirmEmail, setConfirmEmail] = useState(emailFromLink);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState({ type: "", text: "" });
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -40,13 +47,65 @@ function PaymentStatusPage() {
     fetchOrder();
   }, [reference]);
 
-  const isSuccess = status === "success";
+  // Bank-transfer orders (paid straight to the seller) can be waiting for the
+  // seller to confirm, or turned down. Everything else keeps the old behaviour.
+  const isTransfer = order?.paymentMethod === "bank_transfer" || status === "awaiting" || status === "rejected";
+  const mode = isTransfer
+    ? !order || order.status === "awaiting_confirmation"
+      ? "awaiting"
+      : order.status === "payment_rejected"
+      ? "rejected"
+      : "success"
+    : status === "success"
+    ? "success"
+    : "failure";
+
+  const isSuccess = mode === "success";
+  const isAwaiting = mode === "awaiting";
+  const isRejected = mode === "rejected";
+  const lastRejection = order?.paymentRejections?.[order.paymentRejections.length - 1];
+  const sellerName = order?.vendors?.[0]?.businessName || "the seller";
+
+  const statusLabels = {
+    awaiting_confirmation: "Waiting for seller to confirm payment",
+    payment_rejected: "Payment not confirmed",
+  };
+
+  const handleReupload = async (e) => {
+    e.preventDefault();
+    setUploadMessage({ type: "", text: "" });
+    if (!receiptFile) {
+      setUploadMessage({ type: "error", text: "Please choose your receipt (JPG, PNG or PDF)." });
+      return;
+    }
+    if (receiptFile.size > 5 * 1024 * 1024) {
+      setUploadMessage({ type: "error", text: "That file is too big. Please use one under 5 MB." });
+      return;
+    }
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("receipt", receiptFile);
+      form.append("email", confirmEmail);
+      await axiosInstance.post(`/api/orders/${reference}/receipt`, form);
+      const refreshed = await axiosInstance.get(`/api/orders/reference/${reference}`);
+      setOrder(refreshed.data.order);
+      setReceiptFile(null);
+    } catch (error) {
+      setUploadMessage({
+        type: "error",
+        text: error.response?.data?.message || "We could not upload your receipt. Please try again.",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Guests (and anyone not signed in as a customer) get offered an account
   // right after paying — the moment they're most likely to want to track the
   // order. Their guest orders link up automatically on signup by matching
   // email/phone, so the checkout details are passed along as prefill.
-  const showAccountPrompt = isSuccess && order && !authLoading && !isCustomer && !hidePrompt;
+  const showAccountPrompt = (isSuccess || isAwaiting) && order && !authLoading && !isCustomer && !hidePrompt;
   const signupParams = new URLSearchParams({
     mode: "signup",
     redirect: "/orders",
@@ -83,6 +142,8 @@ function PaymentStatusPage() {
             className={`h-1.5 w-full ${
               isSuccess
                 ? "bg-gradient-to-r from-green-600 to-yellow-400"
+                : isAwaiting
+                ? "bg-amber-300"
                 : "bg-gray-200"
             }`}
           />
@@ -115,7 +176,7 @@ function PaymentStatusPage() {
               <motion.div
                 initial={{ scale: 0 }}
                 animate={
-                  isSuccess
+                  isSuccess || isAwaiting
                     ? { scale: 1 }
                     : { scale: 1, x: [0, -6, 6, -4, 4, 0] }
                 }
@@ -127,10 +188,17 @@ function PaymentStatusPage() {
                 className={`relative flex h-20 w-20 items-center justify-center rounded-full ${
                   isSuccess
                     ? "bg-gradient-to-br from-green-500 to-green-600"
+                    : isAwaiting
+                    ? "bg-amber-100"
                     : "bg-gray-100"
                 }`}
               >
-                {isSuccess ? (
+                {isAwaiting ? (
+                  <svg className="w-10 h-10 text-amber-500" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={2.5} />
+                    <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : isSuccess ? (
                   <svg
                     className="w-10 h-10 text-white"
                     viewBox="0 0 24 24"
@@ -171,7 +239,13 @@ function PaymentStatusPage() {
               transition={{ delay: 0.5 }}
               className="text-2xl sm:text-3xl font-black text-gray-900 mb-2"
             >
-              {isSuccess ? "Payment received" : "Payment didn't go through"}
+              {isSuccess
+                ? "Payment received"
+                : isAwaiting
+                ? "Order received"
+                : isRejected
+                ? "Payment not confirmed"
+                : "Payment didn't go through"}
             </motion.h1>
 
             <motion.p
@@ -182,6 +256,10 @@ function PaymentStatusPage() {
             >
               {isSuccess
                 ? "Your order is confirmed and the vendor has been notified."
+                : isAwaiting
+                ? `${sellerName} will check their bank and confirm your payment. We will email you as soon as they do.`
+                : isRejected
+                ? `${sellerName} could not confirm your payment. You can upload a new receipt below.`
                 : "No charge was made. You can try again, or reach out if this keeps happening."}
             </motion.p>
 
@@ -210,7 +288,7 @@ function PaymentStatusPage() {
                       Order status
                     </p>
                     <p className="font-bold text-gray-900 capitalize mt-0.5">
-                      {order.status}
+                      {statusLabels[order.status] || order.status}
                     </p>
                   </div>
                   <div className="text-right">
@@ -223,6 +301,55 @@ function PaymentStatusPage() {
                   </div>
                 </div>
               </motion.div>
+            )}
+
+            {isRejected && (
+              <div className="rounded-2xl bg-red-50 border border-red-100 p-5 text-left mb-6">
+                <p className="text-xs uppercase tracking-wide text-red-500 font-semibold mb-1">
+                  Reason from the seller
+                </p>
+                <p className="text-sm text-red-900 whitespace-pre-wrap mb-4">
+                  {lastRejection?.reason || "The seller did not give a reason."}
+                </p>
+
+                <form onSubmit={handleReupload} className="space-y-3">
+                  {!emailFromLink && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Email you used for this order
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={confirmEmail}
+                        onChange={(e) => setConfirmEmail(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      New payment receipt (JPG, PNG or PDF, up to 5 MB)
+                    </label>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+                      onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                      className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-green-600 file:px-4 file:py-2 file:text-white file:font-medium"
+                    />
+                  </div>
+                  {uploadMessage.text && (
+                    <p className="text-sm text-red-600">{uploadMessage.text}</p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={uploading}
+                    className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white py-2.5 rounded-xl text-sm font-semibold"
+                  >
+                    {uploading ? "Uploading..." : "Send new receipt to the seller"}
+                  </button>
+                </form>
+              </div>
             )}
 
             {showAccountPrompt && (
@@ -276,7 +403,7 @@ function PaymentStatusPage() {
                 Continue shopping
               </motion.button>
 
-              {!isSuccess && (
+              {mode === "failure" && (
                 <motion.button
                   whileHover={{ scale: 1.03, y: -2 }}
                   whileTap={{ scale: 0.97 }}

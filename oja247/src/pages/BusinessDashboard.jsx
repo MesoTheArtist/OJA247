@@ -48,6 +48,11 @@ const BusinessDashboard = () => {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState("");
   const [shippingRef, setShippingRef] = useState(null);
+  // Bank-transfer orders: which order is being confirmed, and the reject form.
+  const [confirmingRef, setConfirmingRef] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
   const { confirm, notify } = useDialog();
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [ordersFetched, setOrdersFetched] = useState(false);
@@ -144,6 +149,64 @@ const BusinessDashboard = () => {
       });
     } finally {
       setShippingRef(null);
+    }
+  };
+
+  // Merge an updated order into the list, keeping the signed receipt links the
+  // list was loaded with (the update responses don't carry them).
+  const mergeOrder = (updated) =>
+    setOrders((prev) =>
+      prev.map((o) => (o._id === updated._id ? { ...o, ...updated, paymentReceipts: o.paymentReceipts } : o))
+    );
+
+  const confirmTransfer = async (order) => {
+    const ok = await confirm({
+      title: "Payment received?",
+      message: `Only confirm once ₦${Number(order.total || 0).toLocaleString()} is really in your bank account. A receipt can be faked, so check your own bank first. The customer will be emailed.`,
+      confirmLabel: "Yes, I got the money",
+    });
+    if (!ok) return;
+    setConfirmingRef(order.reference);
+    try {
+      const res = await axiosInstance.patch(`/api/orders/${order.reference}/payment/confirm`);
+      mergeOrder(res.data.order);
+    } catch (error) {
+      await notify({
+        title: "Couldn't confirm the payment",
+        message: error.response?.data?.message || "Something went wrong. Please try again.",
+        tone: "error",
+      });
+    } finally {
+      setConfirmingRef(null);
+    }
+  };
+
+  const submitReject = async (e) => {
+    e.preventDefault();
+    if (rejectReason.trim().length < 5) {
+      await notify({
+        title: "Add a reason",
+        message: "Please tell the customer why you are rejecting this payment.",
+        tone: "error",
+      });
+      return;
+    }
+    setRejecting(true);
+    try {
+      const res = await axiosInstance.patch(`/api/orders/${rejectTarget.reference}/payment/reject`, {
+        reason: rejectReason.trim(),
+      });
+      mergeOrder(res.data.order);
+      setRejectTarget(null);
+      setRejectReason("");
+    } catch (error) {
+      await notify({
+        title: "Couldn't reject the payment",
+        message: error.response?.data?.message || "Something went wrong. Please try again.",
+        tone: "error",
+      });
+    } finally {
+      setRejecting(false);
     }
   };
 
@@ -558,6 +621,53 @@ const BusinessDashboard = () => {
               </div>
             </div>
 
+            {rejectTarget && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                onClick={() => !rejecting && setRejectTarget(null)}
+              >
+                <form
+                  onSubmit={submitReject}
+                  onClick={(e) => e.stopPropagation()}
+                  className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 sm:p-6"
+                >
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">Reject this payment</h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Order {rejectTarget.reference}. Your reason is emailed to the customer and shown on their order, and
+                    they can upload a new receipt.
+                  </p>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Why are you rejecting it?</label>
+                  <textarea
+                    autoFocus
+                    required
+                    rows={4}
+                    maxLength={500}
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder="e.g. I checked my account and the money has not arrived yet."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <div className="flex justify-end gap-2 mt-4">
+                    <button
+                      type="button"
+                      disabled={rejecting}
+                      onClick={() => setRejectTarget(null)}
+                      className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={rejecting}
+                      className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-sm font-semibold"
+                    >
+                      {rejecting ? "Rejecting…" : "Reject payment"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
             <div className="bg-white rounded-2xl shadow-sm border border-green-100 overflow-hidden">
               <div className="p-5 sm:p-6 border-b border-gray-100 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <h2 className="text-lg font-bold text-gray-900">
@@ -566,6 +676,8 @@ const BusinessDashboard = () => {
                 <div className="flex flex-wrap gap-2">
                   {[
                     { value: "all", label: "All" },
+                    { value: "awaiting_confirmation", label: "Needs confirmation" },
+                    { value: "payment_rejected", label: "Rejected" },
                     { value: "paid", label: "Paid" },
                     { value: "pending", label: "Pending" },
                     { value: "failed", label: "Failed" },
@@ -625,16 +737,74 @@ const BusinessDashboard = () => {
                               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
                                 order.paymentStatus === "paid"
                                   ? "bg-green-100 text-green-700 border border-green-200"
-                                  : order.paymentStatus === "failed"
+                                  : order.paymentStatus === "failed" || order.paymentStatus === "payment_rejected"
                                   ? "bg-red-100 text-red-700 border border-red-200"
                                   : "bg-yellow-100 text-yellow-700 border border-yellow-200"
                               }`}
                             >
                               {order.paymentStatus === "paid" && <CheckCircle2 size={12} />}
-                              {order.paymentStatus === "failed" && <XCircle size={12} />}
-                              {order.paymentStatus === "pending" && <Clock size={12} />}
-                              {order.paymentStatus}
+                              {(order.paymentStatus === "failed" || order.paymentStatus === "payment_rejected") && (
+                                <XCircle size={12} />
+                              )}
+                              {(order.paymentStatus === "pending" || order.paymentStatus === "awaiting_confirmation") && (
+                                <Clock size={12} />
+                              )}
+                              {{
+                                awaiting_confirmation: "Needs your confirmation",
+                                payment_rejected: "Rejected",
+                              }[order.paymentStatus] || order.paymentStatus}
                             </span>
+
+                            {order.paymentMethod === "bank_transfer" && (
+                              <div className="mt-2 space-y-2">
+                                <p className="text-xs text-gray-400">Paid by bank transfer</p>
+
+                                {(order.paymentReceipts || []).map((receipt, idx) =>
+                                  receipt.url ? (
+                                    <a
+                                      key={receipt.publicId}
+                                      href={receipt.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="block text-xs font-semibold text-green-700 hover:text-green-800 underline"
+                                    >
+                                      View receipt{(order.paymentReceipts || []).length > 1 ? ` ${idx + 1}` : ""}
+                                    </a>
+                                  ) : null
+                                )}
+
+                                {order.paymentStatus === "awaiting_confirmation" && (
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      onClick={() => confirmTransfer(order)}
+                                      disabled={confirmingRef === order.reference}
+                                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-xs font-semibold transition"
+                                    >
+                                      <CheckCircle2 size={14} />
+                                      {confirmingRef === order.reference ? "Saving…" : "Payment received"}
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setRejectReason("");
+                                        setRejectTarget(order);
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold transition"
+                                    >
+                                      <XCircle size={14} />
+                                      Reject
+                                    </button>
+                                  </div>
+                                )}
+
+                                {order.paymentStatus === "payment_rejected" && (
+                                  <p className="text-xs text-gray-500 max-w-[14rem]">
+                                    Your reason: {order.paymentRejections?.[order.paymentRejections.length - 1]?.reason}
+                                    <br />
+                                    <span className="text-gray-400">Waiting for the customer to upload a new receipt.</span>
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </td>
                           <td data-label="Delivery" data-stack="true" className="p-4">
                             {(() => {

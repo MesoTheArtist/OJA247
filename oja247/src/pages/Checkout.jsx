@@ -1,11 +1,18 @@
-import { useState, useMemo } from "react";
-import PaystackPop from "@paystack/inline-js";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../services/api";
 import { useCart } from "../context/CartContext";
 
-const SERVICE_FEE_RATE = 0.05; // 5% PSS / Platform Service Fee
-const VAT_RATE = 0.075; // Nigeria standard VAT
+const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
+
+// The reference the customer puts in their transfer narration. Made here, before
+// the order exists, so it can be shown on the payment step. 10 random characters.
+function makeReference() {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  return `oja247-${Array.from(bytes, (b) => chars[b % chars.length]).join("")}`;
+}
 
 function Checkout() {
   const navigate = useNavigate();
@@ -22,6 +29,17 @@ function Checkout() {
   });
 
   const [deliveryMethod, setDeliveryMethod] = useState("delivery");
+
+  // "details" collects who and where; "payment" shows where to transfer the
+  // money and takes the receipt.
+  const [step, setStep] = useState("details");
+  const referenceRef = useRef(makeReference());
+  const [payDetails, setPayDetails] = useState(null);
+  const [payError, setPayError] = useState("");
+  const [loadingPay, setLoadingPay] = useState(false);
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [copied, setCopied] = useState("");
 
   // Group cart items by business, so each vendor's delivery fee can be
   // calculated independently based on the buyer's state.
@@ -79,9 +97,41 @@ function Checkout() {
     [vendorGroupsWithFees]
   );
 
-  const serviceFee = subtotal * SERVICE_FEE_RATE;
-  const vat = (subtotal + serviceFee) * VAT_RATE;
-  const total = subtotal + serviceFee + vat + totalDeliveryFee;
+  // Paid straight to the seller's own bank account: items plus delivery,
+  // with no service fee or VAT added at checkout.
+  const total = subtotal + totalDeliveryFee;
+
+  const storeId = vendorGroups[0]?.business?._id || null;
+  const hasMultipleStores = vendorGroups.length > 1;
+
+  // Load the seller's bank details when the payment step opens.
+  useEffect(() => {
+    if (step !== "payment" || !storeId) return;
+    let cancelled = false;
+
+    const load = async () => {
+      setLoadingPay(true);
+      setPayError("");
+      try {
+        const { data } = await axiosInstance.get(`/api/orders/payment-details/${storeId}`);
+        if (!cancelled) setPayDetails(data);
+      } catch (error) {
+        if (!cancelled) {
+          setPayDetails(null);
+          setPayError(
+            error.response?.data?.message || "We could not load this store's payment details. Please try again."
+          );
+        }
+      } finally {
+        if (!cancelled) setLoadingPay(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, storeId]);
 
   if (cartItems.length === 0) {
     return (
@@ -105,20 +155,51 @@ function Checkout() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
+  const goToPayment = (e) => {
     e.preventDefault();
 
     if (deliveryMethod === "delivery" && !formData.state.trim()) {
       alert("Please enter your state so we can calculate delivery fees.");
       return;
     }
+    if (hasMultipleStores) return;
 
-    const reference = `oja247-${Date.now()}`;
+    setStep("payment");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-    let accessCode = null;
+  const copyText = async (label, text) => {
     try {
-      const { data } = await axiosInstance.post("/api/orders", {
-        reference,
+      await navigator.clipboard.writeText(text);
+      setCopied(label);
+      setTimeout(() => setCopied(""), 1500);
+    } catch {
+      /* clipboard can be blocked; the text is still on screen to copy by hand */
+    }
+  };
+
+  const handleReceiptChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    if (file && file.size > MAX_RECEIPT_BYTES) {
+      alert("That file is too big. Please upload a receipt under 5 MB.");
+      e.target.value = "";
+      setReceiptFile(null);
+      return;
+    }
+    setReceiptFile(file);
+  };
+
+  const handlePlaceOrder = async (e) => {
+    e.preventDefault();
+    if (!receiptFile) {
+      alert("Please upload your payment receipt before placing the order.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        reference: referenceRef.current,
         customer: {
           fullName: formData.fullName,
           phone: formData.phone,
@@ -128,89 +209,51 @@ function Checkout() {
           state: formData.state,
           note: formData.note,
         },
-        items: cartItems.map((item) => ({
-          productId: item._id,
-          businessId: (item.business || item.businessId)?._id || null,
-          name: item.name,
-          category: item.category || "",
-          quantity: item.quantity,
-          price: Number(item.price || 0),
-          image: item.images?.[0] || item.image || "",
-        })),
-        vendors: vendorGroupsWithFees.map((group) => ({
-          businessId: group.business?._id || null,
-          businessName: group.business?.name || "",
-          itemsSubtotal: group.itemsSubtotal,
-          deliveryFee: group.deliveryFee,
-        })),
-        subtotal: Number(subtotal),
-        serviceFee: Number(serviceFee),
-        vat: Number(vat),
-        deliveryFee: Number(totalDeliveryFee),
-        total: Number(total),
+        // Only ids and quantities go up. Prices and delivery are worked out on
+        // the server, so what the customer saw is checked, not trusted.
+        items: cartItems.map((item) => ({ productId: item._id, quantity: item.quantity })),
         deliveryMethod,
-      });
+        expectedTotal: Number(total),
+      };
 
-      accessCode = data.accessCode;
+      const form = new FormData();
+      form.append("payload", JSON.stringify(payload));
+      form.append("receipt", receiptFile);
+
+      await axiosInstance.post("/api/orders/direct", form);
+
+      clearCart();
+      navigate(
+        `/payment-status?status=awaiting&reference=${encodeURIComponent(referenceRef.current)}&email=${encodeURIComponent(formData.email)}`
+      );
     } catch (error) {
       console.error("Order creation error:", error);
-      alert(error.response?.data?.message || "We could not create your order. Please try again.");
-      return;
+      alert(error.response?.data?.message || "We could not place your order. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    if (!accessCode) {
-      alert("We could not start your payment. Please try again.");
-      return;
-    }
-
-    // The server already started this payment with the vendor split attached,
-    // so the popup only has to finish it.
-    const popup = new PaystackPop();
-    popup.resumeTransaction(accessCode, {
-      onSuccess: async (transaction) => {
-        const paidReference = transaction?.reference || reference;
-        try {
-          const verificationResponse = await axiosInstance.post(`/api/orders/verify/${paidReference}`);
-
-          if (verificationResponse.data?.order?.paymentStatus === "paid") {
-            clearCart();
-            navigate(`/payment-status?status=success&reference=${paidReference}`);
-            return;
-          }
-        } catch (error) {
-          console.error("Payment verification error:", error);
-        }
-
-        navigate(`/payment-status?status=failure&reference=${paidReference}`);
-      },
-      onCancel: () => {
-        console.log("Paystack checkout closed by user");
-        navigate(`/payment-status?status=failure&reference=${reference}`);
-      },
-      onError: (error) => {
-        console.error("Paystack popup error:", error);
-        alert("The payment window could not load. Please try again.");
-      },
-    });
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="max-w-6xl mx-auto">
         <button
-          onClick={() => navigate("/cart")}
+          onClick={() => (step === "payment" ? setStep("details") : navigate("/cart"))}
           className="mb-6 text-sm font-medium text-gray-600 hover:text-gray-800"
         >
-          ← Back to cart
+          {step === "payment" ? "← Back to your details" : "← Back to cart"}
         </button>
 
         <div className="mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Checkout</h1>
-          <p className="text-gray-500 mt-1">Complete your order details below.</p>
+          <p className="text-gray-500 mt-1">
+            {step === "details" ? "Step 1 of 2: your delivery details." : "Step 2 of 2: pay the seller and upload your receipt."}
+          </p>
         </div>
 
         <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-6">
-          <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+          {step === "details" ? (
+          <form onSubmit={goToPayment} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Full name</label>
@@ -315,13 +358,124 @@ function Checkout() {
               </div>
             </div>
 
+            {hasMultipleStores && (
+              <p className="mt-4 text-sm text-red-600">
+                Your cart has items from more than one store. Each order can only be from one store, so please{" "}
+                <button type="button" onClick={() => navigate("/cart")} className="underline font-medium">
+                  go back to your cart
+                </button>{" "}
+                and keep one store's items.
+              </p>
+            )}
+
             <button
               type="submit"
-              className="mt-6 w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-medium"
+              disabled={hasMultipleStores}
+              className="mt-6 w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white py-3 rounded-xl font-medium"
             >
-              Place Order
+              Continue to payment
             </button>
           </form>
+        ) : (
+          <form onSubmit={handlePlaceOrder} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Pay {vendorGroups[0]?.business?.name || "the seller"} by bank transfer</h2>
+            <p className="text-sm text-gray-500 mb-5">
+              Your money goes straight to the seller's own bank account. Transfer the exact amount below, then upload
+              your receipt.
+            </p>
+
+            {loadingPay && <p className="text-sm text-gray-500">Loading the seller's bank details...</p>}
+
+            {payError && (
+              <div className="rounded-xl bg-red-50 border border-red-100 p-4 text-sm text-red-700">{payError}</div>
+            )}
+
+            {payDetails && (
+              <div className="space-y-4">
+                <div className="rounded-xl bg-green-50 border border-green-100 p-4">
+                  <p className="text-xs uppercase tracking-wide text-green-700 font-semibold">Amount to transfer</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-2xl font-black text-gray-900">₦{Math.round(total).toLocaleString()}</p>
+                    <button
+                      type="button"
+                      onClick={() => copyText("amount", String(Math.round(total)))}
+                      className="text-xs font-semibold text-green-700"
+                    >
+                      {copied === "amount" ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 divide-y divide-gray-100 text-sm">
+                  {[
+                    ["Bank", payDetails.bankName, "bank"],
+                    ["Account name", payDetails.accountName, "name"],
+                    ["Account number", payDetails.accountNumber, "number"],
+                  ].map(([label, value, key]) => (
+                    <div key={key} className="flex items-center justify-between gap-3 px-4 py-3">
+                      <div>
+                        <p className="text-xs text-gray-400">{label}</p>
+                        <p className="font-semibold text-gray-900 break-all">{value}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyText(key, value)}
+                        className="text-xs font-semibold text-green-700 shrink-0"
+                      >
+                        {copied === key ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-xl bg-amber-50 border border-amber-100 p-4 text-sm text-amber-900">
+                  <p className="font-semibold mb-1">Put this reference in your transfer narration</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-mono font-bold">{referenceRef.current}</p>
+                    <button
+                      type="button"
+                      onClick={() => copyText("ref", referenceRef.current)}
+                      className="text-xs font-semibold text-amber-800"
+                    >
+                      {copied === "ref" ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-amber-800">
+                    Pay only to the account shown here, and check the account name matches the store before you send.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Upload your payment receipt <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="file"
+                    required
+                    accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+                    onChange={handleReceiptChange}
+                    className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-green-600 file:px-4 file:py-2 file:text-white file:font-medium"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    A screenshot or PDF of your transfer (JPG, PNG or PDF, up to 5 MB). Your order can't be placed
+                    without it.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting || !receiptFile}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white py-3 rounded-xl font-medium"
+                >
+                  {submitting ? "Placing your order..." : "I've paid, place my order"}
+                </button>
+                <p className="text-xs text-gray-400 text-center">
+                  The seller will check their bank and confirm your payment, and we will email you.
+                </p>
+              </div>
+            )}
+          </form>
+        )}
 
           <aside className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 h-fit">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Order Summary</h2>
@@ -365,14 +519,6 @@ function Checkout() {
               <div className="flex justify-between">
                 <span>Items Subtotal</span>
                 <span>₦{subtotal.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Service Fee (5%)</span>
-                <span>₦{serviceFee.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>VAT (7.5%)</span>
-                <span>₦{vat.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
               </div>
               <div className="flex justify-between">
                 <span>Total Delivery</span>
