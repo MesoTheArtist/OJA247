@@ -4,8 +4,10 @@ import { Eye, EyeOff } from "lucide-react";
 import axiosInstance from "../services/marketerApi";
 import Logo from "../assets/OJA247 VX1.png";
 import { renderGoogleButton } from '../utils/googleButton';
+import { useDialog } from "../components/DialogProvider";
 
 const MarketerRegisterForm = () => {
+  const { notify } = useDialog();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -114,7 +116,11 @@ const MarketerRegisterForm = () => {
       // marketer sessions are a distinct account type (see marketerAuthMiddleware.js)
       localStorage.setItem("marketerToken", token);
 
-      alert(`You're registered! Your referral code is ${marketer.referralCode}`);
+      await notify({
+        title: "You're registered!",
+        message: `Your referral code is ${marketer.referralCode}`,
+        tone: "success",
+      });
       navigate("/marketer-dashboard");
     } catch (err) {
       setError(

@@ -75,7 +75,7 @@ const CustomerDetailModal = ({ customerId, onClose, onChanged }) => {
       setData((prev) => ({ ...prev, customer: { ...prev.customer, banned: !customer.banned } }));
       onChanged?.();
     } catch (err) {
-      alert(err.response?.data?.message || "Couldn't update this customer's status.");
+      notify({ title: "Couldn't update status", message: err.response?.data?.message || "Please try again.", tone: "error" });
     } finally {
       setBusy(false);
     }
@@ -94,7 +94,7 @@ const CustomerDetailModal = ({ customerId, onClose, onChanged }) => {
       setEditing(false);
       onChanged?.();
     } catch (err) {
-      alert(err.response?.data?.message || "Couldn't save those changes.");
+      notify({ title: "Couldn't save changes", message: err.response?.data?.message || "Please try again.", tone: "error" });
     } finally {
       setBusy(false);
     }
@@ -120,7 +120,7 @@ const CustomerDetailModal = ({ customerId, onClose, onChanged }) => {
       onChanged?.();
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || "Couldn't delete this account.");
+      notify({ title: "Couldn't delete account", message: err.response?.data?.message || "Please try again.", tone: "error" });
       setBusy(false);
     }
   };
@@ -139,10 +139,10 @@ const CustomerDetailModal = ({ customerId, onClose, onChanged }) => {
       setData((prev) => ({ ...prev, customer: { ...prev.customer, emailVerified: true } }));
       onChanged?.();
       if (res.data.linkedOrders > 0) {
-        alert(`Email verified. ${res.data.linkedOrders} past order(s) were linked to this account.`);
+        notify({ title: "Email verified", message: `${res.data.linkedOrders} past order(s) were linked to this account.`, tone: "success" });
       }
     } catch (err) {
-      alert(err.response?.data?.message || "Couldn't verify this email.");
+      notify({ title: "Couldn't verify email", message: err.response?.data?.message || "Please try again.", tone: "error" });
     } finally {
       setBusy(false);
     }

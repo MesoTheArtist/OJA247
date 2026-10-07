@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Eye, EyeOff, Check } from "lucide-react";
 import Logo from "../assets/OJA247 VX1.png";
+import { useDialog } from "../components/DialogProvider";
 
 // Registration is three short steps instead of one 16-field page. All the
 // data still lives in a single formData object, so going back never loses
@@ -20,6 +21,7 @@ const inputClass =
 const labelClass = "block text-sm font-semibold text-gray-700 mb-2";
 
 const BusinessForm = () => {
+  const { notify } = useDialog();
   const navigate = useNavigate();
   const { register } = useAuth();
   const [searchParams] = useSearchParams();
@@ -208,7 +210,12 @@ const BusinessForm = () => {
     );
 
     if (result.success) {
-      alert("Business registered successfully!");
+      // Awaited so the message is read before the page changes, like the old alert.
+      await notify({
+        title: "Business registered",
+        message: "Your business is registered. Taking you to your dashboard.",
+        tone: "success",
+      });
       navigate(`/dashboard/${result.business._id}`);
     } else {
       setError(result.message);
@@ -672,4 +679,4 @@ const BusinessForm = () => {
   );
 };
 
-export default BusinessForm;  
+export default BusinessForm;

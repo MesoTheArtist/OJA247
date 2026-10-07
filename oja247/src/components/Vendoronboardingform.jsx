@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../services/api';
+import { useDialog } from "./DialogProvider";
 
 // Combined vendor onboarding form: payout info + KYC docs in one flow.
 // Basic tier (NIN + bank match) is required to submit.
@@ -295,6 +296,7 @@ const styles = `
 `;
 
 export default function VendorOnboardingForm({ onSubmitted, existing = null } = {}) {
+  const { notify } = useDialog();
   const { business, isAuthenticated } = useAuth();
 
   const [banks, setBanks] = useState([]);
@@ -463,7 +465,7 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
       const file = e.target.files?.[0];
       if (!file) return setter(null);
       if (file.size > maxSizeMB * 1024 * 1024) {
-        alert(`File is too large. Max size is ${maxSizeMB}MB.`);
+        notify({ title: "File too big", message: `Max size is ${maxSizeMB}MB.`, tone: "error" });
         e.target.value = '';
         return setter(null);
       }

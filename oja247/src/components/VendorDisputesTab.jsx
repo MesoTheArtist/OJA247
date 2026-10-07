@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { LifeBuoy, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
 import axiosInstance from "../services/api";
+import { useDialog } from "./DialogProvider";
 
 const REASON_LABELS = {
   item_not_received: "Never received it",
@@ -24,6 +25,7 @@ const SELF_RESOLVE_WINDOW_DAYS = 7; // mirrors Dispute.SELF_RESOLVE_WINDOW_DAYS
 // Once a dispute auto-escalates (backend's weekly cron, 7-day timeout) it
 // moves to admin — the vendor can still see it here, just can't act on it.
 const VendorDisputesTab = ({ businessId }) => {
+  const { notify } = useDialog();
   const [disputes, setDisputes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("open");
@@ -67,7 +69,7 @@ const VendorDisputesTab = ({ businessId }) => {
       setDisputes((prev) => prev.map((d) => (d._id === id ? res.data.dispute : d)));
       setDrafts((prev) => ({ ...prev, [id]: { note: "", refunded: false } }));
     } catch (err) {
-      alert(err.response?.data?.message || "Couldn't resolve this dispute. Please try again.");
+      notify({ title: "Couldn't resolve dispute", message: err.response?.data?.message || "Please try again.", tone: "error" });
     } finally {
       setResolvingId(null);
     }

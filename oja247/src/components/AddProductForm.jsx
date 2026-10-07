@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { createProduct } from '../services/api';
 import ImageUpload from './ImageUpload';
+import { useDialog } from './DialogProvider';
 
 const AddProductForm = ({ businessId, onProductAdded }) => {
+  const { notify } = useDialog();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -78,7 +80,7 @@ const AddProductForm = ({ businessId, onProductAdded }) => {
         onProductAdded(response.data);
       }
 
-      alert('Product added successfully!');
+      notify({ title: 'Product added', message: 'Your product was added successfully.', tone: 'success' });
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to add product');
     } finally {

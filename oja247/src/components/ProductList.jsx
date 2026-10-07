@@ -3,7 +3,7 @@ import { getProductsByBusiness, updateProduct, deleteProduct } from '../services
 import { useDialog } from './DialogProvider';
 
 const ProductList = ({ businessId }) => {
-  const { confirm } = useDialog();
+  const { confirm, notify } = useDialog();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -36,9 +36,9 @@ const ProductList = ({ businessId }) => {
     try {
       await deleteProduct(productId);
       setProducts(products.filter(p => p._id !== productId));
-      alert('Product deleted successfully!');
+      notify({ title: 'Product deleted', message: 'The product was deleted.', tone: 'success' });
     } catch (error) {
-      alert('Failed to delete product');
+      notify({ title: 'Could not delete product', message: 'Please try again.', tone: 'error' });
       console.error('Error deleting product:', error);
     }
   };
@@ -77,9 +77,9 @@ const ProductList = ({ businessId }) => {
       
       setProducts(products.map(p => p._id === productId ? response.data : p));
       setEditingProduct(null);
-      alert('Product updated successfully!');
+      notify({ title: 'Product updated', message: 'Your changes were saved.', tone: 'success' });
     } catch (error) {
-      alert('Failed to update product');
+      notify({ title: 'Could not update product', message: 'Please try again.', tone: 'error' });
       console.error('Error updating product:', error);
     }
   };

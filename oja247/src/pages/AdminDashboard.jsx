@@ -102,7 +102,7 @@ const formatChartDate = (isoDate) => {
 };
 
 const AdminDashboard = () => {
-  const { confirm, prompt } = useDialog();
+  const { confirm, prompt, notify } = useDialog();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -468,7 +468,7 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error("Error fetching data:", error);
       if (error.response?.status === 403) {
-        alert("Admin access required");
+        await notify({ title: "Admin access required", message: "You don't have permission to open this page.", tone: "error" });
         navigate("/");
       } else {
         showToast("Couldn't load dashboard data. Try refreshing.", "error");
