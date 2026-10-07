@@ -3,7 +3,25 @@ import { useNavigate } from "react-router-dom";
 import axiosInstance from "../services/api";
 import { useCart } from "../context/CartContext";
 
-const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
+const MAX_RECEIPT_BYTES = 4 * 1024 * 1024; // the host rejects requests over ~4.5 MB
+
+// Turns a failed order request into a message that says what went wrong.
+function describeOrderError(error) {
+  const res = error?.response;
+  if (!res) {
+    return error?.code === "ECONNABORTED"
+      ? "The request timed out before the server answered. Check your connection and try again."
+      : "We couldn't reach the server (network or connection problem). Check your internet and try again.";
+  }
+  if (res.status === 413) {
+    return "Your receipt file is too large for the server. Please use a file under 4 MB (a smaller screenshot works).";
+  }
+  if (res.status === 429) return "Too many attempts. Please wait a few minutes and try again.";
+  const message = typeof res.data?.message === "string" ? res.data.message : null;
+  const code = res.data?.code ? ` [${res.data.code}]` : "";
+  if (message) return `${message}${code}`;
+  return `The server returned an unexpected response (status ${res.status}). Please try again.`;
+}
 
 // The reference the customer puts in their transfer narration. Made here, before
 // the order exists, so it can be shown on the payment step. 10 random characters.
@@ -181,7 +199,7 @@ function Checkout() {
   const handleReceiptChange = (e) => {
     const file = e.target.files?.[0] || null;
     if (file && file.size > MAX_RECEIPT_BYTES) {
-      alert("That file is too big. Please upload a receipt under 5 MB.");
+      alert("That file is too big. Please upload a receipt under 4 MB.");
       e.target.value = "";
       setReceiptFile(null);
       return;
@@ -233,7 +251,7 @@ function Checkout() {
       );
     } catch (error) {
       console.error("Order creation error:", error);
-      alert(error.response?.data?.message || "We could not place your order. Please try again.");
+      alert(describeOrderError(error));
     } finally {
       setSubmitting(false);
     }

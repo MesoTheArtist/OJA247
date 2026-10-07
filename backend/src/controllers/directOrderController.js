@@ -16,7 +16,7 @@ import { sendVendorNewOrderWhatsApp } from "../services/whatsappService.js";
 
 const SITE_URL = process.env.SITE_URL || "https://oja247.store";
 
-// Memory storage, one file, 5 MB. The type is checked from the file's bytes
+// Memory storage, one file, 4 MB. The type is checked from the file's bytes
 // in the handlers below, not here, because the mimetype a browser sends can
 // be anything.
 export const receiptUpload = multer({
@@ -30,7 +30,7 @@ export function handleReceiptUpload(req, res, next) {
     if (!err) return next();
     const message =
       err.code === "LIMIT_FILE_SIZE"
-        ? "That file is too big. Please upload a receipt under 5 MB."
+        ? "That file is too big. Please upload a receipt under 4 MB."
         : "We couldn't read that upload. Please try again.";
     return res.status(400).json({ message });
   });
@@ -79,6 +79,8 @@ export const getPaymentDetails = async (req, res) => {
 // waiting for the vendor to confirm. Prices, delivery and the total are all
 // worked out here from the database, never trusted from the browser.
 export const createDirectOrder = async (req, res) => {
+  // Which step we were on, so a failure can say exactly where it happened.
+  let stage = "reading_request";
   try {
     let payload;
     try {
@@ -113,6 +115,7 @@ export const createDirectOrder = async (req, res) => {
     }
 
     // Rebuild the items from the database.
+    stage = "checking_products";
     const wanted = new Map();
     for (const item of items) {
       const quantity = Number(item.quantity);
@@ -181,6 +184,7 @@ export const createDirectOrder = async (req, res) => {
     // real cause (missing keys, rejected options) instead of the generic
     // "could not place your order" message. No order exists yet, so nothing
     // is left half-created.
+    stage = "uploading_receipt";
     let receipt;
     try {
       receipt = await uploadReceipt(req.file.buffer, req.file.originalname);
@@ -193,10 +197,12 @@ export const createDirectOrder = async (req, res) => {
         hasApiSecret: Boolean(process.env.CLOUDINARY_API_SECRET),
       });
       return res.status(502).json({
-        message: "We couldn't save your receipt. Please try again in a moment.",
+        code: "RECEIPT_UPLOAD_FAILED",
+        message: "We couldn't save your receipt (storage error). Please try again in a moment.",
       });
     }
 
+    stage = "saving_order";
     const order = await Order.create({
       reference,
       customer: {
@@ -232,6 +238,7 @@ export const createDirectOrder = async (req, res) => {
     const dashboardUrl = `${SITE_URL}/dashboard/${businessId}`;
     const statusUrl = `${SITE_URL}/payment-status?status=awaiting&reference=${encodeURIComponent(reference)}&email=${encodeURIComponent(order.customer.email)}`;
 
+    stage = "sending_notifications";
     // Notifications are best-effort. The order is already saved, so a mail
     // hiccup must not make the customer think it failed and pay twice.
     await Promise.allSettled([
@@ -273,8 +280,11 @@ export const createDirectOrder = async (req, res) => {
     if (error?.code === 11000) {
       return res.status(409).json({ message: "This order was already placed." });
     }
-    console.error("Create direct order error:", error);
-    res.status(500).json({ message: "We could not place your order. Please try again." });
+    console.error("Create direct order error:", { stage, name: error?.name, message: error?.message });
+    res.status(500).json({
+      code: `ORDER_FAILED_${stage.toUpperCase()}`,
+      message: `We could not place your order (problem while ${stage.replace(/_/g, " ")}). Please try again.`,
+    });
   }
 };
 

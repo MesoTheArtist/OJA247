@@ -4,7 +4,7 @@ import cloudinary from "../config/cloudinaryConfig.js";
 // details. They are uploaded with Cloudinary "authenticated" delivery, so the
 // stored publicId alone is useless; only a signed link we generate works.
 
-export const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
+export const MAX_RECEIPT_BYTES = 4 * 1024 * 1024; // Vercel rejects request bodies over ~4.5 MB
 
 // Decide what a file really is from its first bytes, not from the name or the
 // mimetype the browser claims. Returns null for anything that is not a JPG,

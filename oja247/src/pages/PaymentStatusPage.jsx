@@ -78,8 +78,8 @@ function PaymentStatusPage() {
       setUploadMessage({ type: "error", text: "Please choose your receipt (JPG, PNG or PDF)." });
       return;
     }
-    if (receiptFile.size > 5 * 1024 * 1024) {
-      setUploadMessage({ type: "error", text: "That file is too big. Please use one under 5 MB." });
+    if (receiptFile.size > 4 * 1024 * 1024) {
+      setUploadMessage({ type: "error", text: "That file is too big. Please use one under 4 MB." });
       return;
     }
     setUploading(true);
@@ -333,7 +333,7 @@ function PaymentStatusPage() {
                   )}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      New payment receipt (JPG, PNG or PDF, up to 5 MB)
+                      New payment receipt (JPG, PNG or PDF, up to 4 MB)
                     </label>
                     <input
                       type="file"
