@@ -87,7 +87,11 @@ function PaymentStatusPage() {
       const form = new FormData();
       form.append("receipt", receiptFile);
       form.append("email", confirmEmail);
-      await axiosInstance.post(`/api/orders/${reference}/receipt`, form);
+      // Multipart must be explicit: the shared axios instance defaults to JSON,
+      // which would drop the file (see Checkout.jsx).
+      await axiosInstance.post(`/api/orders/${reference}/receipt`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       const refreshed = await axiosInstance.get(`/api/orders/reference/${reference}`);
       setOrder(refreshed.data.order);
       setReceiptFile(null);

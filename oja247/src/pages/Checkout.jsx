@@ -220,7 +220,12 @@ function Checkout() {
       form.append("payload", JSON.stringify(payload));
       form.append("receipt", receiptFile);
 
-      await axiosInstance.post("/api/orders/direct", form);
+      // The shared axios instance defaults to a JSON Content-Type, which makes
+      // axios turn a FormData body into JSON and silently drop the file. Say
+      // multipart explicitly so the receipt actually reaches the server.
+      await axiosInstance.post("/api/orders/direct", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       clearCart();
       navigate(
