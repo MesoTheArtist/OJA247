@@ -18,6 +18,7 @@ import {
   sendVerificationReviewedEmail,
   sendAccountBanStatusEmail,
   sendAdminBannedVendorOpenOrdersEmail,
+  sendCustomerVendorSuspendedEmail,
   sendAccountDeletedEmail,
   sendCustomerDetailsUpdatedEmail,
   sendPointsWithdrawalPaidEmail,
@@ -159,6 +160,8 @@ export const toggleUserBan = async (req, res) => {
   try {
     const { id } = req.params;
     const { banned } = req.body;
+    // Optional note from the admin, included in the suspension email.
+    const reason = typeof req.body.reason === "string" ? req.body.reason.trim().slice(0, 500) : "";
 
     const user = await User.findByIdAndUpdate(
       id,
@@ -194,6 +197,7 @@ export const toggleUserBan = async (req, res) => {
       to: user.email,
       name: user.businessId?.name || user.email,
       banned: user.banned,
+      reason,
       dashboardUrl: `${process.env.SITE_URL || "https://oja247.store"}/business-dashboard`,
     });
 
@@ -220,6 +224,20 @@ export const toggleUserBan = async (req, res) => {
               daysWaiting: Math.floor((now - new Date(o.createdAt).getTime()) / (24 * 60 * 60 * 1000)),
             })),
           }).catch((err) => console.error("Banned-vendor admin email failed:", err));
+
+          // Tell each of those customers too, so they know they can report the
+          // order straight away instead of waiting. One failed email must not
+          // affect the others.
+          for (const o of open) {
+            if (!o.customer?.email) continue;
+            sendCustomerVendorSuspendedEmail({
+              to: o.customer.email,
+              customerName: o.customer.fullName,
+              businessName: user.businessId?.name || "The store",
+              orderReference: o.reference,
+              total: o.total,
+            }).catch((err) => console.error("Banned-vendor customer email failed:", err));
+          }
         }
       } catch (err) {
         console.error("Could not list open orders for banned vendor:", err);

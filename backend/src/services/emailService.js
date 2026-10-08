@@ -719,7 +719,11 @@ export async function sendMarketerPayoutDetailsChangedEmail({ to, name, bankName
 
 // Shared by both the User (business owner/buyer account) and Marketer ban
 // flows — same message shape either way, just a different dashboard link.
-export async function sendAccountBanStatusEmail({ to, name, banned, dashboardUrl }) {
+export async function sendAccountBanStatusEmail({ to, name, banned, dashboardUrl, reason }) {
+  // Admin-typed, so escaped. Only shown on a suspension, and only if one was given.
+  const reasonBlock = banned && reason
+    ? `<div style="background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:12px 14px; margin:16px 0;"><p style="margin:0 0 4px; font-size:12px; font-weight:700; color:#991b1b;">Reason given</p><p style="margin:0; font-size:13px; color:#7f1d1d; line-height:1.6; white-space:pre-wrap;">${esc(reason)}</p></div>`
+    : "";
   return sendEmail({
     to,
     subject: banned ? "Your OJA247 account has been suspended" : "Your OJA247 account has been reinstated",
@@ -728,6 +732,7 @@ export async function sendAccountBanStatusEmail({ to, name, banned, dashboardUrl
         ? `
         <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Account suspended</h1>
         <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${name}, your OJA247 account has been suspended by an administrator. You won't be able to log in while this is in effect.</p>
+        ${reasonBlock}
         <p style="color:#6b7280; font-size:13px; line-height:1.6;">If you believe this is a mistake, reply to this email or contact support to ask about the reason and next steps.</p>
         `
         : `
@@ -736,6 +741,26 @@ export async function sendAccountBanStatusEmail({ to, name, banned, dashboardUrl
         ${button("Go to my dashboard", dashboardUrl || SITE_URL)}
         `,
       { preheader: banned ? "Your account has been suspended" : "Your account has been reinstated" }
+    ),
+  });
+}
+
+// To a customer whose bank-transfer order was still waiting on a vendor who has
+// just been banned. They paid the vendor's own account, so OJA247 can't refund
+// them, but they can report it right away instead of waiting.
+export async function sendCustomerVendorSuspendedEmail({ to, customerName, businessName, orderReference, total }) {
+  return sendEmail({
+    to,
+    subject: `Update on your order ${orderReference}`,
+    html: layout(
+      `
+      ${h1("The store on your order has been suspended")}
+      ${p(`Hi ${esc(customerName) || "there"}, <strong>${esc(businessName)}</strong> has been suspended on OJA247, and your order <strong>${esc(orderReference)}</strong> (${NAIRA(total)}) was still waiting for them to confirm your payment. They can no longer log in to answer it.`)}
+      ${p("You paid the store's own bank account directly, so OJA247 can't refund that money for you. What you can do now is report the order straight away. It goes to our team, who will follow up with the store. You don't have to wait.")}
+      ${button("Report this order", `${SITE_URL}/report-problem?reference=${encodeURIComponent(orderReference)}`)}
+      ${small("You'll be asked for the email address you used to place the order. It's also worth contacting the store yourself if you have their number.")}
+      `,
+      { preheader: `${businessName} was suspended. You can report order ${orderReference} now.` }
     ),
   });
 }
