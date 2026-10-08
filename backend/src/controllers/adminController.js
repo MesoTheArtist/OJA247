@@ -365,7 +365,7 @@ export const setBusinessGrandfatherExemption = async (req, res) => {
 
     const business = await Business.findByIdAndUpdate(
       id,
-      { grandfatherExemptUntil: newDate },
+      { grandfatherExemptUntil: newDate, grandfatherReminderSentAt: null },
       { new: true }
     );
     if (!business) return res.status(404).json({ message: "Business not found" });

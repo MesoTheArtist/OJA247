@@ -1066,6 +1066,25 @@ export async function sendExemptionGrantedEmail({ to, businessName, exemptUntil,
   });
 }
 
+// Vendor: the free exemption is about to end and no subscription covers the
+// time after it, so the store will drop out of search unless they subscribe.
+export async function sendExemptionEndingEmail({ to, businessName, exemptUntil, daysLeft }) {
+  const until = formatDate(exemptUntil);
+  const days = daysLeft === 1 ? "1 day" : `${daysLeft} days`;
+  return sendEmail({
+    to,
+    subject: `Your free visibility on OJA247 ends in ${days}`,
+    html: layout(
+      `${h1("Your free visibility is ending soon ⏳")}
+       ${p(`Hi ${esc(businessName)}, the free period that keeps your store visible to shoppers ends on <strong>${esc(until)}</strong> — that's ${esc(days)} away.`)}
+       ${p("After that date your store only stays in customer search and the Explore page while you have an active subscription.")}
+       ${small("Subscribe before then and your store won't miss a single day of visibility.")}
+       ${button("Subscribe now", `${SITE_URL}/dashboard`)}`,
+      { preheader: `Subscribe before ${until} to keep your store visible.` }
+    ),
+  });
+}
+
 // Customer + vendor: an admin settled an escalated dispute. `audience`
 // decides the wording.
 export async function sendDisputeAdminDecisionEmail({

@@ -19,6 +19,18 @@ const PLAN_DURATIONS_DAYS = {
   yearly: 365,
 };
 
+// Runs a follow-up step that must never undo or fail an activation that has
+// already happened (points bookkeeping, the receipt email). A failure is logged
+// loudly with the label so it can be fixed by hand, and nothing is thrown.
+async function bestEffort(label, fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    console.error(`${label} failed after the subscription was activated — needs a manual look:`, err);
+    return null;
+  }
+}
+
 // A renewal bought before the current period ends starts when that period
 // ends, so no paid days are lost. If the subscription already lapsed (or there
 // never was one), the new period starts now.
@@ -158,31 +170,40 @@ export const initiateSubscription = async (req, res) => {
     // Fully covered by points — activate immediately, no Paystack step.
     if (chargeAmount <= 0) {
       const { periodStart, periodEnd } = computePeriod(planType, periodStartFor(business.subscriptionExpiresAt));
-      payment.periodStart = periodStart;
-      payment.periodEnd = periodEnd;
-      await payment.save();
+      try {
+        payment.periodStart = periodStart;
+        payment.periodEnd = periodEnd;
+        await payment.save();
 
-      await Business.findByIdAndUpdate(businessId, {
-        subscriptionStatus: "active",
-        subscriptionExpiresAt: periodEnd,
-        hasPaidFirstSubscription: true,
-        subscriptionReminderSentAt: null,
-        subscriptionExpiredEmailSentAt: null,
-      });
+        await Business.findByIdAndUpdate(businessId, {
+          subscriptionStatus: "active",
+          subscriptionExpiresAt: periodEnd,
+          hasPaidFirstSubscription: true,
+          subscriptionReminderSentAt: null,
+          subscriptionExpiredEmailSentAt: null,
+        });
+      } catch (err) {
+        // Nothing was charged and nothing was activated: don't leave a "success" record behind.
+        console.error(`Points-only activation failed for payment ${payment._id}:`, err);
+        await SubscriptionPayment.findByIdAndUpdate(payment._id, { status: "failed" }).catch(() => {});
+        throw err;
+      }
 
-      await deductAppliedPoints(payment);
+      await bestEffort(`Points deduction for payment ${payment._id}`, () => deductAppliedPoints(payment));
 
-      await sendSubscriptionReceiptEmail({
-        to: await getOwnerEmail(businessId),
-        businessName: business.name,
-        planType,
-        amountPaid: 0,
-        planPrice: payment.amount,
-        pointsApplied: payment.pointsApplied,
-        paidAt: new Date(),
-        reference: payment.paystackReference,
-        expiresAt: periodEnd,
-      });
+      await bestEffort(`Receipt email for payment ${payment._id}`, async () =>
+        sendSubscriptionReceiptEmail({
+          to: await getOwnerEmail(businessId),
+          businessName: business.name,
+          planType,
+          amountPaid: 0,
+          planPrice: payment.amount,
+          pointsApplied: payment.pointsApplied,
+          paidAt: new Date(),
+          reference: payment.paystackReference,
+          expiresAt: periodEnd,
+        })
+      );
 
       // No Paystack cash was collected on this payment — it's covered
       // entirely by points, which are themselves money the platform already
@@ -236,38 +257,56 @@ async function markSubscriptionPaid(reference) {
     return SubscriptionPayment.findOne({ paystackReference: reference });
   }
 
-  const currentBusiness = await Business.findById(payment.businessId).select("subscriptionExpiresAt");
-  const { periodStart, periodEnd } = computePeriod(
-    payment.planType,
-    periodStartFor(currentBusiness?.subscriptionExpiresAt)
-  );
-  payment.periodStart = periodStart;
-  payment.periodEnd = periodEnd;
-  await payment.save();
+  // Activation is the one step the vendor actually paid for. If it fails after
+  // the payment was claimed, hand the payment back to "pending": the webhook
+  // gets a 500, Paystack re-sends it, and the retry can run again. Without this
+  // the payment would sit as "success" with no subscription, and every retry
+  // would skip it as already done.
+  let periodEnd;
+  try {
+    const currentBusiness = await Business.findById(payment.businessId).select("subscriptionExpiresAt");
+    const period = computePeriod(payment.planType, periodStartFor(currentBusiness?.subscriptionExpiresAt));
+    periodEnd = period.periodEnd;
+    payment.periodStart = period.periodStart;
+    payment.periodEnd = period.periodEnd;
+    await payment.save();
 
-  await Business.findByIdAndUpdate(payment.businessId, {
-    subscriptionStatus: "active",
-    subscriptionExpiresAt: periodEnd,
-    hasPaidFirstSubscription: true,
-    subscriptionReminderSentAt: null,
-    subscriptionExpiredEmailSentAt: null,
-  });
+    await Business.findByIdAndUpdate(payment.businessId, {
+      subscriptionStatus: "active",
+      subscriptionExpiresAt: periodEnd,
+      hasPaidFirstSubscription: true,
+      subscriptionReminderSentAt: null,
+      subscriptionExpiredEmailSentAt: null,
+    });
+  } catch (err) {
+    console.error(`Subscription activation failed for payment ${payment._id} (${reference}) — returning it to pending so it can be retried:`, err);
+    try {
+      await SubscriptionPayment.findByIdAndUpdate(payment._id, { status: "pending", periodStart: null, periodEnd: null });
+    } catch (revertErr) {
+      console.error(`MANUAL FIX NEEDED: payment ${payment._id} (${reference}) was paid but is stuck as "success" without an active subscription:`, revertErr);
+    }
+    throw err;
+  }
 
-  await deductAppliedPoints(payment);
+  // The vendor is active from here on. The rest is bookkeeping and must not
+  // undo or fail it.
+  await bestEffort(`Points deduction for payment ${payment._id}`, () => deductAppliedPoints(payment));
 
   const cashCollected = payment.amount - (payment.pointsApplied || 0);
 
-  const business = await Business.findById(payment.businessId).select("name");
-  await sendSubscriptionReceiptEmail({
-    to: await getOwnerEmail(payment.businessId),
-    businessName: business?.name || "",
-    planType: payment.planType,
-    amountPaid: cashCollected,
-    planPrice: payment.amount,
-    pointsApplied: payment.pointsApplied,
-    paidAt: new Date(),
-    reference: payment.paystackReference,
-    expiresAt: periodEnd,
+  await bestEffort(`Receipt email for payment ${payment._id}`, async () => {
+    const business = await Business.findById(payment.businessId).select("name");
+    return sendSubscriptionReceiptEmail({
+      to: await getOwnerEmail(payment.businessId),
+      businessName: business?.name || "",
+      planType: payment.planType,
+      amountPaid: cashCollected,
+      planPrice: payment.amount,
+      pointsApplied: payment.pointsApplied,
+      paidAt: new Date(),
+      reference: payment.paystackReference,
+      expiresAt: periodEnd,
+    });
   });
 
   // Conversion is based on cash actually collected on THIS payment

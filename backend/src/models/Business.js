@@ -52,6 +52,10 @@ const BusinessSchema = new mongoose.Schema(
     // is time-boxed and meant for "give existing vendors N months to pay",
     // not a permanent exemption.
     grandfatherExemptUntil: { type: Date, default: null },
+    // Set when the "your free visibility ends soon" email goes out; reset to
+    // null whenever an admin sets or changes the exemption date, so each
+    // exemption is reminded about once.
+    grandfatherReminderSentAt: { type: Date, default: null },
 
     // --- Subscription (new) ---
     subscriptionStatus: {

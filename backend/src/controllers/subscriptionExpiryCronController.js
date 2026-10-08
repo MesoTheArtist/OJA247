@@ -5,6 +5,7 @@ import {
   sendSubscriptionExpiringEmail,
   sendSubscriptionExpiredEmail,
   sendNeverSubscribedReminderEmail,
+  sendExemptionEndingEmail,
 } from "../services/emailService.js";
 
 const REMINDER_WINDOW_DAYS = 4; // matches the in-dashboard popup's warning window
@@ -71,6 +72,7 @@ export const runSubscriptionExpiryCheck = async (req, res) => {
         remindersSent: 0,
         expiredNoticesSent: 0,
         neverSubscribedNotified: 0,
+        exemptionEndingNotified: 0,
       });
     }
 
@@ -156,11 +158,48 @@ export const runSubscriptionExpiryCheck = async (req, res) => {
       }
     }
 
+    // --- Pass 4: free exemption ending soon (once per exemption) ---
+    // Only stores an exemption is currently carrying: its end is within the
+    // reminder window, they were not reminded yet for this date, and no paid
+    // subscription already runs past it (those vendors have nothing to do).
+    // visibilityExempt is permanent so it never ends; hidden stores are skipped.
+    let exemptionEndingNotified = 0;
+    {
+      const endingSoon = await Business.find({
+        isHidden: { $ne: true },
+        visibilityExempt: { $ne: true },
+        grandfatherExemptUntil: { $gte: now, $lte: reminderCutoff },
+        grandfatherReminderSentAt: null,
+        $expr: { $lt: [{ $ifNull: ["$subscriptionExpiresAt", new Date(0)] }, "$grandfatherExemptUntil"] },
+      }).select("name grandfatherExemptUntil");
+
+      for (const business of endingSoon) {
+        const daysLeft = Math.max(
+          1,
+          Math.ceil((business.grandfatherExemptUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        );
+        const to = await getOwnerEmail(business._id);
+        const { settled, sent } = await deliver("Exemption-ending reminder", business._id, to, () =>
+          sendExemptionEndingEmail({
+            to,
+            businessName: business.name,
+            exemptUntil: business.grandfatherExemptUntil,
+            daysLeft,
+          })
+        );
+        if (!settled) continue;
+        if (sent) exemptionEndingNotified += 1;
+        business.grandfatherReminderSentAt = now;
+        await business.save();
+      }
+    }
+
     res.json({
       success: true,
       remindersSent,
       expiredNoticesSent,
       neverSubscribedNotified,
+      exemptionEndingNotified,
     });
   } catch (error) {
     console.error("Subscription expiry check error:", error);
