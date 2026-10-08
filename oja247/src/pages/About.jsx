@@ -240,7 +240,7 @@ const About = () => {
         </motion.div>
 
         {/* Two large tilt cards, side by side — no grid needed for two people */}
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {founders.map((f, i) => (
             <motion.div
               key={f.name}
@@ -334,7 +334,7 @@ const About = () => {
           <div className="absolute -top-40 -right-20 w-96 h-96 rounded-full bg-[#0B8F4D]/25 blur-3xl pointer-events-none" />
           <div className="absolute -bottom-32 left-1/4 w-72 h-72 rounded-full bg-[#F59E0B]/20 blur-3xl pointer-events-none" />
 
-          <div className="relative grid sm:grid-cols-3 gap-10 items-end">
+          <div className="relative grid grid-cols-1 sm:grid-cols-3 gap-10 items-end">
             <h3 className="text-3xl md:text-4xl font-bold leading-tight sm:col-span-3 md:col-span-1">
               Two founders.
               <br />

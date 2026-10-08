@@ -33,13 +33,13 @@ function CartPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Your Cart</h1>
           <button
             onClick={clearCart}
-            className="text-sm text-red-600 hover:text-red-700 font-medium"
+            className="text-sm text-red-600 hover:text-red-700 font-medium inline-block py-2 -my-2"
           >
             Clear cart
           </button>
         </div>
 
-        <div className="grid lg:grid-cols-[2fr_1fr] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
           <div className="space-y-4">
             {cartItems.map((item) => (
               <div
@@ -49,12 +49,12 @@ function CartPage() {
                 <img
                   src={item.images?.[0] || item.image || "https://via.placeholder.com/200"}
                   alt={item.name}
-                  className="w-24 h-24 object-cover rounded-xl"
+                  className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 object-cover rounded-xl"
                 />
 
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="flex justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <h2 className="font-semibold text-lg text-gray-900">{item.name}</h2>
                       <p className="text-sm text-gray-500">{item.category}</p>
                     </div>

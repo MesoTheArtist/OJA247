@@ -65,7 +65,7 @@ const ForgotPasswordForm = ({ type }) => {
                 If an account exists for <strong>{email}</strong>, a password reset link is on its way. The link
                 expires in 1 hour.
               </p>
-              <Link to={loginPath} className="text-green-600 font-semibold hover:text-green-700">
+              <Link to={loginPath} className="text-green-600 font-semibold hover:text-green-700 inline-block py-2 -my-2">
                 Back to login
               </Link>
             </div>
@@ -106,7 +106,7 @@ const ForgotPasswordForm = ({ type }) => {
 
               <Link
                 to={loginPath}
-                className="mt-6 flex items-center justify-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+                className="mt-6 flex items-center justify-center gap-1 text-sm text-gray-500 hover:text-gray-700 py-2 -my-2"
               >
                 <ArrowLeft size={14} /> Back to login
               </Link>

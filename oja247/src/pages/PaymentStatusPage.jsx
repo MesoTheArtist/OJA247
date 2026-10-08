@@ -426,7 +426,7 @@ function PaymentStatusPage() {
                 <button
                   onClick={() => setHidePrompt(true)}
                   aria-label="Dismiss"
-                  className="absolute top-3 right-4 text-gray-400 hover:text-gray-600 text-xl leading-none"
+                  className="absolute top-1 right-2 p-3 text-gray-400 hover:text-gray-600 text-xl leading-none"
                 >
                   ×
                 </button>

@@ -110,7 +110,8 @@ const ResetPasswordForm = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 p-3 text-gray-400"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -140,7 +141,7 @@ const ResetPasswordForm = () => {
 
               <Link
                 to={loginPath}
-                className="mt-6 block text-center text-sm text-gray-500 hover:text-gray-700"
+                className="mt-6 block text-center text-sm text-gray-500 hover:text-gray-700 py-2 -my-2"
               >
                 Back to login
               </Link>

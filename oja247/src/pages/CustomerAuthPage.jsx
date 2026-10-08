@@ -270,7 +270,8 @@ const CustomerAuthPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 p-3 text-gray-400 hover:text-gray-600"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -279,7 +280,7 @@ const CustomerAuthPage = () => {
 
             {mode === 'signin' && (
               <div className="text-right -mt-1">
-                <Link to="/customer-forgot-password" className="text-sm text-green-600 hover:text-green-700 font-medium">
+                <Link to="/customer-forgot-password" className="text-sm text-green-600 hover:text-green-700 font-medium inline-block py-2 -my-2">
                   Forgot password?
                 </Link>
               </div>

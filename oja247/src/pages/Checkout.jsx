@@ -266,7 +266,7 @@ function Checkout() {
       <div className="max-w-6xl mx-auto">
         <button
           onClick={() => (step === "payment" ? setStep("details") : navigate("/cart"))}
-          className="mb-6 text-sm font-medium text-gray-600 hover:text-gray-800"
+          className="mb-4 -mt-2 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
         >
           {step === "payment" ? "← Back to your details" : "← Back to cart"}
         </button>
@@ -278,10 +278,10 @@ function Checkout() {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-6">
           {step === "details" ? (
           <form onSubmit={goToPayment} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Full name</label>
                 <input

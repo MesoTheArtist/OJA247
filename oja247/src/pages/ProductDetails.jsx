@@ -174,11 +174,11 @@ function ProductDetails() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-5 flex-wrap">
-          <Link to="/" className="hover:text-gray-700 transition-colors">
+          <Link to="/" className="py-2 -my-2 hover:text-gray-700 transition-colors">
             Home
           </Link>
           <span>/</span>
-          <Link to="/products" className="hover:text-gray-700 transition-colors">
+          <Link to="/products" className="py-2 -my-2 hover:text-gray-700 transition-colors">
             All Products
           </Link>
           {product.category && (
@@ -186,7 +186,7 @@ function ProductDetails() {
               <span>/</span>
               <Link
                 to={`/products?category=${encodeURIComponent(product.category)}`}
-                className="hover:text-gray-700 transition-colors"
+                className="py-2 -my-2 hover:text-gray-700 transition-colors"
               >
                 {product.category}
               </Link>
@@ -196,7 +196,7 @@ function ProductDetails() {
           <span className="text-gray-900 font-medium truncate max-w-[200px]">{product.name}</span>
         </nav>
 
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           {/* Image gallery */}
           <div>
             <div

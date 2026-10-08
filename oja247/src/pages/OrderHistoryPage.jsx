@@ -157,7 +157,7 @@ const OrderHistoryPage = () => {
                   transition={{ delay: i * 0.05 }}
                   className="backdrop-blur-xl bg-white/70 border border-gray-200/50 rounded-2xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-shadow"
                 >
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                     <div className="flex gap-4 min-w-0">
                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-100 to-yellow-100 flex items-center justify-center flex-shrink-0">
                         <Package className="text-green-600" size={22} />
@@ -177,9 +177,9 @@ const OrderHistoryPage = () => {
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2 sm:flex-col sm:items-end sm:flex-shrink-0">
                       <span
-                        className={`text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap ${
+                        className={`text-xs font-bold px-3 py-1 rounded-full sm:whitespace-nowrap ${
                           STATUS_STYLES[order.status] || "bg-gray-100 text-gray-600"
                         }`}
                       >

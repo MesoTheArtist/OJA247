@@ -223,7 +223,8 @@ const MarketerRegisterForm = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 p-3 text-gray-500 hover:text-gray-700"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -264,7 +265,7 @@ const MarketerRegisterForm = () => {
                 <button
                   type="button"
                   onClick={() => navigate("/marketer-login")}
-                  className="text-green-600 font-semibold hover:text-green-700"
+                  className="py-2 -my-2 text-green-600 font-semibold hover:text-green-700"
                 >
                   Log in
                 </button>
@@ -277,7 +278,7 @@ const MarketerRegisterForm = () => {
                 <button
                   type="button"
                   onClick={() => navigate("/business-form")}
-                  className="text-green-600 font-semibold hover:text-green-700"
+                  className="py-2 -my-2 text-green-600 font-semibold hover:text-green-700"
                 >
                   Register your business
                 </button>

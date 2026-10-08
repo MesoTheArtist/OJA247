@@ -294,9 +294,9 @@ function BusinessDetails() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-5 sm:p-8 pt-16 sm:pt-8 sm:pl-44 flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-6 text-center sm:text-left relative z-10">
-          <div className="flex-1 min-w-0 sm:mt-2">
+          <div className="w-full sm:w-auto flex-1 min-w-0 sm:mt-2">
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-              <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 truncate">
+              <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 break-words sm:truncate">
                 {business.name}
               </h1>
               {business.verified && (
