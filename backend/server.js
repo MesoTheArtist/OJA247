@@ -42,6 +42,13 @@ console.log("===================================");
 
 const app = express();
 
+// Vercel puts one proxy in front of the app. Without this, Express sees every
+// visitor as the same address (the proxy's), so every rate limiter would share
+// ONE bucket across all customers, and express-rate-limit logs the
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR warning. Trusting exactly one hop makes
+// req.ip the real visitor's IP, from the X-Forwarded-For header Vercel sets.
+app.set("trust proxy", 1);
+
 // SECURITY: sets standard protective headers (X-Content-Type-Options,
 // X-Frame-Options, a conservative default CSP, etc.) — the app had none
 // of this before. crossOriginResourcePolicy is relaxed to "cross-origin"
