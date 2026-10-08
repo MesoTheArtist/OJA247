@@ -1038,6 +1038,34 @@ export async function sendFeaturedEmail({ to, businessName }) {
   });
 }
 
+// Vendor: an admin gave this store a time-limited exemption, so it stays visible
+// to shoppers until `exemptUntil` without needing an active subscription.
+// `extended` is true when the store already had an active exemption and the
+// date was pushed back.
+export async function sendExemptionGrantedEmail({ to, businessName, exemptUntil, extended = false }) {
+  const until = formatDate(exemptUntil);
+  const daysLeft = Math.max(1, Math.ceil((new Date(exemptUntil).getTime() - Date.now()) / 86400000));
+  const duration = daysLeft === 1 ? "1 day" : `${daysLeft} days`;
+  return sendEmail({
+    to,
+    subject: extended
+      ? `Good news: your OJA247 visibility is extended to ${until}`
+      : `Congratulations! ${businessName} stays visible on OJA247 until ${until}`,
+    html: layout(
+      `${h1(extended ? "Your free visibility has been extended 🎉" : "Congratulations, you've got free visibility 🎉")}
+       ${p(`Hi ${esc(businessName)}, great news from the OJA247 team. ${
+         extended
+           ? "We've extended the time your store stays visible to shoppers"
+           : "We've given your store a special exemption, so it stays visible to shoppers"
+       } <strong>until ${esc(until)}</strong> (${esc(duration)} from today), with no subscription needed.`)}
+       ${p("In that time customers can find your store and products in search and listings, and place orders as normal.")}
+       ${small(`When ${esc(until)} passes, your store goes back to the normal rule: it stays listed while you have an active subscription. Subscribe before then and your store won't miss a day.`)}
+       ${button("Open my dashboard", `${SITE_URL}/dashboard`)}`,
+      { preheader: `Your store stays visible on OJA247 until ${until}.` }
+    ),
+  });
+}
+
 // Customer + vendor: an admin settled an escalated dispute. `audience`
 // decides the wording.
 export async function sendDisputeAdminDecisionEmail({

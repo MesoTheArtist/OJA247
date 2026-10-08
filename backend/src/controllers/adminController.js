@@ -21,6 +21,7 @@ import {
   sendCustomerDetailsUpdatedEmail,
   sendPointsWithdrawalPaidEmail,
   sendFeaturedEmail,
+  sendExemptionGrantedEmail,
   sendDisputeAdminDecisionEmail,
 } from "../services/emailService.js";
 import { linkGuestOrders } from "../services/orderLinking.js";
@@ -354,12 +355,41 @@ export const setBusinessGrandfatherExemption = async (req, res) => {
     const { id } = req.params;
     const { exemptUntil } = req.body;
 
+    const newDate = exemptUntil ? new Date(exemptUntil) : null;
+    if (newDate && Number.isNaN(newDate.getTime())) {
+      return res.status(400).json({ message: "'exemptUntil' must be a valid date or null" });
+    }
+
+    const previous = await Business.findById(id).select("grandfatherExemptUntil");
+    if (!previous) return res.status(404).json({ message: "Business not found" });
+
     const business = await Business.findByIdAndUpdate(
       id,
-      { grandfatherExemptUntil: exemptUntil ? new Date(exemptUntil) : null },
+      { grandfatherExemptUntil: newDate },
       { new: true }
     );
     if (!business) return res.status(404).json({ message: "Business not found" });
+
+    // Congratulate the vendor when they are given (or extended to) a future
+    // date. Nothing is sent when the exemption is cleared, set to a date
+    // that has already passed, or saved again with the same date.
+    const before = previous.grandfatherExemptUntil ? previous.grandfatherExemptUntil.getTime() : null;
+    const wasActive = before !== null && before > Date.now();
+    if (newDate && newDate.getTime() > Date.now() && newDate.getTime() !== before) {
+      User.findOne({ businessId: id })
+        .select("email")
+        .then((owner) =>
+          owner?.email
+            ? sendExemptionGrantedEmail({
+                to: owner.email,
+                businessName: business.name,
+                exemptUntil: newDate,
+                extended: wasActive,
+              })
+            : null
+        )
+        .catch((err) => console.error("Exemption email failed:", err));
+    }
 
     res.json(business);
   } catch (error) {
