@@ -112,8 +112,8 @@ function AccountAlertsPopup({
           <>
             <h3 className="text-lg font-bold text-gray-900 mb-2">Finish setting up your documents</h3>
             <p className="text-sm text-gray-600 mb-6">
-              Your vendor verification documents aren't fully uploaded yet. Complete them to unlock full payout
-              limits and get your verified badge.
+              Your vendor verification documents aren't fully uploaded yet. Complete them to get your verified badge
+              and build customer trust.
             </p>
             <div className="flex gap-3">
               <button

@@ -546,7 +546,7 @@ const BusinessDashboard = () => {
                   : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >
-              Payouts & Verification
+              Bank & Verification
             </button>
 
             <button
@@ -1342,8 +1342,8 @@ const BusinessDashboard = () => {
                   ₦{earningsSummary.totalEarned.toLocaleString()}
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
-                  From {earningsSummary.ordersCount} paid order{earningsSummary.ordersCount === 1 ? "" : "s"} — already
-                  settled to your bank
+                  From {earningsSummary.ordersCount} paid order{earningsSummary.ordersCount === 1 ? "" : "s"} — paid straight
+                  to your own bank account
                 </p>
               </div>
             )}

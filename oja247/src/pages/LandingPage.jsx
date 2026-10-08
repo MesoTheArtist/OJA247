@@ -167,8 +167,8 @@ const LandingPage = () => {
     {
       icon: Wallet,
       color: "from-green-500 to-yellow-400",
-      title: "Instant payouts",
-      body: "Paystack splits your share automatically on every order — no holding period, no manual settlement.",
+      title: "Paid straight to you",
+      body: "Customers pay your own bank account directly. OJA247 never holds your sales, so the money is yours as soon as you confirm it.",
     },
   ];
 
@@ -195,7 +195,7 @@ const LandingPage = () => {
       icon: MapPin,
       color: "from-green-500 to-yellow-400",
       title: "Built for Nigeria",
-      body: "Paystack payouts, WhatsApp order alerts, and pricing that fits how Nigerian vendors actually sell.",
+      body: "Pay-by-bank-transfer checkout, WhatsApp order alerts, and pricing that fits how Nigerian vendors actually sell.",
     },
     {
       icon: ShieldCheck,

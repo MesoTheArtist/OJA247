@@ -590,7 +590,7 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
       <div className="vof-card">
         <style>{styles}</style>
         <header className="vof-header">
-          <h1>Your payout &amp; verification details</h1>
+          <h1>Your bank &amp; verification details</h1>
           <p>
             Tier: <strong style={{ textTransform: 'capitalize' }}>{tier}</strong> · Review:{' '}
             <strong style={{ textTransform: 'capitalize' }}>{existing.reviewStatus}</strong>
@@ -598,13 +598,13 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
         </header>
 
         <fieldset>
-          <legend>Payout account</legend>
+          <legend>Bank account customers pay into</legend>
           <p>
             {existing.bankName || 'Bank'} · ****{String(existing.accountNumber || '').slice(-4)}
             {existing.accountName ? ` · ${existing.accountName}` : ''}
           </p>
           {existing.payoutHold && (
-            <p className="vof-error">Payouts are on hold pending admin review of your bank change.</p>
+            <p className="vof-error">Your store can't take new orders until an admin reviews your bank change.</p>
           )}
         </fieldset>
 
@@ -637,7 +637,7 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
         <p>
           {existing
             ? 'Your saved details are filled in — just change what you need or add a missing document.'
-            : 'Payout details and ID verification — one form, five minutes.'}
+            : 'Bank details and ID verification — one form, five minutes.'}
         </p>
       </header>
 

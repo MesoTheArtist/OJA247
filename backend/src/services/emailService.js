@@ -265,16 +265,16 @@ export async function sendVerificationReviewedEmail({ to, businessName, business
 export async function sendPayoutHoldEmail({ to, businessName, reason }) {
   return sendEmail({
     to,
-    subject: "Your payouts are on hold — action needed",
+    subject: "Your store is paused — action needed",
     html: layout(
       `
-      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Your payouts are temporarily on hold</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, we've paused payouts to your account.</p>
+      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Your store is temporarily paused</h1>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, we've paused new orders to your store.</p>
       ${reason ? `<div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px 14px; color:#9a3412; font-size:14px; margin:14px 0;">${reason}</div>` : ""}
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">This is usually because a bank account change couldn't be automatically verified. An admin will review it shortly — you don't need to do anything else right now, but orders can't be split to your account until it's cleared.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">This is usually because a bank account change couldn't be automatically verified. An admin will review it shortly — you don't need to do anything else right now, but customers can't place new orders at your store until it's cleared.</p>
       ${button("View my dashboard", `${SITE_URL}/dashboard`)}
       `,
-      { preheader: "Your account needs a quick review before payouts resume" }
+      { preheader: "Your store needs a quick review before it can take orders again" }
     ),
   });
 }
@@ -282,18 +282,18 @@ export async function sendPayoutHoldEmail({ to, businessName, reason }) {
 export async function sendBankDetailsUpdatedEmail({ to, businessName, bankName, accountNumberLast4 }) {
   return sendEmail({
     to,
-    subject: "Your payout bank details were updated",
+    subject: "Your bank details were updated",
     html: layout(
       `
-      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Payout bank account updated</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, this confirms your payout account on OJA247 was just changed to:</p>
+      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Bank account updated</h1>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, this confirms the bank account customers pay on OJA247 was just changed to:</p>
       <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px 14px; color:#166534; font-size:14px; margin:14px 0;">
         ${bankName} &middot; account ending in ${accountNumberLast4}
       </div>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">The account name matched your business name, so this took effect immediately — no admin review needed and payouts continue as normal. If you didn't make this change, contact us right away.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">The account name matched your business name, so this took effect immediately — no admin review needed. Customers placing new orders will now be asked to pay this account. If you didn't make this change, change your password and contact us right away, because someone else may have access to your account.</p>
       ${button("View my dashboard", `${SITE_URL}/dashboard`)}
       `,
-      { preheader: "Your payout bank account was just changed" }
+      { preheader: "The bank account customers pay was just changed" }
     ),
   });
 }
