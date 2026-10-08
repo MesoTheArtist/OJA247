@@ -19,6 +19,15 @@ const PLAN_DURATIONS_DAYS = {
   yearly: 365,
 };
 
+// A renewal bought before the current period ends starts when that period
+// ends, so no paid days are lost. If the subscription already lapsed (or there
+// never was one), the new period starts now.
+function periodStartFor(currentExpiresAt, now = new Date()) {
+  return currentExpiresAt && new Date(currentExpiresAt).getTime() > now.getTime()
+    ? new Date(currentExpiresAt)
+    : now;
+}
+
 function computePeriod(planType, from = new Date()) {
   const periodStart = from;
   const periodEnd = new Date(from);
@@ -148,7 +157,7 @@ export const initiateSubscription = async (req, res) => {
 
     // Fully covered by points — activate immediately, no Paystack step.
     if (chargeAmount <= 0) {
-      const { periodStart, periodEnd } = computePeriod(planType);
+      const { periodStart, periodEnd } = computePeriod(planType, periodStartFor(business.subscriptionExpiresAt));
       payment.periodStart = periodStart;
       payment.periodEnd = periodEnd;
       await payment.save();
@@ -212,12 +221,26 @@ export const initiateSubscription = async (req, res) => {
 // the same reference (e.g. if the user's browser confirms AND the webhook
 // fires). Only ever processes a payment from pending -> success once.
 async function markSubscriptionPaid(reference) {
-  const payment = await SubscriptionPayment.findOne({ paystackReference: reference });
-  if (!payment) return null;
-  if (payment.status === "success") return payment; // already processed, no-op
+  // Claim the payment atomically. The browser's verify call and Paystack's
+  // webhook usually arrive within milliseconds of each other; a plain
+  // read-then-write let both see "pending" and both run the code below, which
+  // double-deducted points, sent two receipts and could pay a marketer twice.
+  // Only the caller whose update actually flips the status continues.
+  const payment = await SubscriptionPayment.findOneAndUpdate(
+    { paystackReference: reference, status: { $ne: "success" } },
+    { status: "success" },
+    { new: true }
+  );
+  if (!payment) {
+    // Either no such payment (null) or another call already processed it.
+    return SubscriptionPayment.findOne({ paystackReference: reference });
+  }
 
-  payment.status = "success";
-  const { periodStart, periodEnd } = computePeriod(payment.planType);
+  const currentBusiness = await Business.findById(payment.businessId).select("subscriptionExpiresAt");
+  const { periodStart, periodEnd } = computePeriod(
+    payment.planType,
+    periodStartFor(currentBusiness?.subscriptionExpiresAt)
+  );
   payment.periodStart = periodStart;
   payment.periodEnd = periodEnd;
   await payment.save();
@@ -263,6 +286,17 @@ async function markSubscriptionPaid(reference) {
   return payment;
 }
 
+// The Paystack popup is opened by the browser with an amount the browser
+// chooses, so a "success" from Paystack only proves that SOME amount was paid.
+// Make sure at least what this payment needs in cash (plan price minus points)
+// came in, in naira, before activating anything.
+function paidEnough(payment, paystackData) {
+  const expectedKobo = Math.round(((payment.amount || 0) - (payment.pointsApplied || 0)) * 100);
+  const paidKobo = Number(paystackData?.amount);
+  const currencyOk = !paystackData?.currency || paystackData.currency === "NGN";
+  return currencyOk && Number.isFinite(paidKobo) && paidKobo >= expectedKobo;
+}
+
 // POST /api/subscriptions/verify/:reference
 export const verifySubscriptionPayment = async (req, res) => {
   try {
@@ -297,6 +331,14 @@ export const verifySubscriptionPayment = async (req, res) => {
       payment.status = "failed";
       await payment.save();
       return res.status(400).json({ message: "Payment verification failed", verification: verificationData });
+    }
+
+    if (payment.status !== "success" && !paidEnough(payment, verificationData.data)) {
+      console.error(
+        `Subscription verify: amount mismatch for ${reference} — paid ${verificationData.data?.amount} kobo ${verificationData.data?.currency || ""}, ` +
+          `needed ${Math.round((payment.amount - (payment.pointsApplied || 0)) * 100)} kobo. Not activated.`
+      );
+      return res.status(400).json({ message: "The amount paid does not match this plan, so the subscription was not activated. Please contact support." });
     }
 
     const paidPayment = await markSubscriptionPaid(reference);
@@ -338,6 +380,14 @@ export const handleSubscriptionWebhook = async (req, res) => {
     const event = req.body;
 
     if (event.event === "charge.success" && event.data?.reference) {
+      const pending = await SubscriptionPayment.findOne({ paystackReference: event.data.reference });
+      if (pending && pending.status !== "success" && !paidEnough(pending, event.data)) {
+        // Answer 200 so Paystack stops retrying, but never activate on a short payment.
+        console.error(
+          `Subscription webhook: amount mismatch for ${event.data.reference} — paid ${event.data.amount} kobo ${event.data.currency || ""}. Not activated.`
+        );
+        return res.sendStatus(200);
+      }
       await markSubscriptionPaid(event.data.reference);
     }
 

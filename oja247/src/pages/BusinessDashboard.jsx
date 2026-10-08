@@ -423,8 +423,16 @@ const BusinessDashboard = () => {
   const daysUntilSubExpiry = subscriptionExpiresAt
     ? Math.ceil((subscriptionExpiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
-  const subExpired = daysUntilSubExpiry !== null && daysUntilSubExpiry < 0;
-  const subExpiringSoon = daysUntilSubExpiry !== null && daysUntilSubExpiry >= 0 && daysUntilSubExpiry <= 4;
+  // Expired / expiring warnings are about being hidden from customers, so they
+  // only apply while visibility is enforced and nothing exempts the store —
+  // the same rule the reminder emails follow.
+  const grandfatheredNow =
+    business.grandfatherExemptUntil && Date.now() <= new Date(business.grandfatherExemptUntil).getTime();
+  const subscriptionRulesApply =
+    business.enforceSubscriptionVisibility && !business.visibilityExempt && !grandfatheredNow;
+  const subExpired = subscriptionRulesApply && daysUntilSubExpiry !== null && daysUntilSubExpiry < 0;
+  const subExpiringSoon =
+    subscriptionRulesApply && daysUntilSubExpiry !== null && daysUntilSubExpiry >= 0 && daysUntilSubExpiry <= 4;
 
   // A business that's never subscribed at all (subscriptionExpiresAt is
   // null) falls through the two checks above entirely — neither counts
@@ -432,13 +440,7 @@ const BusinessDashboard = () => {
   // visibility enforcement is actually on (see businessController.getBusiness)
   // and nothing else is exempting them from it, same override order the
   // backend uses for the public listing itself.
-  const grandfathered =
-    business.grandfatherExemptUntil && Date.now() <= new Date(business.grandfatherExemptUntil).getTime();
-  const neverSubscribed =
-    business.enforceSubscriptionVisibility &&
-    !subscriptionExpiresAt &&
-    !business.visibilityExempt &&
-    !grandfathered;
+  const neverSubscribed = subscriptionRulesApply && !subscriptionExpiresAt;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-yellow-50" style={{ overflowX: "clip" }}>

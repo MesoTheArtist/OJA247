@@ -20,6 +20,30 @@ async function getOwnerEmail(businessId) {
   return owner?.email || null;
 }
 
+// Sends one reminder and says whether the business can be marked "done".
+// Returns { settled, sent }:
+//  - no owner email on file  -> settled (nothing to retry, so we don't look it
+//    up again every day), but not counted as sent
+//  - email went out          -> settled and sent
+//  - email did NOT go out    -> not settled, so tomorrow's run tries again.
+// emailService's sendEmail never throws: it returns { sent: false } when SMTP is
+// down, rate-limited or unconfigured. Without checking that value, a failed send
+// was marked as done and the vendor never got the reminder.
+async function deliver(label, businessId, to, send) {
+  if (!to) return { settled: true, sent: false };
+  try {
+    const result = await send();
+    if (result && result.sent === false) {
+      console.error(`${label} not sent for business ${businessId} (mail service reported failure) — will retry on the next run.`);
+      return { settled: false, sent: false };
+    }
+    return { settled: true, sent: true };
+  } catch (err) {
+    console.error(`${label} failed for business ${businessId}:`, err);
+    return { settled: false, sent: false };
+  }
+}
+
 // GET /api/cron/subscription-expiry  (called daily by Vercel Cron — see vercel.json)
 // Two passes: businesses with 0-4 days left get a reminder (once per
 // subscription period — see subscriptionReminderSentAt), and businesses
@@ -34,33 +58,55 @@ export const runSubscriptionExpiryCheck = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
+    // All three reminders are about being hidden from customers (or not),
+    // which only happens while the visibility kill switch is on. With it off
+    // nobody is hidden, so telling a vendor "your store is hidden" would be
+    // untrue. Vendors whose subscription ran out in the meantime get their
+    // notice on the first run after the switch is turned on.
+    const settings = await PlatformSettings.getSettings();
+    if (!settings.enforceSubscriptionVisibility) {
+      return res.json({
+        success: true,
+        skipped: "subscription visibility is not being enforced",
+        remindersSent: 0,
+        expiredNoticesSent: 0,
+        neverSubscribedNotified: 0,
+      });
+    }
+
     const now = new Date();
+    // Stores an admin has exempted (permanently, or until a future date) stay
+    // visible whatever their subscription says, so they are never told otherwise.
+    const notExempt = {
+      isHidden: { $ne: true },
+      visibilityExempt: { $ne: true },
+      $or: [{ grandfatherExemptUntil: null }, { grandfatherExemptUntil: { $lte: now } }],
+    };
     const reminderCutoff = new Date(now.getTime() + REMINDER_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
     // --- Pass 1: expiring soon (0-4 days left, not yet reminded) ---
     const expiringSoon = await Business.find({
       subscriptionExpiresAt: { $gte: now, $lte: reminderCutoff },
       subscriptionReminderSentAt: null,
+      ...notExempt,
     }).select("name subscriptionExpiresAt");
 
+    let remindersSent = 0;
     for (const business of expiringSoon) {
       const daysLeft = Math.ceil((business.subscriptionExpiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       const to = await getOwnerEmail(business._id);
-      if (to) {
-        try {
-          await sendSubscriptionExpiringEmail({
-            to,
-            businessName: business.name,
-            daysLeft,
-            expiresAt: business.subscriptionExpiresAt,
-          });
-        } catch (err) {
-          // One bad send shouldn't abort the whole cron run and skip every
-          // other vendor still waiting on today's reminder — log and move on.
-          console.error(`Expiring-soon reminder failed for business ${business._id}:`, err);
-          continue; // don't mark as sent if it didn't actually send
-        }
-      }
+      // One bad send shouldn't abort the whole run and skip every other vendor
+      // still waiting on today's reminder, so a failure just moves on.
+      const { settled, sent } = await deliver("Expiring-soon reminder", business._id, to, () =>
+        sendSubscriptionExpiringEmail({
+          to,
+          businessName: business.name,
+          daysLeft,
+          expiresAt: business.subscriptionExpiresAt,
+        })
+      );
+      if (!settled) continue; // didn't send: leave unmarked so it is retried
+      if (sent) remindersSent += 1;
       business.subscriptionReminderSentAt = now;
       await business.save();
     }
@@ -69,38 +115,30 @@ export const runSubscriptionExpiryCheck = async (req, res) => {
     const expired = await Business.find({
       subscriptionExpiresAt: { $lt: now },
       subscriptionExpiredEmailSentAt: null,
+      ...notExempt,
     }).select("name");
 
+    let expiredNoticesSent = 0;
     for (const business of expired) {
       const to = await getOwnerEmail(business._id);
-      if (to) {
-        try {
-          await sendSubscriptionExpiredEmail({ to, businessName: business.name });
-        } catch (err) {
-          console.error(`Expired-subscription notice failed for business ${business._id}:`, err);
-          continue;
-        }
-      }
+      const { settled, sent } = await deliver("Expired-subscription notice", business._id, to, () =>
+        sendSubscriptionExpiredEmail({ to, businessName: business.name })
+      );
+      if (!settled) continue;
+      if (sent) expiredNoticesSent += 1;
       business.subscriptionExpiredEmailSentAt = now;
       await business.save();
     }
 
     // --- Pass 3: never subscribed at all (periodic nag, kill-switch gated) ---
-    // Only relevant once enforceSubscriptionVisibility is actually on — no
-    // point nagging a vendor about invisibility that isn't happening yet.
-    // A business the admin has exempted (visibilityExempt) or grandfathered
-    // is visible without subscribing, so it's excluded here too — nagging
-    // them to subscribe would be misleading, same override logic the public
-    // listing and the in-dashboard popup both use.
+    // Exempt and grandfathered stores are excluded (see notExempt above), same
+    // override logic the public listing and the in-dashboard popup use.
     let neverSubscribedNotified = 0;
-    const settings = await PlatformSettings.getSettings();
-    if (settings.enforceSubscriptionVisibility) {
+    {
       const cutoff = new Date(now.getTime() - NEVER_SUBSCRIBED_REMINDER_INTERVAL_DAYS * 24 * 60 * 60 * 1000);
       const neverSubscribed = await Business.find({
         subscriptionExpiresAt: null,
-        isHidden: { $ne: true },
-        visibilityExempt: { $ne: true },
-        $or: [{ grandfatherExemptUntil: null }, { grandfatherExemptUntil: { $lte: now } }],
+        ...notExempt,
         $and: [
           { $or: [{ neverSubscribedReminderSentAt: null }, { neverSubscribedReminderSentAt: { $lte: cutoff } }] },
         ],
@@ -108,15 +146,11 @@ export const runSubscriptionExpiryCheck = async (req, res) => {
 
       for (const business of neverSubscribed) {
         const to = await getOwnerEmail(business._id);
-        if (to) {
-          try {
-            await sendNeverSubscribedReminderEmail({ to, businessName: business.name });
-            neverSubscribedNotified += 1;
-          } catch (err) {
-            console.error(`Never-subscribed reminder failed for business ${business._id}:`, err);
-            continue; // don't mark as sent if it didn't actually send
-          }
-        }
+        const { settled, sent } = await deliver("Never-subscribed reminder", business._id, to, () =>
+          sendNeverSubscribedReminderEmail({ to, businessName: business.name })
+        );
+        if (!settled) continue;
+        if (sent) neverSubscribedNotified += 1;
         business.neverSubscribedReminderSentAt = now;
         await business.save();
       }
@@ -124,8 +158,8 @@ export const runSubscriptionExpiryCheck = async (req, res) => {
 
     res.json({
       success: true,
-      remindersSent: expiringSoon.length,
-      expiredNoticesSent: expired.length,
+      remindersSent,
+      expiredNoticesSent,
       neverSubscribedNotified,
     });
   } catch (error) {
