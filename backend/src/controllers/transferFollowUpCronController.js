@@ -46,7 +46,12 @@ export const runTransferFollowUpCheck = async (req, res) => {
           order.vendors?.[0]?.businessId || order.items?.[0]?.businessId || null;
         if (!businessId) continue;
 
-        const owner = await User.findOne({ businessId }).select("email");
+        const owner = await User.findOne({ businessId }).select("email banned");
+
+        // A banned vendor can't log in to answer, so reminding them is pointless
+        // and the admin was already sent the list of open orders when they were
+        // banned. Customers can dispute straight away (see disputeController).
+        if (owner?.banned) continue;
         const businessName = order.vendors?.[0]?.businessName || "your store";
 
         // A new waiting period starts whenever a receipt is (re)uploaded.

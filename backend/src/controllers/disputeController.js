@@ -61,7 +61,10 @@ export const fileDispute = async (req, res) => {
       );
       const waitingSince = Math.max(order.createdAt.getTime(), lastReceiptAt);
       const waitedMs = Date.now() - waitingSince;
-      if (waitedMs < UNCONFIRMED_PAYMENT_DAYS * 24 * 60 * 60 * 1000) {
+      // A banned vendor can't log in to confirm or reject, so there is nothing
+      // to wait for: the customer can dispute immediately.
+      const vendorBanned = Boolean(await User.exists({ businessId, banned: true }));
+      if (!vendorBanned && waitedMs < UNCONFIRMED_PAYMENT_DAYS * 24 * 60 * 60 * 1000) {
         return res.status(400).json({
           message: `The vendor has ${UNCONFIRMED_PAYMENT_DAYS} days to confirm your payment. You can file a dispute if they haven't answered by then.`,
         });

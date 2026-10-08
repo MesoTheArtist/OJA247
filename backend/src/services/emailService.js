@@ -740,6 +740,39 @@ export async function sendAccountBanStatusEmail({ to, name, banned, dashboardUrl
   });
 }
 
+// To the admin right after a vendor is banned, listing every bank-transfer
+// order still waiting on them. Those customers paid the vendor's own account,
+// so OJA247 cannot refund them; this list is what to follow up on.
+export async function sendAdminBannedVendorOpenOrdersEmail({ businessName, vendorEmail, orders }) {
+  const rows = orders
+    .map(
+      (o) => `<tr>
+        <td style="padding:6px 8px; border-bottom:1px solid #e5e7eb; font-size:13px;">${esc(o.reference)}</td>
+        <td style="padding:6px 8px; border-bottom:1px solid #e5e7eb; font-size:13px;">${NAIRA(o.total)}</td>
+        <td style="padding:6px 8px; border-bottom:1px solid #e5e7eb; font-size:13px;">${esc(o.customer?.fullName || "—")}<br><span style="color:#6b7280;">${esc(o.customer?.email || "")}</span></td>
+        <td style="padding:6px 8px; border-bottom:1px solid #e5e7eb; font-size:13px;">${o.daysWaiting}d</td>
+      </tr>`
+    )
+    .join("");
+  return sendEmail({
+    to: ADMIN_EMAIL,
+    subject: `Vendor banned with ${orders.length} unconfirmed order${orders.length === 1 ? "" : "s"}: ${businessName}`,
+    html: layout(
+      `
+      ${h1("A banned vendor has orders waiting")}
+      ${p(`<strong>${esc(businessName)}</strong> (${esc(vendorEmail || "no email on file")}) was just banned. ${orders.length} bank-transfer order${orders.length === 1 ? " is" : "s are"} still waiting for them to confirm payment. They can no longer log in, so they cannot answer.`)}
+      <table style="width:100%; border-collapse:collapse; margin:16px 0;">
+        <tr style="text-align:left; font-size:12px; color:#6b7280;"><th style="padding:6px 8px;">Order</th><th style="padding:6px 8px;">Amount</th><th style="padding:6px 8px;">Customer</th><th style="padding:6px 8px;">Waiting</th></tr>
+        ${rows}
+      </table>
+      ${p("These customers paid the vendor's own bank account, so OJA247 cannot refund them. They can file a dispute straight away from their order page, and the useful next step is to contact the vendor about these orders.")}
+      ${button("Open the admin dashboard", `${SITE_URL}/admin`)}
+      `,
+      { preheader: `${businessName} was banned with ${orders.length} orders still unconfirmed.` }
+    ),
+  });
+}
+
 const DISPUTE_REASON_LABELS = {
   item_not_received: "Item not received",
   wrong_item: "Wrong item received",

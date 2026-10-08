@@ -17,6 +17,7 @@ import Review from "../models/Review.js";
 import {
   sendVerificationReviewedEmail,
   sendAccountBanStatusEmail,
+  sendAdminBannedVendorOpenOrdersEmail,
   sendAccountDeletedEmail,
   sendCustomerDetailsUpdatedEmail,
   sendPointsWithdrawalPaidEmail,
@@ -195,6 +196,35 @@ export const toggleUserBan = async (req, res) => {
       banned: user.banned,
       dashboardUrl: `${process.env.SITE_URL || "https://oja247.store"}/business-dashboard`,
     });
+
+    // Banning a vendor strands any bank-transfer orders still waiting on them
+    // (customers already paid the vendor's own account). Tell the admin which
+    // ones, so they can be followed up. Best effort: never fails the ban.
+    if (banned && user.businessId) {
+      try {
+        const businessId = String(user.businessId._id || user.businessId);
+        const open = await Order.find({
+          paymentMethod: "bank_transfer",
+          status: "awaiting_confirmation",
+          "vendors.businessId": businessId,
+        }).select("reference total customer createdAt paymentReceipts");
+        if (open.length > 0) {
+          const now = Date.now();
+          sendAdminBannedVendorOpenOrdersEmail({
+            businessName: user.businessId?.name || "A vendor",
+            vendorEmail: user.email,
+            orders: open.map((o) => ({
+              reference: o.reference,
+              total: o.total,
+              customer: o.customer,
+              daysWaiting: Math.floor((now - new Date(o.createdAt).getTime()) / (24 * 60 * 60 * 1000)),
+            })),
+          }).catch((err) => console.error("Banned-vendor admin email failed:", err));
+        }
+      } catch (err) {
+        console.error("Could not list open orders for banned vendor:", err);
+      }
+    }
 
     res.json(user);
   } catch (error) {

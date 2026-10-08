@@ -1,5 +1,6 @@
 import Order from "../models/Order.js";
 import Dispute from "../models/Dispute.js";
+import User from "../models/User.js";
 
 // A dispute is "active" while it's still being worked — open (vendor's
 // self-resolve window) or escalated (with admin). resolved/unresolved are
@@ -51,5 +52,26 @@ export async function withActiveDisputeVendors(orders) {
     byOrder.get(key).push(d.businessId);
   }
 
-  return plain.map((o) => ({ ...o, activeDisputeBusinessIds: byOrder.get(o._id.toString()) || [] }));
+  // Bank-transfer orders still waiting on a vendor who has since been banned:
+  // the customer can dispute at once instead of waiting out the usual days.
+  const waiting = plain.filter(
+    (o) => o.paymentMethod === "bank_transfer" && o.status === "awaiting_confirmation"
+  );
+  let bannedBusinessIds = new Set();
+  if (waiting.length > 0) {
+    const ids = [...new Set(waiting.flatMap((o) => (o.vendors || []).map((v) => String(v.businessId))))];
+    const bannedOwners = await User.find({ businessId: { $in: ids }, banned: true })
+      .select("businessId")
+      .lean();
+    bannedBusinessIds = new Set(bannedOwners.map((u) => String(u.businessId)));
+  }
+
+  return plain.map((o) => ({
+    ...o,
+    activeDisputeBusinessIds: byOrder.get(o._id.toString()) || [],
+    vendorSuspended:
+      o.paymentMethod === "bank_transfer" &&
+      o.status === "awaiting_confirmation" &&
+      (o.vendors || []).some((v) => bannedBusinessIds.has(String(v.businessId))),
+  }));
 }
