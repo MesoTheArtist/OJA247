@@ -558,17 +558,34 @@ const AdminDashboard = () => {
 
   const toggleUserBan = async (id, currentStatus, email) => {
     const banning = !currentStatus;
-    const ok = await confirm({
-      title: banning ? "Ban user?" : "Unban user?",
-      message: `${banning ? "Ban" : "Unban"} user "${email}"?`,
-      confirmLabel: banning ? "Ban" : "Unban",
-      tone: banning ? "danger" : "default",
-    });
-    if (!ok) return;
+    let reason = "";
+
+    if (banning) {
+      // One dialog: the reason is optional and goes into the email the user
+      // receives. Cancelling aborts the ban.
+      const input = await prompt({
+        title: "Ban user?",
+        message: `Ban "${email}"? You can add a reason, which is included in the email they receive. Leave it empty to send none.`,
+        placeholder: "Reason (optional)",
+        multiline: true,
+        confirmLabel: "Ban",
+        tone: "danger",
+      });
+      if (input === null) return; // cancelled
+      reason = input;
+    } else {
+      const ok = await confirm({
+        title: "Unban user?",
+        message: `Unban user "${email}"?`,
+        confirmLabel: "Unban",
+      });
+      if (!ok) return;
+    }
 
     try {
       await axiosInstance.patch(`/api/admin/users/${id}/ban`, {
         banned: !currentStatus,
+        reason,
       });
       showToast(`User ${currentStatus ? "unbanned" : "banned"}`);
       fetchAllData();
