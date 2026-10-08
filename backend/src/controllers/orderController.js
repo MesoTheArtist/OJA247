@@ -567,6 +567,7 @@ export const getOrderByReference = async (req, res) => {
     // receipts: they can show the customer's name and bank details.
     const publicOrder = order.toObject();
     delete publicOrder.paymentReceipts;
+    delete publicOrder.duplicateReceiptOf;
 
     // For a bank-transfer order still waiting on the seller, give the page the
     // seller's WhatsApp number (digits only, as wa.me wants) so the customer
@@ -610,8 +611,24 @@ export const getOrdersByBusiness = async (req, res) => {
       createdAt: -1,
     });
 
+    // The vendor's current account, to flag transfer orders where the customer
+    // was told to pay a different (older) account.
+    const vendorNow = await Vendor.findOne({ businessId }).select("accountNumber");
+    const currentAccount = String(vendorNow?.accountNumber || "");
+
     // Signed, private links to each payment receipt so the vendor can open them.
-    res.json(orders.map(withReceiptLinks));
+    res.json(
+      orders.map((order) => {
+        const plain = withReceiptLinks(order);
+        const told = String(plain.paymentInstructions?.accountNumber || "");
+        plain.payToChanged = Boolean(told && currentAccount && told !== currentAccount);
+        // Only a yes/no for the vendor, never another order's reference.
+        plain.duplicateReceipt = Boolean(plain.duplicateReceiptOf);
+        delete plain.duplicateReceiptOf;
+        plain.paymentReceipts = (plain.paymentReceipts || []).map(({ fileHash, ...rest }) => rest);
+        return plain;
+      })
+    );
   } catch (error) {
     console.error("Get orders by business error:", error);
     res.status(500).json({ message: "Error fetching business orders" });

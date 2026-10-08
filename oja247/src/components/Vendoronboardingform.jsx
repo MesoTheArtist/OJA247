@@ -296,7 +296,7 @@ const styles = `
 `;
 
 export default function VendorOnboardingForm({ onSubmitted, existing = null } = {}) {
-  const { notify } = useDialog();
+  const { notify, prompt } = useDialog();
   const { business, isAuthenticated } = useAuth();
 
   const [banks, setBanks] = useState([]);
@@ -473,8 +473,8 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
     };
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function handleSubmit(e, currentPassword) {
+    e?.preventDefault?.();
     setSubmitError(null);
 
     // Belt-and-braces: goNext already stops anyone reaching the last step
@@ -508,6 +508,7 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
     if (cacFile) payload.append('cac_document', cacFile);
     if (addressProofFile) payload.append('address_proof', addressProofFile);
     if (selfieFile) payload.append('selfie', selfieFile);
+    if (currentPassword) payload.append('current_password', currentPassword);
 
     try {
       const { data } = await axiosInstance.post('/api/vendors', payload, {
@@ -521,6 +522,27 @@ export default function VendorOnboardingForm({ onSubmitted, existing = null } = 
       setResult(data.data);
       onSubmitted?.(data.data);
     } catch (err) {
+      const code = err.response?.data?.code;
+      if (code === 'PASSWORD_REQUIRED' || code === 'PASSWORD_INCORRECT') {
+        // Changing the payout bank account needs the password again.
+        setSubmitting(false);
+        const typed = await prompt({
+          title: 'Confirm your password',
+          message:
+            code === 'PASSWORD_INCORRECT'
+              ? "That password wasn't right. Enter it again to change your bank details."
+              : 'For your security, enter your password to change your bank details.',
+          placeholder: 'Your password',
+          inputType: 'password',
+          confirmLabel: 'Confirm',
+        });
+        if (typed) {
+          await handleSubmit(null, typed);
+          return;
+        }
+        setSubmitError('Your bank details were not changed because no password was entered.');
+        return;
+      }
       setSubmitError(err.response?.data?.message || err.message);
     } finally {
       setSubmitting(false);

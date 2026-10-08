@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import mongoose from "mongoose";
 import multer from "multer";
 import Order from "../models/Order.js";
@@ -40,6 +41,22 @@ const REFERENCE_PATTERN = /^oja247-[a-z0-9]{8,24}$/i;
 const sameEmail = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
 // The vendor's bank details, only if this store can take orders right now.
+// Anti-junk limits for bank-transfer orders. Receipts are compulsory, so
+// someone can attach any image to spam a vendor; these keep that in check.
+const DAILY_TRANSFER_ORDER_CAP = 5; // new orders per email per 24 hours
+const escapeRegex = (str) => String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const emailMatcher = (email) => new RegExp(`^${escapeRegex(String(email).trim())}$`, "i");
+const sha256 = (buffer) => crypto.createHash("sha256").update(buffer).digest("hex");
+
+// Does this exact receipt file already sit on a different order?
+async function findDuplicateReceipt(fileHash, reference) {
+  const other = await Order.findOne({
+    "paymentReceipts.fileHash": fileHash,
+    reference: { $ne: reference },
+  }).select("reference");
+  return other?.reference || "";
+}
+
 async function loadPayableVendor(businessId) {
   if (!mongoose.isValidObjectId(businessId)) return { error: "Store not found.", status: 404 };
 
@@ -147,6 +164,38 @@ export const createDirectOrder = async (req, res) => {
     if (result.error) return res.status(result.status).json({ message: result.error });
     const { business, vendor } = result;
 
+    // This store may have blocked this customer.
+    const customerEmail = String(customer.email).trim();
+    if ((vendor.blockedCustomerEmails || []).includes(customerEmail.toLowerCase())) {
+      return res.status(403).json({ message: "This store can't take your order right now." });
+    }
+
+    // Junk limits: one unconfirmed order per customer per store at a time, and
+    // a daily cap on new transfer orders per email.
+    const [waitingWithStore, ordersToday] = await Promise.all([
+      Order.exists({
+        paymentMethod: "bank_transfer",
+        status: "awaiting_confirmation",
+        "customer.email": emailMatcher(customerEmail),
+        "vendors.businessId": businessId,
+      }),
+      Order.countDocuments({
+        paymentMethod: "bank_transfer",
+        "customer.email": emailMatcher(customerEmail),
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      }),
+    ]);
+    if (waitingWithStore) {
+      return res.status(409).json({
+        message: `You already have an order waiting for ${business.name} to confirm your payment. Please wait for their answer, or message them, before placing another.`,
+      });
+    }
+    if (ordersToday >= DAILY_TRANSFER_ORDER_CAP) {
+      return res.status(429).json({
+        message: "You've placed several orders today. Please try again tomorrow, or contact the stores directly.",
+      });
+    }
+
     const orderItems = products.map((pr) => ({
       productId: String(pr._id),
       businessId,
@@ -204,6 +253,12 @@ export const createDirectOrder = async (req, res) => {
       });
     }
 
+    // Fingerprint the receipt and flag it if the identical file is already on
+    // another order. This only warns the vendor; it never blocks the order.
+    const fileHash = sha256(req.file.buffer);
+    receipt.fileHash = fileHash;
+    const duplicateReceiptOf = await findDuplicateReceipt(fileHash, reference);
+
     stage = "saving_order";
     const order = await Order.create({
       reference,
@@ -235,6 +290,12 @@ export const createDirectOrder = async (req, res) => {
       paymentStatus: "awaiting_confirmation",
       paymentMethod: "bank_transfer",
       paymentReceipts: [receipt],
+      duplicateReceiptOf,
+      paymentInstructions: {
+        bankName: vendor.bankName,
+        accountName: vendor.accountName || "",
+        accountNumber: vendor.accountNumber,
+      },
     });
 
     const dashboardUrl = `${SITE_URL}/dashboard/${businessId}`;
@@ -412,6 +473,9 @@ export const resubmitReceipt = async (req, res) => {
     }
 
     const receipt = await uploadReceipt(req.file.buffer, req.file.originalname);
+    const fileHash = sha256(req.file.buffer);
+    receipt.fileHash = fileHash;
+    const duplicateReceiptOf = await findDuplicateReceipt(fileHash, order.reference);
 
     const updated = await Order.findOneAndUpdate(
       { _id: order._id, status: "payment_rejected" },
@@ -419,6 +483,7 @@ export const resubmitReceipt = async (req, res) => {
         status: "awaiting_confirmation",
         paymentStatus: "awaiting_confirmation",
         lastVendorReminderAt: null,
+        duplicateReceiptOf,
         $push: { paymentReceipts: receipt },
       },
       { new: true }

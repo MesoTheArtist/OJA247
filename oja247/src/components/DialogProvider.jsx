@@ -7,6 +7,7 @@ import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 //   if (!(await confirm({ title: "Delete product?", message: "...", tone: "danger" }))) return;
 //   await notify({ title: "Couldn't save", message: err.message, tone: "error" });
 //   const reason = await prompt({ title: "Reject?", message: "Why?", multiline: true });
+//   const pw = await prompt({ title: "Confirm", message: "Enter your password", inputType: "password" });
 //   // reason is the typed text (maybe ""), or null if the person cancelled
 //
 // Both return promises, so call sites read like the native versions with an
@@ -65,7 +66,7 @@ export function DialogProvider({ children }) {
 }
 
 function DialogView({ dialog, onClose }) {
-  const { kind, tone, title, message, confirmLabel, cancelLabel, placeholder, defaultValue, multiline } = dialog;
+  const { kind, tone, title, message, confirmLabel, cancelLabel, placeholder, defaultValue, multiline, inputType } = dialog;
   const style = TONES[tone] || TONES.default;
   const Icon = style.icon;
   const isConfirm = kind === "confirm";
@@ -154,7 +155,8 @@ function DialogView({ dialog, onClose }) {
             ) : (
               <input
                 ref={inputRef}
-                type="text"
+                type={inputType || "text"}
+                autoComplete={inputType === "password" ? "current-password" : "off"}
                 value={value}
                 placeholder={placeholder}
                 aria-labelledby="dialog-title"

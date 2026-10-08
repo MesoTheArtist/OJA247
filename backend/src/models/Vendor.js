@@ -13,6 +13,8 @@ const VendorSchema = new mongoose.Schema(
     contactEmail: { type: String, required: true },
     contactPhone: { type: String, required: true },
     contactWhatsapp: { type: String, default: "" },
+    // Customers this store has blocked from placing orders (lowercase emails).
+    blockedCustomerEmails: { type: [String], default: [] },
 
     // payout details
     bankCode: { type: String, required: true },

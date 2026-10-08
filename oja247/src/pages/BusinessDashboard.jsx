@@ -159,6 +159,39 @@ const BusinessDashboard = () => {
       prev.map((o) => (o._id === updated._id ? { ...o, ...updated, paymentReceipts: o.paymentReceipts } : o))
     );
 
+  // Block / unblock a customer email from placing new orders at this store.
+  const blockedEmails = (vendorStatus?.blockedCustomerEmails || []).map((e) => String(e).toLowerCase());
+  const isBlocked = (order) => blockedEmails.includes(String(order.customer?.email || "").toLowerCase());
+
+  const toggleBlockCustomer = async (order) => {
+    const email = String(order.customer?.email || "").trim();
+    if (!email) return;
+    const blocking = !isBlocked(order);
+
+    if (blocking) {
+      const ok = await confirm({
+        title: "Block this customer?",
+        message: `${email} won't be able to place new orders at your store. Orders they already placed aren't affected. You can unblock them any time.`,
+        confirmLabel: "Block customer",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+
+    try {
+      const { data } = blocking
+        ? await axiosInstance.post("/api/vendors/me/blocked-customers", { email })
+        : await axiosInstance.delete("/api/vendors/me/blocked-customers", { data: { email } });
+      setVendorStatus((prev) => (prev ? { ...prev, blockedCustomerEmails: data.data.blockedCustomerEmails } : prev));
+    } catch (error) {
+      await notify({
+        title: blocking ? "Couldn't block this customer" : "Couldn't unblock this customer",
+        message: error.response?.data?.message || "Please try again.",
+        tone: "error",
+      });
+    }
+  };
+
   const confirmTransfer = async (order) => {
     const ok = await confirm({
       title: "Payment received?",
@@ -759,6 +792,23 @@ const BusinessDashboard = () => {
                               <div className="mt-2 space-y-2">
                                 <p className="text-xs text-gray-400">Paid by bank transfer</p>
 
+                                {order.paymentInstructions?.accountNumber && (
+                                  <p className="text-xs text-gray-500">
+                                    Customer was told to pay {order.paymentInstructions.bankName}, account ending{" "}
+                                    <span className="font-semibold">{String(order.paymentInstructions.accountNumber).slice(-4)}</span>
+                                  </p>
+                                )}
+                                {order.duplicateReceipt && (
+                                  <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                                    This exact receipt file was already used on another order. Check your bank carefully before you confirm.
+                                  </p>
+                                )}
+                                {order.payToChanged && (
+                                  <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                                    You changed your bank account after this order was placed. The customer may have paid the old account, so check that account's statement too.
+                                  </p>
+                                )}
+
                                 {(order.paymentReceipts || []).map((receipt, idx) =>
                                   receipt.url ? (
                                     <a
@@ -794,6 +844,16 @@ const BusinessDashboard = () => {
                                       Reject
                                     </button>
                                   </div>
+                                )}
+
+                                {(order.paymentStatus === "awaiting_confirmation" || order.paymentStatus === "payment_rejected") && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleBlockCustomer(order)}
+                                    className="text-xs font-semibold text-gray-500 hover:text-red-600 underline"
+                                  >
+                                    {isBlocked(order) ? "Customer blocked · Unblock" : "Block this customer"}
+                                  </button>
                                 )}
 
                                 {order.paymentStatus === "payment_rejected" && (

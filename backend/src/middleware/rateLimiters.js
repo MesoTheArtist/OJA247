@@ -70,3 +70,16 @@ export const directOrderLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many attempts. Please try again in a few minutes." },
 });
+
+// Changing the payout bank account asks for the vendor's password again, so a
+// stolen login can't quietly redirect customers' money. This only counts
+// FAILED requests (wrong password, bad details) so a stolen session can't
+// guess the password here, while a normal successful save is never blocked.
+export const bankChangeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 8,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: false, message: "Too many attempts. Please try again in a few minutes." },
+});

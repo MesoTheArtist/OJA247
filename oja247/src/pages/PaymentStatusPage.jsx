@@ -335,6 +335,18 @@ function PaymentStatusPage() {
                     </p>
                   </div>
                 </div>
+
+                {order.paymentMethod === "bank_transfer" && order.paymentInstructions?.accountNumber && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">
+                      You were told to pay
+                    </p>
+                    <p className="text-sm text-gray-700 mt-1">
+                      {order.paymentInstructions.accountName && <span className="font-semibold">{order.paymentInstructions.accountName} · </span>}
+                      {order.paymentInstructions.bankName} · {order.paymentInstructions.accountNumber}
+                    </p>
+                  </div>
+                )}
               </motion.div>
             )}
 

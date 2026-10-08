@@ -1,6 +1,7 @@
 import axios from "axios";
 import cloudinary from "../config/cloudinaryConfig.js";
 import Vendor from "../models/Vendor.js";
+import User from "../models/User.js";
 import Business from "../models/Business.js";
 import { sendPayoutHoldEmail, sendBankDetailsUpdatedEmail } from "../services/emailService.js";
 import { verifyNin, ninNameMatchesAccount } from "../services/ninVerificationService.js";
@@ -234,6 +235,35 @@ export const onboardVendor = async (req, res) => {
 
     const existingVendor = await Vendor.findOne({ businessId: business_id });
 
+    // Customers pay the account saved here, so changing it is the most
+    // sensitive thing a vendor can do. Ask for the password again, so a stolen
+    // or left-open login can't quietly redirect money. (Admins editing on a
+    // vendor's behalf are exempt, and so is any account with no password at
+    // all, which can't be asked for one; the alert email still goes out.)
+    const changingBankNow =
+      Boolean(existingVendor) &&
+      (existingVendor.bankCode !== bank_code || existingVendor.accountNumber !== account_number);
+    if (changingBankNow && req.user.role !== "admin") {
+      const userWithPassword = await User.findById(req.user.id).select("+password");
+      if (userWithPassword?.password) {
+        const supplied = String(req.body.current_password || "");
+        if (!supplied) {
+          return res.status(403).json({
+            status: false,
+            code: "PASSWORD_REQUIRED",
+            message: "For your security, enter your password to change your bank details.",
+          });
+        }
+        if (!(await userWithPassword.comparePassword(supplied))) {
+          return res.status(403).json({
+            status: false,
+            code: "PASSWORD_INCORRECT",
+            message: "That password isn't right, so your bank details were not changed.",
+          });
+        }
+      }
+    }
+
     // NIN existence check via Dojah. Done before any uploads or Paystack
     // calls so a bad NIN costs nothing. Only runs when the NIN is new or
     // hasn't been verified yet — resubmissions that just add a document
@@ -428,5 +458,66 @@ export const acknowledgeVendorNotification = async (req, res) => {
   } catch (error) {
     console.error("Acknowledge vendor notification failed:", error.message);
     return res.status(500).json({ status: false, message: "Could not update notification." });
+  }
+};
+
+// POST /api/vendors/me/blocked-customers   body: { email }
+// DELETE /api/vendors/me/blocked-customers body: { email }
+// The vendor stops (or resumes) taking orders from one customer email. Only
+// affects NEW orders: anything already placed is untouched.
+const MAX_BLOCKED_CUSTOMERS = 500;
+const SIMPLE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export const blockCustomer = async (req, res) => {
+  try {
+    if (!req.user.businessId) {
+      return res.status(404).json({ status: false, message: "No business linked to this account." });
+    }
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!SIMPLE_EMAIL.test(email)) {
+      return res.status(400).json({ status: false, message: "That doesn't look like a valid email address." });
+    }
+
+    const vendor = await Vendor.findOne({ businessId: req.user.businessId }).select("blockedCustomerEmails");
+    if (!vendor) {
+      return res.status(404).json({ status: false, message: "You haven't set up your store yet." });
+    }
+    if ((vendor.blockedCustomerEmails || []).length >= MAX_BLOCKED_CUSTOMERS) {
+      return res.status(400).json({ status: false, message: "Your block list is full. Unblock someone first." });
+    }
+
+    const updated = await Vendor.findOneAndUpdate(
+      { businessId: req.user.businessId },
+      { $addToSet: { blockedCustomerEmails: email } },
+      { new: true }
+    ).select("blockedCustomerEmails");
+    return res.json({ status: true, data: { blockedCustomerEmails: updated.blockedCustomerEmails } });
+  } catch (error) {
+    console.error("Block customer failed:", error.message);
+    return res.status(500).json({ status: false, message: "Could not block that customer." });
+  }
+};
+
+export const unblockCustomer = async (req, res) => {
+  try {
+    if (!req.user.businessId) {
+      return res.status(404).json({ status: false, message: "No business linked to this account." });
+    }
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ status: false, message: "Email is required." });
+    }
+    const updated = await Vendor.findOneAndUpdate(
+      { businessId: req.user.businessId },
+      { $pull: { blockedCustomerEmails: email } },
+      { new: true }
+    ).select("blockedCustomerEmails");
+    if (!updated) {
+      return res.status(404).json({ status: false, message: "You haven't set up your store yet." });
+    }
+    return res.json({ status: true, data: { blockedCustomerEmails: updated.blockedCustomerEmails } });
+  } catch (error) {
+    console.error("Unblock customer failed:", error.message);
+    return res.status(500).json({ status: false, message: "Could not unblock that customer." });
   }
 };

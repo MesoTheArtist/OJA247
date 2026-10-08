@@ -111,6 +111,8 @@ const OrderSchema = new mongoose.Schema(
         resourceType: { type: String, default: "image" },
         format: { type: String, default: "" },
         originalName: { type: String, default: "" },
+        // SHA-256 of the file, to spot the same receipt used on another order.
+        fileHash: { type: String, default: "" },
         uploadedAt: { type: Date, default: Date.now },
         _id: false,
       },
@@ -123,6 +125,18 @@ const OrderSchema = new mongoose.Schema(
         _id: false,
       },
     ],
+    // The account the customer was TOLD to pay when they placed the order,
+    // copied at that moment. If the vendor changes their bank details later,
+    // disputes can still show exactly where this customer was sent.
+    paymentInstructions: {
+      bankName: { type: String, default: "" },
+      accountName: { type: String, default: "" },
+      accountNumber: { type: String, default: "" },
+      _id: false,
+    },
+    // Set when the latest receipt file is byte-for-byte the same as one on
+    // another order. Internal only (the vendor just sees a warning flag).
+    duplicateReceiptOf: { type: String, default: "" },
     paymentConfirmedAt: { type: Date, default: null },
     // For the daily follow-up job on unconfirmed bank-transfer orders.
     lastVendorReminderAt: { type: Date, default: null },
@@ -130,5 +144,7 @@ const OrderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+OrderSchema.index({ "paymentReceipts.fileHash": 1 }, { sparse: true });
 
 export default mongoose.model("Order", OrderSchema);
