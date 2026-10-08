@@ -21,6 +21,7 @@ import {
   deleteMarketer,
   getTransactions,
   markPointsWithdrawalPaid,
+  rejectPointsWithdrawal,
   getTaxLedger,
   markTaxRemitted,
   adminListDisputes,
@@ -119,6 +120,7 @@ router.get("/transactions", getTransactions);
 // Business points withdrawal (cash-out) — the points-ledger equivalent of
 // payout-batches/:marketerId/mark-paid above
 router.patch("/points-withdrawals/:id/mark-paid", markPointsWithdrawalPaid);
+router.patch("/points-withdrawals/:id/reject", rejectPointsWithdrawal);
 
 // Tax Ledger tab (accrued per paid order — see orderController.js)
 router.get("/tax-ledger", getTaxLedger);

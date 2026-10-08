@@ -960,6 +960,23 @@ export async function sendCustomerDetailsUpdatedEmail({ to, name, changes }) {
 }
 
 // A business's points-to-cash withdrawal was marked paid by an admin.
+// Vendor: an admin declined a points withdrawal; the points are back in their balance.
+export async function sendPointsWithdrawalRejectedEmail({ to, businessName, amount, reason, newBalance }) {
+  return sendEmail({
+    to,
+    subject: `Your ${NAIRA(amount)} points withdrawal wasn't approved`,
+    html: layout(
+      `${h1("Your withdrawal wasn't approved")}
+       ${p(`Hi ${esc(businessName)}, we couldn't process your request to withdraw <strong>${NAIRA(amount)}</strong> from your referral points.`)}
+       ${reason ? `<div style="background:#f9fafb; border-left:4px solid #9ca3af; border-radius:6px; padding:12px 16px; margin:16px 0; color:#374151; font-size:14px; line-height:1.6;"><strong>Reason:</strong> ${esc(reason)}</div>` : ""}
+       ${p(`Nothing has been lost: the <strong>${esc(String(amount))} points</strong> are back in your balance, which is now <strong>${esc(Number(newBalance).toLocaleString())} points</strong>.`)}
+       ${small("Fix the issue mentioned above (for example your payout account details) and you can request the withdrawal again, or use your points toward your subscription.")}
+       ${button("Open my dashboard", `${SITE_URL}/dashboard`)}`,
+      { preheader: `Your ${NAIRA(amount)} in points is back in your balance` }
+    ),
+  });
+}
+
 export async function sendPointsWithdrawalPaidEmail({ to, businessName, amount, transferReference }) {
   return sendEmail({
     to,

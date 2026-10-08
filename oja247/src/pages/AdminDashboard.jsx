@@ -277,6 +277,36 @@ const AdminDashboard = () => {
   }, [activeTab, transactionTypeFilter]);
 
   const [markingPaidId, setMarkingPaidId] = useState(null);
+
+  // Declining a withdrawal gives the vendor their points back (the points are
+  // taken off their balance the moment they ask), so a reason is required and
+  // is emailed to them.
+  const rejectPointsWithdrawal = async (t) => {
+    const reason = await prompt({
+      title: "Reject this withdrawal?",
+      message: `${t.party} asked to withdraw ${Math.abs(t.amount).toLocaleString()} points. Rejecting puts those points back in their balance and emails them your reason.`,
+      placeholder: "Reason (the vendor will see this)",
+      multiline: true,
+      confirmLabel: "Reject and refund",
+      tone: "danger",
+    });
+    if (reason === null) return; // cancelled
+    if (!reason.trim()) {
+      showToast("A reason is required.", "error");
+      return;
+    }
+    setMarkingPaidId(t.id);
+    try {
+      await axiosInstance.patch(`/api/admin/points-withdrawals/${t.id}/reject`, { reason: reason.trim() });
+      showToast("Withdrawal rejected and points refunded");
+      fetchTransactions();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Couldn't reject this withdrawal.", "error");
+    } finally {
+      setMarkingPaidId(null);
+    }
+  };
+
   const markPointsWithdrawalPaid = async (id) => {
     setMarkingPaidId(id);
     try {
@@ -1765,7 +1795,7 @@ const AdminDashboard = () => {
                               className={`px-2.5 py-1 rounded-full text-xs font-semibold border capitalize ${
                                 ["success", "paid"].includes(t.status)
                                   ? "bg-green-500/15 text-green-700 border-green-500/30"
-                                  : ["failed"].includes(t.status)
+                                  : ["failed", "rejected"].includes(t.status)
                                   ? "bg-red-500/15 text-red-600 border-red-500/30"
                                   : "bg-yellow-500/15 text-amber-700 border-yellow-500/30"
                               }`}
@@ -1778,13 +1808,22 @@ const AdminDashboard = () => {
                           </td>
                           <td data-label="Actions" className="p-4">
                             {t.kind === "points" && t.pointsType === "withdrawn_cash" && t.status === "pending" && (
-                              <button
-                                onClick={() => markPointsWithdrawalPaid(t.id)}
-                                disabled={markingPaidId === t.id}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition disabled:opacity-50"
-                              >
-                                {markingPaidId === t.id ? "Marking…" : "Mark paid"}
-                              </button>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  onClick={() => markPointsWithdrawalPaid(t.id)}
+                                  disabled={markingPaidId === t.id}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition disabled:opacity-50"
+                                >
+                                  {markingPaidId === t.id ? "Working…" : "Mark paid"}
+                                </button>
+                                <button
+                                  onClick={() => rejectPointsWithdrawal(t)}
+                                  disabled={markingPaidId === t.id}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-300 text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                                >
+                                  Reject
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>

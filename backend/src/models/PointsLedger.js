@@ -8,7 +8,8 @@ const PointsLedgerSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ["earned", "redeemed_subscription", "withdrawn_cash"],
+      // "withdrawal_refunded" puts a rejected withdrawal's points back (positive points)
+      enum: ["earned", "redeemed_subscription", "withdrawn_cash", "withdrawal_refunded"],
       required: true,
     },
     points: { type: Number, required: true }, // positive for "earned", negative for redeem/withdraw
@@ -25,10 +26,14 @@ const PointsLedgerSchema = new mongoose.Schema(
     // but still tracked through a status so payouts can be batched/audited.
     status: {
       type: String,
-      enum: ["n/a", "pending", "paid", "failed"],
+      enum: ["n/a", "pending", "paid", "failed", "rejected"],
       default: "n/a",
     },
     transferReference: { type: String, default: "" },
+    // Set on a rejected withdrawal (shown to the vendor), and on the matching
+    // "withdrawal_refunded" entry that points back at the withdrawal it undoes.
+    rejectionReason: { type: String, default: "" },
+    refundOfEntryId: { type: mongoose.Schema.Types.ObjectId, ref: "PointsLedger", default: null },
   },
   { timestamps: true }
 );
