@@ -43,7 +43,8 @@ export function getDisputeEligibility(order) {
   if (!order) return { eligible: false, daysLeft: 0 };
 
   if (isAwaitingTransfer(order)) {
-    const daysUntil = daysUntilUnconfirmedDispute(order);
+    // A banned vendor can't answer, so there is no waiting period.
+    const daysUntil = order.vendorSuspended ? 0 : daysUntilUnconfirmedDispute(order);
     return {
       eligible: daysUntil === 0 && getDisputableVendors(order).length > 0,
       daysLeft: 0,
