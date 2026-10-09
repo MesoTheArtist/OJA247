@@ -26,15 +26,17 @@ const companyLinks = [
   { label: "About OJA247", path: "/about" },
   { label: "Our Story", path: "/about" },
   { label: "Careers", path: "/about" },
-  { label: "Contact", path: "/about" },
+  { label: "Contact", path: "mailto:support@oja247.store" },
 ];
 
 const supportLinks = [
-  { label: "Help Center", path: "/about" },
+  { label: "Help Center", path: "/help" },
+  { label: "Email Support", path: "mailto:support@oja247.store" },
   { label: "Report a Problem", path: "/report-problem" },
-  { label: "Delivery Information", path: "/about" },
-  { label: "Privacy Policy", path: "/about" },
-  { label: "Terms & Conditions", path: "/about" },
+  { label: "Delivery & Payments", path: "/delivery-information" },
+  { label: "Terms & Conditions", path: "/terms" },
+  { label: "Seller Terms", path: "/vendor-terms" },
+  { label: "Privacy Policy", path: "/privacy" },
 ];
 
 const TikTokIcon = ({ size = 20 }) => (
@@ -86,7 +88,11 @@ const Footer = () => {
         {links.map(({ label, path }) => (
           <li
             key={label}
-            onClick={() => navigate(path)}
+            onClick={() => {
+              // Email links open the mail app; everything else is a page.
+              if (path.startsWith("mailto:")) window.location.href = path;
+              else navigate(path);
+            }}
             className="hover:text-green-400 cursor-pointer transition-colors"
           >
             {label}
