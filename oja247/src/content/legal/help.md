@@ -29,5 +29,6 @@ This usually means your subscription has ended or your account needs a review. C
 
 - [Terms & Conditions](/terms)
 - [Seller Terms](/vendor-terms)
+- [Prohibited Items](/prohibited-items)
 - [Privacy Policy](/privacy)
 - [Delivery & Payment Information](/delivery-information)

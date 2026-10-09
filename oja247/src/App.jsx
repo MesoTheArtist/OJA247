@@ -29,7 +29,7 @@ import JoinPage from "./pages/JoinPage";
 import ConfirmReceiptPage from "./pages/ConfirmReceiptPage";
 import UnsubscribePage from "./pages/UnsubscribePage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
-import { TermsPage, VendorTermsPage, PrivacyPage, DeliveryPage, HelpPage } from "./pages/PolicyPages";
+import { TermsPage, VendorTermsPage, PrivacyPage, DeliveryPage, HelpPage, ProhibitedItemsPage } from "./pages/PolicyPages";
 
 function App() {
   return (
@@ -45,6 +45,7 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/vendor-terms" element={<VendorTermsPage />} />
+          <Route path="/prohibited-items" element={<ProhibitedItemsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/delivery-information" element={<DeliveryPage />} />
           <Route path="/help" element={<HelpPage />} />

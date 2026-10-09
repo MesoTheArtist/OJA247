@@ -51,7 +51,7 @@ OJA247 provides the technology that lets you run your own online storefront and 
 
 - Listings, prices, photos and descriptions must be accurate. Prices are in naira.
 - You must have the right to use everything you upload. You give OJA247 a non-exclusive licence to display your store, products and images on the platform and in our marketing of it.
-- You may not sell anything illegal, counterfeit, stolen or dangerous, or anything we list as prohibited in our guidance to sellers. You may not post fake reviews, mislead customers, or harass them.
+- You may not sell anything illegal, counterfeit, stolen or dangerous, or anything on our [Prohibited Items](/prohibited-items) list, which forms part of these terms. You may not post fake reviews, mislead customers, or harass them.
 
 ## 9. Customer information
 

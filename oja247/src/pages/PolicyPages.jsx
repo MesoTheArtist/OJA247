@@ -4,6 +4,7 @@ import termsText from "../content/legal/terms.md?raw";
 import vendorTermsText from "../content/legal/vendor-terms.md?raw";
 import privacyText from "../content/legal/privacy.md?raw";
 import deliveryText from "../content/legal/delivery.md?raw";
+import prohibitedText from "../content/legal/prohibited-items.md?raw";
 import helpText from "../content/legal/help.md?raw";
 
 // The wording lives in src/content/legal/*.md. Edit those files (or paste in
@@ -20,6 +21,15 @@ export const VendorTermsPage = () => (
     subtitle="For businesses that sell on OJA247."
     updated={UPDATED}
     content={vendorTermsText}
+  />
+);
+
+export const ProhibitedItemsPage = () => (
+  <LegalLayout
+    title="Prohibited Items"
+    subtitle="What may not be sold on OJA247."
+    updated={UPDATED}
+    content={prohibitedText}
   />
 );
 

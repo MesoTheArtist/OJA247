@@ -159,6 +159,7 @@ const LegalLayout = ({ title, subtitle, updated, content }) => {
         <div className="mt-12 pt-6 border-t border-gray-100 text-sm text-gray-500 flex flex-wrap gap-x-5 gap-y-2">
           <Link to="/terms" className="hover:text-green-700">Terms &amp; Conditions</Link>
           <Link to="/vendor-terms" className="hover:text-green-700">Seller Terms</Link>
+          <Link to="/prohibited-items" className="hover:text-green-700">Prohibited Items</Link>
           <Link to="/privacy" className="hover:text-green-700">Privacy Policy</Link>
           <Link to="/delivery-information" className="hover:text-green-700">Delivery &amp; Payments</Link>
           <Link to="/help" className="hover:text-green-700">Help Center</Link>

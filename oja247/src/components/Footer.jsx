@@ -36,6 +36,7 @@ const supportLinks = [
   { label: "Delivery & Payments", path: "/delivery-information" },
   { label: "Terms & Conditions", path: "/terms" },
   { label: "Seller Terms", path: "/vendor-terms" },
+  { label: "Prohibited Items", path: "/prohibited-items" },
   { label: "Privacy Policy", path: "/privacy" },
 ];
 
