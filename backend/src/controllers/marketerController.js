@@ -77,6 +77,11 @@ export const getMarketerDashboard = async (req, res) => {
         .filter((p) => p.status === "paid")
         .sort((a, b) => new Date(b.paidAt) - new Date(a.paidAt))
         .map((p) => ({ id: p._id, amount: p.amount, paidAt: p.paidAt })),
+      // Payouts an admin declined, with the reason, so earnings never just vanish
+      rejectedPayouts: payouts
+        .filter((p) => p.status === "rejected")
+        .sort((a, b) => new Date(b.rejectedAt) - new Date(a.rejectedAt))
+        .map((p) => ({ id: p._id, amount: p.amount, rejectedAt: p.rejectedAt, reason: p.rejectionReason })),
     });
   } catch (error) {
     console.error("Get marketer dashboard error:", error);

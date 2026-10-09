@@ -544,6 +544,29 @@ const MarketerDashboard = () => {
             </div>
           )}
         </div>
+
+        {/* Payouts an admin declined, with the reason, so earnings never just vanish */}
+        {data.rejectedPayouts?.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-red-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-red-100 bg-red-50">
+              <h3 className="font-bold text-red-700">Payouts not approved</h3>
+            </div>
+            <div className="divide-y">
+              {data.rejectedPayouts.map((p) => (
+                <div key={p.id} className="px-6 py-4 flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-600">{new Date(p.rejectedAt).toLocaleDateString("en-NG")}</p>
+                    {p.reason && <p className="text-sm text-gray-700 mt-1 break-words">Reason: {p.reason}</p>}
+                  </div>
+                  <p className="font-bold text-gray-900 shrink-0">₦{p.amount.toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+            <p className="px-6 py-3 text-xs text-gray-500 border-t">
+              Think this is a mistake? Reply to the email we sent you and we'll look into it.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -62,7 +62,7 @@ const NAV_ITEMS = [
   { id: "vendors", label: "Vendor Verification", icon: ShieldCheck },
   { id: "emails", label: "Emails", icon: Mail },
   { id: "marketers", label: "Marketers", icon: UserCog },
-  { id: "payout-batches", label: "Payout Batches", icon: Wallet },
+  { id: "payouts", label: "Payouts", icon: Wallet },
   { id: "transactions", label: "Transactions", icon: Receipt },
   { id: "visibility", label: "Kill Switch", icon: ToggleLeft },
   { id: "grandfather", label: "Grandfather Exemptions", icon: CalendarClock },
@@ -153,14 +153,16 @@ const AdminDashboard = () => {
   const [transactionTypeFilter, setTransactionTypeFilter] = useState("all"); // all | subscription | marketer_payout | points
   const [transactionSearch, setTransactionSearch] = useState("");
 
-  // Marketer payout batches — this week's frozen ("batched") payouts,
-  // grouped by marketer with bank details, awaiting a manual bank
-  // transfer + confirmation here. See payoutBatchController.js: payouts
-  // aren't automated yet, so an admin pays each batch by hand.
-  const [payoutBatches, setPayoutBatches] = useState([]);
-  const [payoutBatchesLoading, setPayoutBatchesLoading] = useState(false);
-  const [markingBatchPaidId, setMarkingBatchPaidId] = useState(null);
-  const [batchTransferRefDrafts, setBatchTransferRefDrafts] = useState({});
+  // Payouts: one list of everything to send, marketers and vendors together.
+  // The data stays where it was (MarketerPayout / PointsLedger); see
+  // getPayouts in payoutBatchController.js. Payouts aren't automated, so an
+  // admin sends each transfer by hand, then marks it paid here.
+  const [payouts, setPayouts] = useState({ rows: [], toPay: { count: 0, total: 0 } });
+  const [payoutsLoading, setPayoutsLoading] = useState(false);
+  const [payoutTypeFilter, setPayoutTypeFilter] = useState("all"); // all | marketer | vendor
+  const [payoutStatusFilter, setPayoutStatusFilter] = useState("to_pay"); // to_pay | paid | rejected
+  const [payoutBusyId, setPayoutBusyId] = useState(null);
+  const [payoutRefDrafts, setPayoutRefDrafts] = useState({});
 
   // Toast replaces alert() for non-blocking confirmations/errors.
   const [toast, setToast] = useState(null); // { message, type: "success" | "error" }
@@ -276,18 +278,72 @@ const AdminDashboard = () => {
     fetchTransactions();
   }, [activeTab, transactionTypeFilter]);
 
-  const [markingPaidId, setMarkingPaidId] = useState(null);
+  const fetchPayouts = () => {
+    setPayoutsLoading(true);
+    return axiosInstance
+      .get("/api/admin/payouts", { params: { type: payoutTypeFilter, status: payoutStatusFilter } })
+      .then((res) => setPayouts({ rows: res.data.rows, toPay: res.data.toPay }))
+      .catch(() => showToast("Couldn't load payouts.", "error"))
+      .finally(() => setPayoutsLoading(false));
+  };
 
-  // Declining a withdrawal gives the vendor their points back (the points are
-  // taken off their balance the moment they ask), so a reason is required and
-  // is emailed to them.
-  const rejectPointsWithdrawal = async (t) => {
+  useEffect(() => {
+    if (activeTab !== "payouts") return;
+    fetchPayouts();
+  }, [activeTab, payoutTypeFilter, payoutStatusFilter]);
+
+  const copyToClipboard = async (text, what) => {
+    try {
+      await navigator.clipboard.writeText(String(text));
+      showToast(`${what} copied`);
+    } catch {
+      showToast("Couldn't copy — select it and copy by hand.", "error");
+    }
+  };
+
+  // Marking paid is the one step that can't be taken back (it emails the
+  // person that money is on its way), so ask first.
+  const markPayoutPaid = async (row) => {
+    const ok = await confirm({
+      title: "Have you sent the money?",
+      message: `Confirm you have already transferred ₦${Number(row.amount).toLocaleString()} to ${row.party}. This marks it paid and emails them.`,
+      confirmLabel: "Yes, mark paid",
+    });
+    if (!ok) return;
+    setPayoutBusyId(row.rowId);
+    try {
+      const transferReference = payoutRefDrafts[row.rowId] || "";
+      if (row.kind === "marketer") {
+        await axiosInstance.post(`/api/admin/payout-batches/${row.marketerId}/mark-paid`, { transferReference });
+      } else {
+        await axiosInstance.patch(`/api/admin/points-withdrawals/${row.entryId}/mark-paid`, { transferReference });
+      }
+      showToast("Marked as paid — they have been notified by email");
+      setPayoutRefDrafts((prev) => {
+        const next = { ...prev };
+        delete next[row.rowId];
+        return next;
+      });
+      fetchPayouts();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Couldn't mark as paid.", "error");
+    } finally {
+      setPayoutBusyId(null);
+    }
+  };
+
+  // Declining needs a reason (emailed to them). For a vendor the withdrawn
+  // points go back to their balance; for a marketer the payout is cancelled.
+  const rejectPayout = async (row) => {
     const reason = await prompt({
-      title: "Reject this withdrawal?",
-      message: `${t.party} asked to withdraw ${Math.abs(t.amount).toLocaleString()} points. Rejecting puts those points back in their balance and emails them your reason.`,
-      placeholder: "Reason (the vendor will see this)",
+      title: row.kind === "vendor" ? "Reject this withdrawal?" : "Reject this payout?",
+      message:
+        row.kind === "vendor"
+          ? `${row.party} asked to withdraw ₦${Number(row.amount).toLocaleString()}. Rejecting puts those points back in their balance and emails them your reason.`
+          : `This cancels the ₦${Number(row.amount).toLocaleString()} waiting to be paid to ${row.party} and emails them your reason.`,
+      placeholder: "Reason (they will see this)",
       multiline: true,
-      confirmLabel: "Reject and refund",
+      confirmLabel: row.kind === "vendor" ? "Reject and refund" : "Reject payout",
       tone: "danger",
     });
     if (reason === null) return; // cancelled
@@ -295,62 +351,20 @@ const AdminDashboard = () => {
       showToast("A reason is required.", "error");
       return;
     }
-    setMarkingPaidId(t.id);
+    setPayoutBusyId(row.rowId);
     try {
-      await axiosInstance.patch(`/api/admin/points-withdrawals/${t.id}/reject`, { reason: reason.trim() });
-      showToast("Withdrawal rejected and points refunded");
-      fetchTransactions();
+      if (row.kind === "marketer") {
+        await axiosInstance.post(`/api/admin/payout-batches/${row.marketerId}/reject`, { reason: reason.trim() });
+        showToast("Payout rejected — marketer notified");
+      } else {
+        await axiosInstance.patch(`/api/admin/points-withdrawals/${row.entryId}/reject`, { reason: reason.trim() });
+        showToast("Withdrawal rejected and points refunded");
+      }
+      fetchPayouts();
     } catch (err) {
-      showToast(err.response?.data?.message || "Couldn't reject this withdrawal.", "error");
+      showToast(err.response?.data?.message || "Couldn't reject this payout.", "error");
     } finally {
-      setMarkingPaidId(null);
-    }
-  };
-
-  const markPointsWithdrawalPaid = async (id) => {
-    setMarkingPaidId(id);
-    try {
-      await axiosInstance.patch(`/api/admin/points-withdrawals/${id}/mark-paid`, {});
-      showToast("Marked as paid");
-      fetchTransactions();
-    } catch (err) {
-      showToast(err.response?.data?.message || "Couldn't mark as paid.", "error");
-    } finally {
-      setMarkingPaidId(null);
-    }
-  };
-
-  const fetchPayoutBatches = () => {
-    setPayoutBatchesLoading(true);
-    axiosInstance
-      .get("/api/admin/payout-batches")
-      .then((res) => setPayoutBatches(res.data.batches))
-      .catch(() => showToast("Couldn't load payout batches.", "error"))
-      .finally(() => setPayoutBatchesLoading(false));
-  };
-
-  useEffect(() => {
-    if (activeTab !== "payout-batches") return;
-    fetchPayoutBatches();
-  }, [activeTab]);
-
-  const markBatchPaid = async (marketerId) => {
-    setMarkingBatchPaidId(marketerId);
-    try {
-      await axiosInstance.post(`/api/admin/payout-batches/${marketerId}/mark-paid`, {
-        transferReference: batchTransferRefDrafts[marketerId] || "",
-      });
-      showToast("Marked as paid — marketer notified by email");
-      setBatchTransferRefDrafts((prev) => {
-        const next = { ...prev };
-        delete next[marketerId];
-        return next;
-      });
-      fetchPayoutBatches();
-    } catch (err) {
-      showToast(err.response?.data?.message || "Couldn't mark as paid.", "error");
-    } finally {
-      setMarkingBatchPaidId(null);
+      setPayoutBusyId(null);
     }
   };
 
@@ -1662,51 +1676,119 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {activeTab === "payout-batches" && (
+          {activeTab === "payouts" && (
             <div className="bg-white border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Payout Batches <span className="text-gray-500 font-normal">({payoutBatches.length})</span>
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  This week's frozen marketer payouts, grouped by marketer. Pay manually (bank transfer or
-                  Paystack dashboard), then mark paid here. The marketer gets an email confirmation
+              <div className="p-6 border-b border-gray-200 flex flex-col gap-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Payouts <span className="text-gray-500 font-normal">({payouts.rows.length})</span>
+                  </h2>
+                  <span className="inline-flex w-fit items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-amber-500/15 text-amber-800 border border-amber-500/30">
+                    {payouts.toPay.count === 0
+                      ? "Nothing to send right now"
+                      : `₦${Number(payouts.toPay.total).toLocaleString()} to send · ${payouts.toPay.count} transfer${payouts.toPay.count === 1 ? "" : "s"}`}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Everything owed to marketers and vendors in one place. Send the money to the account shown (bank
+                  transfer or the Paystack dashboard), then mark it paid. Marking paid, or rejecting, emails them
                   automatically.
                 </p>
+                <div className="flex flex-wrap gap-x-6 gap-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: "all", label: "All" },
+                      { id: "marketer", label: "Marketers" },
+                      { id: "vendor", label: "Vendors" },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => setPayoutTypeFilter(f.id)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
+                          payoutTypeFilter === f.id
+                            ? "bg-green-500/15 text-green-700 border-green-500/30"
+                            : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: "to_pay", label: "To pay" },
+                      { id: "paid", label: "Paid" },
+                      { id: "rejected", label: "Rejected" },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => setPayoutStatusFilter(f.id)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
+                          payoutStatusFilter === f.id
+                            ? "bg-green-500/15 text-green-700 border-green-500/30"
+                            : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              {payoutBatchesLoading ? (
+              {payoutsLoading ? (
                 <div className="p-10 text-center text-gray-500 text-sm">Loading…</div>
-              ) : payoutBatches.length === 0 ? (
+              ) : payouts.rows.length === 0 ? (
                 <EmptyState
                   icon={Wallet}
-                  title="No batches awaiting payment"
-                  message="Pending marketer payouts get frozen into a batch by the weekly cron job — nothing's due right now."
+                  title={payoutStatusFilter === "to_pay" ? "Nothing to pay right now" : "Nothing here yet"}
+                  message={
+                    payoutStatusFilter === "to_pay"
+                      ? "Marketer earnings are frozen into the list by the weekly job (or when a marketer asks to withdraw), and vendor withdrawals appear the moment they are requested."
+                      : "Payouts you have marked paid or rejected will be listed here."
+                  }
                 />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full sm:min-w-[900px] admin-table">
+                  <table className="w-full sm:min-w-[960px] admin-table">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Marketer</th>
-                        <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Bank Details</th>
-                        <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Total Owed</th>
-                        <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Actions</th>
+                        <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Who</th>
+                        <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Pay to</th>
+                        <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">Amount</th>
+                        <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">{payoutStatusFilter === "to_pay" ? "Waiting since" : "Details"}</th>
+                        <th className="text-left p-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">{payoutStatusFilter === "to_pay" ? "Actions" : "Status"}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {payoutBatches.map((b) => (
-                        <tr key={b.marketerId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td data-label="Marketer" data-stack="true" className="p-4">
-                            <p className="font-medium text-gray-900">{b.name}</p>
-                            <p className="text-xs text-gray-500">{b.email}</p>
+                      {payouts.rows.map((row) => (
+                        <tr key={row.rowId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                          <td data-label="Who" data-stack="true" className="p-4">
+                            <p className="font-medium text-gray-900">{row.party}</p>
+                            <p className="text-xs text-gray-500">{row.email}</p>
+                            <span
+                              className={`mt-1 inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                                row.kind === "marketer"
+                                  ? "bg-purple-500/10 text-purple-700 border-purple-500/30"
+                                  : "bg-blue-500/10 text-blue-700 border-blue-500/30"
+                              }`}
+                            >
+                              {row.kind === "marketer" ? "Marketer" : "Vendor"}
+                            </span>
                           </td>
-                          <td data-label="Bank Details" data-stack="true" className="p-4 text-sm text-gray-600">
-                            {b.hasPayoutDetails ? (
+                          <td data-label="Pay to" data-stack="true" className="p-4 text-sm text-gray-600">
+                            {row.hasBank ? (
                               <>
-                                <p>{b.bankName}</p>
-                                <p className="text-xs text-gray-400">
-                                  {b.accountNumber} — {b.accountName}
-                                </p>
+                                <p>{row.bank.bankName}</p>
+                                <p className="text-xs text-gray-500">{row.bank.accountName}</p>
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(row.bank.accountNumber, "Account number")}
+                                  className="mt-1 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-100 hover:bg-gray-200 text-xs font-mono text-gray-800 transition"
+                                  title="Copy account number"
+                                >
+                                  {row.bank.accountNumber}
+                                  <span className="text-[10px] font-sans text-gray-500">Copy</span>
+                                </button>
                               </>
                             ) : (
                               <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-500/15 text-red-600 border border-red-500/30">
@@ -1714,26 +1796,55 @@ const AdminDashboard = () => {
                               </span>
                             )}
                           </td>
-                          <td data-label="Total Owed" className="p-4 font-semibold text-gray-900">₦{Number(b.total).toLocaleString()}</td>
-                          <td data-label="Actions" data-stack="true" className="p-4">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                placeholder="Transfer ref (optional)"
-                                value={batchTransferRefDrafts[b.marketerId] || ""}
-                                onChange={(e) =>
-                                  setBatchTransferRefDrafts((prev) => ({ ...prev, [b.marketerId]: e.target.value }))
-                                }
-                                className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs w-36 focus:outline-none focus:ring-2 focus:ring-green-500/30"
-                              />
-                              <button
-                                onClick={() => markBatchPaid(b.marketerId)}
-                                disabled={markingBatchPaidId === b.marketerId}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition disabled:opacity-50"
+                          <td data-label="Amount" className="p-4">
+                            <p className="font-semibold text-gray-900">₦{Number(row.amount).toLocaleString()}</p>
+                            {row.kind === "marketer" && row.count > 1 && (
+                              <p className="text-xs text-gray-500">{row.count} referral payouts</p>
+                            )}
+                            {row.kind === "vendor" && <p className="text-xs text-gray-500">Points withdrawal</p>}
+                          </td>
+                          <td data-label={payoutStatusFilter === "to_pay" ? "Waiting since" : "Details"} data-stack="true" className="p-4 text-sm text-gray-500">
+                            <p>{new Date(row.date).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</p>
+                            {row.reference && <p className="text-xs text-gray-400">Ref: {row.reference}</p>}
+                            {row.reason && <p className="text-xs text-gray-500 mt-1">Reason: {row.reason}</p>}
+                          </td>
+                          <td data-label={payoutStatusFilter === "to_pay" ? "Actions" : "Status"} data-stack="true" className="p-4">
+                            {payoutStatusFilter === "to_pay" ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Transfer ref"
+                                  aria-label="Transfer reference (optional)"
+                                  value={payoutRefDrafts[row.rowId] || ""}
+                                  onChange={(e) => setPayoutRefDrafts((prev) => ({ ...prev, [row.rowId]: e.target.value }))}
+                                  className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs w-32 focus:outline-none focus:ring-2 focus:ring-green-500/30"
+                                />
+                                <button
+                                  onClick={() => markPayoutPaid(row)}
+                                  disabled={payoutBusyId === row.rowId}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition disabled:opacity-50"
+                                >
+                                  {payoutBusyId === row.rowId ? "Working…" : "Mark paid"}
+                                </button>
+                                <button
+                                  onClick={() => rejectPayout(row)}
+                                  disabled={payoutBusyId === row.rowId}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-300 text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <span
+                                className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                                  row.status === "paid"
+                                    ? "bg-green-500/15 text-green-700 border-green-500/30"
+                                    : "bg-red-500/15 text-red-600 border-red-500/30"
+                                }`}
                               >
-                                {markingBatchPaidId === b.marketerId ? "Marking…" : "Mark paid"}
-                              </button>
-                            </div>
+                                {row.status === "paid" ? "Paid" : "Rejected"}
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1824,23 +1935,18 @@ const AdminDashboard = () => {
                             {new Date(t.date).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
                           </td>
                           <td data-label="Actions" className="p-4">
-                            {t.kind === "points" && t.pointsType === "withdrawn_cash" && t.status === "pending" && (
-                              <div className="flex flex-wrap gap-2">
-                                <button
-                                  onClick={() => markPointsWithdrawalPaid(t.id)}
-                                  disabled={markingPaidId === t.id}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition disabled:opacity-50"
-                                >
-                                  {markingPaidId === t.id ? "Working…" : "Mark paid"}
-                                </button>
-                                <button
-                                  onClick={() => rejectPointsWithdrawal(t)}
-                                  disabled={markingPaidId === t.id}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-300 text-red-600 hover:bg-red-50 transition disabled:opacity-50"
-                                >
-                                  Reject
-                                </button>
-                              </div>
+                            {((t.kind === "points" && t.pointsType === "withdrawn_cash" && t.status === "pending") ||
+                              (t.kind === "marketer_payout" && t.status === "batched")) && (
+                              <button
+                                onClick={() => {
+                                  setPayoutTypeFilter(t.kind === "marketer_payout" ? "marketer" : "vendor");
+                                  setPayoutStatusFilter("to_pay");
+                                  setActiveTab("payouts");
+                                }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-300 text-green-700 hover:bg-green-50 transition"
+                              >
+                                Pay in Payouts →
+                              </button>
                             )}
                           </td>
                         </tr>

@@ -33,7 +33,7 @@ import {
   deleteCustomerAdmin,
   adminVerifyCustomerEmail,
 } from "../controllers/adminController.js";
-import { getPayoutBatches, markPayoutBatchPaid } from "../controllers/payoutBatchController.js";
+import { getPayoutBatches, markPayoutBatchPaid, getPayouts, rejectMarketerPayouts } from "../controllers/payoutBatchController.js";
 import {
   getAudienceCounts,
   sendTestCampaign,
@@ -94,6 +94,9 @@ router.patch("/vendors/:id/review", reviewVendor);
 // Marketer payout batches (weekly, frozen by the cron job — see cronRoutes.js)
 router.get("/payout-batches", getPayoutBatches);
 router.post("/payout-batches/:marketerId/mark-paid", markPayoutBatchPaid);
+router.post("/payout-batches/:marketerId/reject", rejectMarketerPayouts);
+// One list of everything to pay, marketers and vendors together (the Payouts tab)
+router.get("/payouts", getPayouts);
 
 // Platform settings (global kill switches)
 router.get("/settings", getPlatformSettings);

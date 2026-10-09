@@ -13,7 +13,7 @@ const MarketerPayoutSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "batched", "paid", "failed"],
+      enum: ["pending", "batched", "paid", "failed", "rejected"],
       default: "pending",
     },
     // Set when the weekly batch job picks this up
@@ -22,6 +22,11 @@ const MarketerPayoutSchema = new mongoose.Schema(
     // Filled in once the transfer mechanism (Paystack transfers vs. other) is decided
     transferReference: { type: String, default: "" },
     failureReason: { type: String, default: "" },
+    // Set when an admin declines the payout (e.g. suspected self-referral or
+    // fraud). The row is kept, so the one-payout-per-referral rule still holds
+    // and the marketer can see what happened and why.
+    rejectedAt: { type: Date, default: null },
+    rejectionReason: { type: String, default: "" },
   },
   { timestamps: true }
 );

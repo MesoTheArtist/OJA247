@@ -150,8 +150,8 @@ export async function sendMarketerWithdrawalRequestEmail({ marketerName, markete
       <div style="background:#f0fdf4; border-radius:10px; padding:18px; text-align:center; margin:20px 0;">
         <p style="margin:0; font-size:28px; font-weight:800; color:#16a34a;">₦${amount.toLocaleString()}</p>
       </div>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Marketer payouts are paid by hand for now — please review and pay it in the admin panel's payout batches, then mark it paid.</p>
-      ${button("Review payout batches", `${SITE_URL}/admin`)}
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Marketer payouts are paid by hand for now — please review and pay it in the admin panel's Payouts tab, then mark it paid.</p>
+      ${button("Review payouts", `${SITE_URL}/admin`)}
       `,
       { preheader: `${marketerName} requested a ₦${amount.toLocaleString()} withdrawal` }
     ),
@@ -169,7 +169,7 @@ export async function sendBusinessPointsWithdrawalRequestEmail({ businessName, b
       <div style="background:#f0fdf4; border-radius:10px; padding:18px; text-align:center; margin:20px 0;">
         <p style="margin:0; font-size:28px; font-weight:800; color:#16a34a;">₦${amount.toLocaleString()}</p>
       </div>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">This is paid out to the vendor's existing verified payout account — review and mark it paid in the admin panel's transactions tab.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">This is paid out to the vendor's existing verified payout account — review and mark it paid in the admin panel's Payouts tab.</p>
       ${button("Review transactions", `${SITE_URL}/admin`)}
       `,
       { preheader: `${businessName} requested a ₦${amount.toLocaleString()} points withdrawal` }
@@ -1031,6 +1031,22 @@ export async function sendPointsWithdrawalRejectedEmail({ to, businessName, amou
        ${small("Fix the issue mentioned above (for example your payout account details) and you can request the withdrawal again, or use your points toward your subscription.")}
        ${button("Open my dashboard", `${SITE_URL}/dashboard`)}`,
       { preheader: `Your ${NAIRA(amount)} in points is back in your balance` }
+    ),
+  });
+}
+
+// Marketer: an admin declined a payout that was waiting to be paid.
+export async function sendMarketerPayoutRejectedEmail({ to, name, amount, reason }) {
+  return sendEmail({
+    to,
+    subject: `Your ${NAIRA(amount)} payout wasn't approved`,
+    html: layout(
+      `${h1("Your payout wasn't approved")}
+       ${p(`Hi ${esc(name)}, we couldn't approve your payout of <strong>${NAIRA(amount)}</strong>.`)}
+       ${reason ? `<div style="background:#f9fafb; border-left:4px solid #9ca3af; border-radius:6px; padding:12px 16px; margin:16px 0; color:#374151; font-size:14px; line-height:1.6;"><strong>Reason:</strong> ${esc(reason)}</div>` : ""}
+       ${small("If you think this is a mistake, reply to this email and we'll look into it. Your other earnings are not affected.")}
+       ${button("Open my dashboard", `${SITE_URL}/marketer-dashboard`)}`,
+      { preheader: `Your ${NAIRA(amount)} payout wasn't approved` }
     ),
   });
 }
