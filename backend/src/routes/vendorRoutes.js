@@ -2,7 +2,7 @@ import { bankChangeLimiter } from "../middleware/rateLimiters.js";
 import express from "express";
 import multer from "multer";
 import path from "path";
-import { getBanks, resolveAccount, onboardVendor, getMyVendor, acknowledgeVendorNotification, blockCustomer, unblockCustomer } from "../controllers/vendorController.js";
+import { getBanks, resolveAccount, onboardVendor, getMyVendor, acknowledgeVendorNotification, blockCustomer, unblockCustomer, getSellerTermsStatus, acceptSellerTerms } from "../controllers/vendorController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -39,6 +39,8 @@ router.get("/banks", getBanks);
 router.get("/resolve-account", resolveAccount);
 router.get("/me", protect, getMyVendor);
 router.patch("/me/seen", protect, acknowledgeVendorNotification);
+router.get("/me/terms", protect, getSellerTermsStatus);
+router.post("/me/terms/accept", protect, acceptSellerTerms);
 router.post("/me/blocked-customers", protect, blockCustomer);
 router.delete("/me/blocked-customers", protect, unblockCustomer);
 router.post("/", protect, bankChangeLimiter, uploadFields, onboardVendor);

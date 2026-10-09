@@ -28,6 +28,8 @@ const BusinessForm = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [step, setStep] = useState(1);
+  // Must be ticked on the last step before a store can be registered.
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const cardRef = useRef(null);
 
   const [formData, setFormData] = useState({
@@ -188,6 +190,11 @@ const BusinessForm = () => {
       }
     }
 
+    if (!acceptedTerms) {
+      setError("Please tick the box to accept the Seller Terms and the Prohibited Items list.");
+      return;
+    }
+
     setLoading(true);
 
     const businessData = {
@@ -207,6 +214,7 @@ const BusinessForm = () => {
       formData.password,
       businessData,
       formData.referralCodeUsed.trim() || null,
+      acceptedTerms,
     );
 
     if (result.success) {
@@ -606,6 +614,28 @@ const BusinessForm = () => {
               )}
                 </div>
               </div>
+            )}
+
+            {step === STEPS.length && (
+              <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                />
+                <span>
+                  I have read and accept the{" "}
+                  <a href="/vendor-terms" target="_blank" rel="noopener noreferrer" className="text-green-700 underline font-medium">
+                    Seller Terms
+                  </a>{" "}
+                  and the{" "}
+                  <a href="/prohibited-items" target="_blank" rel="noopener noreferrer" className="text-green-700 underline font-medium">
+                    Prohibited Items list
+                  </a>
+                  . I understand that customers pay my bank account directly, and that OJA247 does not hold or refund that money.
+                </span>
+              </label>
             )}
 
             {/* Navigation. Both the Continue and Register buttons submit the

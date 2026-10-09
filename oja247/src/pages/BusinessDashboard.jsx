@@ -6,6 +6,7 @@ import ProductList from "../components/ProductList.jsx";
 import VendorOnboardingForm from "../components/Vendoronboardingform.jsx";
 import SubscriptionTab from "../components/SubscriptionTab.jsx";
 import AccountAlertsPopup from "../components/AccountAlertsPopup.jsx";
+import SellerTermsPrompt from "../components/SellerTermsPrompt.jsx";
 import ReferralPointsTab from "../components/ReferralPointsTab.jsx";
 import VendorReviewsTab from "../components/VendorReviewsTab.jsx";
 import VendorDisputesTab from "../components/VendorDisputesTab.jsx";
@@ -444,6 +445,7 @@ const BusinessDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-yellow-50" style={{ overflowX: "clip" }}>
+      <SellerTermsPrompt />
       <AccountAlertsPopup
         businessId={businessId}
         needsVerification={needsVerification}

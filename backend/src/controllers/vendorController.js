@@ -2,6 +2,7 @@ import axios from "axios";
 import cloudinary from "../config/cloudinaryConfig.js";
 import Vendor from "../models/Vendor.js";
 import User from "../models/User.js";
+import { SELLER_TERMS_VERSION } from "../config/sellerTerms.js";
 import Business from "../models/Business.js";
 import { sendPayoutHoldEmail, sendBankDetailsUpdatedEmail } from "../services/emailService.js";
 import { verifyNin, ninNameMatchesAccount } from "../services/ninVerificationService.js";
@@ -519,5 +520,43 @@ export const unblockCustomer = async (req, res) => {
   } catch (error) {
     console.error("Unblock customer failed:", error.message);
     return res.status(500).json({ status: false, message: "Could not unblock that customer." });
+  }
+};
+
+// GET /api/vendors/me/terms
+// Has this seller accepted the CURRENT version of the Seller Terms? Anyone who
+// isn't a seller (admins) is never asked.
+export const getSellerTermsStatus = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("role sellerTermsVersion sellerTermsAcceptedAt");
+    if (!user) return res.status(404).json({ status: false, message: "Account not found." });
+    const accepted = user.role !== "owner" || user.sellerTermsVersion === SELLER_TERMS_VERSION;
+    return res.json({
+      status: true,
+      data: { accepted, acceptedVersion: user.sellerTermsVersion || "", currentVersion: SELLER_TERMS_VERSION },
+    });
+  } catch (error) {
+    console.error("Seller terms status failed:", error.message);
+    return res.status(500).json({ status: false, message: "Could not check the Seller Terms." });
+  }
+};
+
+// POST /api/vendors/me/terms/accept
+// Records that this seller accepted the current Seller Terms, with the date.
+export const acceptSellerTerms = async (req, res) => {
+  try {
+    if (req.body?.accepted !== true) {
+      return res.status(400).json({ status: false, message: "Please confirm that you accept the Seller Terms." });
+    }
+    const user = await User.findOneAndUpdate(
+      { _id: req.user.id, role: "owner" },
+      { sellerTermsAcceptedAt: new Date(), sellerTermsVersion: SELLER_TERMS_VERSION },
+      { new: true }
+    ).select("sellerTermsVersion");
+    if (!user) return res.status(404).json({ status: false, message: "Seller account not found." });
+    return res.json({ status: true, data: { accepted: true, acceptedVersion: user.sellerTermsVersion } });
+  } catch (error) {
+    console.error("Accept seller terms failed:", error.message);
+    return res.status(500).json({ status: false, message: "Could not save your acceptance." });
   }
 };

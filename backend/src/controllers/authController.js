@@ -1,3 +1,4 @@
+import { SELLER_TERMS_VERSION } from "../config/sellerTerms.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { authenticator } from "otplib";
@@ -31,9 +32,10 @@ const generatePreAuthToken = (id) => {
 // Register new business owner
 export const register = async (req, res) => {
   try {
-    console.log("Register request received:", req.body);
+    // Never log the whole body: it contains the password.
+    console.log("Register request received for:", req.body?.email);
 
-    const { email, password, businessData, referralCodeUsed } = req.body;
+    const { email, password, businessData, referralCodeUsed, acceptedSellerTerms } = req.body;
 
     if (!email || !password || !businessData) {
       return res.status(400).json({
@@ -44,6 +46,14 @@ export const register = async (req, res) => {
     if (!businessData.name || !businessData.category || !businessData.location || !businessData.contact) {
       return res.status(400).json({
         message: "Registration failed: business name, category, location, and contact are required."
+      });
+    }
+
+    // Sellers must agree to the Seller Terms (and the prohibited items list)
+    // to open a store. The acceptance and its version are saved on the user.
+    if (acceptedSellerTerms !== true) {
+      return res.status(400).json({
+        message: "Registration failed: please accept the Seller Terms to open a store.",
       });
     }
 
@@ -96,7 +106,9 @@ export const register = async (req, res) => {
     const user = new User({
       email: email.toLowerCase().trim(),
       password,
-      businessId: savedBusiness._id
+      businessId: savedBusiness._id,
+      sellerTermsAcceptedAt: new Date(),
+      sellerTermsVersion: SELLER_TERMS_VERSION,
     });
 
     const savedUser = await user.save();

@@ -40,6 +40,10 @@ const UserSchema = new mongoose.Schema(
     // signal for matching guest orders (email is the primary match).
     fullName: { type: String, default: "" },
     phone: { type: String, default: "" },
+    // Which version of the Seller Terms this seller accepted, and when.
+    // Empty until they accept; see config/sellerTerms.js.
+    sellerTermsAcceptedAt: { type: Date, default: null },
+    sellerTermsVersion: { type: String, default: "" },
     banned: {
       type: Boolean,
       default: false
