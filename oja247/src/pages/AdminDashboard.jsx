@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
 import CustomerAdminTab from "../components/CustomerAdminTab.jsx";
 import CampaignAdminTab from "../components/CampaignAdminTab.jsx";
+import WaitingOrdersTab from "../components/WaitingOrdersTab.jsx";
 import { useDialog } from "../components/DialogProvider";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
 import {
@@ -57,6 +58,7 @@ const NAV_ITEMS = [
   { id: "businesses", label: "Businesses", icon: Store },
   { id: "products", label: "Products", icon: Package },
   { id: "orders", label: "Orders", icon: ShoppingCart },
+  { id: "waiting-orders", label: "Waiting Orders", icon: Clock },
   { id: "users", label: "Users", icon: Users },
   { id: "customers", label: "Customers", icon: UserCircle },
   { id: "vendors", label: "Vendor Verification", icon: ShieldCheck },
@@ -1386,6 +1388,8 @@ const AdminDashboard = () => {
           {activeTab === "customers" && <CustomerAdminTab showToast={showToast} />}
 
           {activeTab === "emails" && <CampaignAdminTab showToast={showToast} />}
+
+          {activeTab === "waiting-orders" && <WaitingOrdersTab showToast={showToast} />}
 
           {activeTab === "vendors" && (
             <div className="bg-white border border-gray-200 shadow-sm rounded-2xl overflow-hidden">

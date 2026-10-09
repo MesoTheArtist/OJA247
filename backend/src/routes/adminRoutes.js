@@ -5,6 +5,7 @@ import {
   getAllUsers,
   getStats,
   getAllOrders,
+  getWaitingOrders,
   toggleFeatured,
   deleteBusiness,
   toggleUserBan,
@@ -58,6 +59,7 @@ router.use(requireAdmin);
 
 // Admin routes
 router.get("/users", getAllUsers);
+router.get("/waiting-orders", getWaitingOrders);
 
 // Analytics tab (charts, subscription breakdown, leaderboard, activity feed)
 router.get("/analytics/growth", getGrowthAnalytics);

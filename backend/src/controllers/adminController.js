@@ -1195,3 +1195,123 @@ export const getFlaggedVendors = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// GET /api/admin/waiting-orders
+// Bank-transfer orders still waiting for the vendor to confirm or reject the
+// payment, oldest first, plus a per-vendor summary (how many are waiting, how
+// long, how fast they usually answer) to help decide who to follow up or ban.
+export const getWaitingOrders = async (req, res) => {
+  try {
+    const DAY = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const waiting = await Order.find({
+      paymentMethod: "bank_transfer",
+      status: "awaiting_confirmation",
+    })
+      .sort({ createdAt: 1 })
+      .limit(300)
+      .select("reference total customer createdAt vendors lastVendorReminderAt adminNonComplianceAlertedAt paymentReceipts duplicateReceiptOf")
+      .lean();
+
+    const businessIds = [...new Set(waiting.flatMap((o) => (o.vendors || []).map((v) => String(v.businessId))))];
+
+    const [bannedOwners, disputes, history] = await Promise.all([
+      User.find({ businessId: { $in: businessIds }, banned: true }).select("businessId").lean(),
+      Dispute.find({
+        orderId: { $in: waiting.map((o) => o._id) },
+        reason: "payment_not_confirmed",
+        status: { $in: ["open", "escalated"] },
+      })
+        .select("orderId")
+        .lean(),
+      // How fast each vendor has answered recently: order placed -> payment confirmed.
+      Order.aggregate([
+        {
+          $match: {
+            paymentMethod: "bank_transfer",
+            paymentConfirmedAt: { $ne: null },
+            createdAt: { $gte: new Date(now - 90 * DAY) },
+          },
+        },
+        { $unwind: "$vendors" },
+        {
+          $group: {
+            _id: "$vendors.businessId",
+            confirmed: { $sum: 1 },
+            avgMs: { $avg: { $subtract: ["$paymentConfirmedAt", "$createdAt"] } },
+          },
+        },
+      ]),
+    ]);
+
+    const bannedSet = new Set(bannedOwners.map((u) => String(u.businessId)));
+    const disputedSet = new Set(disputes.map((d) => String(d.orderId)));
+    const historyByBusiness = new Map(history.map((h) => [String(h._id), h]));
+
+    const orders = waiting.map((o) => {
+      const vendor = o.vendors?.[0] || {};
+      const lastReceiptAt = (o.paymentReceipts || []).reduce(
+        (latest, r) => Math.max(latest, new Date(r.uploadedAt || 0).getTime()),
+        0
+      );
+      const waitingSince = Math.max(new Date(o.createdAt).getTime(), lastReceiptAt);
+      return {
+        _id: o._id,
+        reference: o.reference,
+        total: o.total,
+        customerName: o.customer?.fullName || "",
+        customerEmail: o.customer?.email || "",
+        businessId: String(vendor.businessId || ""),
+        businessName: vendor.businessName || "Unknown store",
+        daysWaiting: Math.floor((now - waitingSince) / DAY),
+        waitingSince: new Date(waitingSince),
+        lastRemindedAt: o.lastVendorReminderAt || null,
+        adminAlerted: Boolean(o.adminNonComplianceAlertedAt),
+        vendorBanned: bannedSet.has(String(vendor.businessId)),
+        disputeOpen: disputedSet.has(String(o._id)),
+        duplicateReceipt: Boolean(o.duplicateReceiptOf),
+      };
+    });
+
+    const byVendor = new Map();
+    for (const o of orders) {
+      const row = byVendor.get(o.businessId) || {
+        businessId: o.businessId,
+        businessName: o.businessName,
+        waiting: 0,
+        over3Days: 0,
+        oldestDays: 0,
+        vendorBanned: o.vendorBanned,
+      };
+      row.waiting += 1;
+      if (o.daysWaiting >= 3) row.over3Days += 1;
+      row.oldestDays = Math.max(row.oldestDays, o.daysWaiting);
+      byVendor.set(o.businessId, row);
+    }
+    const vendors = [...byVendor.values()]
+      .map((v) => {
+        const h = historyByBusiness.get(v.businessId);
+        return {
+          ...v,
+          confirmedLast90Days: h?.confirmed || 0,
+          avgConfirmHours: h ? Math.round((h.avgMs / (60 * 60 * 1000)) * 10) / 10 : null,
+        };
+      })
+      .sort((a, b) => b.over3Days - a.over3Days || b.waiting - a.waiting || b.oldestDays - a.oldestDays);
+
+    res.json({
+      summary: {
+        waitingCount: orders.length,
+        over3Days: orders.filter((o) => o.daysWaiting >= 3).length,
+        vendorsInvolved: vendors.length,
+        bannedVendorOrders: orders.filter((o) => o.vendorBanned).length,
+      },
+      orders,
+      vendors,
+    });
+  } catch (error) {
+    console.error("Waiting orders failed:", error);
+    res.status(500).json({ message: "Could not load waiting orders." });
+  }
+};
