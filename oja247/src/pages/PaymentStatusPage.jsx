@@ -6,6 +6,7 @@ import Loader from "../components/Loader";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
 import Logo from "../assets/OJA247 VX1.png";
 import { useAuth } from "../context/AuthContext";
+import { useDialog } from "../components/DialogProvider";
 
 function PaymentStatusPage() {
   const [searchParams] = useSearchParams();
@@ -14,6 +15,8 @@ function PaymentStatusPage() {
   const [loading, setLoading] = useState(true);
   const [hidePrompt, setHidePrompt] = useState(false);
   const { isCustomer, loading: authLoading } = useAuth();
+  const { confirm, prompt, notify } = useDialog();
+  const [cancelling, setCancelling] = useState(false);
 
   const showLoader = useMinimumLoadingTime(loading);
 
@@ -47,6 +50,47 @@ function PaymentStatusPage() {
     fetchOrder();
   }, [reference]);
 
+  // The customer cancels an order the seller hasn't confirmed yet. The email
+  // must match the one on the order (asked for here if it isn't in the link).
+  const cancelOrder = async () => {
+    const ok = await confirm({
+      title: "Cancel this order?",
+      message:
+        "If you already sent money to the seller, OJA247 can't return it, because it went straight to their bank account. You would need to ask the seller for a refund.",
+      confirmLabel: "Yes, cancel the order",
+      cancelLabel: "Keep my order",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    let email = (confirmEmail || "").trim();
+    if (!email) {
+      const typed = await prompt({
+        title: "Confirm your email",
+        message: "Enter the email address you used for this order.",
+        placeholder: "you@example.com",
+        confirmLabel: "Cancel order",
+      });
+      if (!typed) return;
+      email = typed.trim();
+    }
+
+    setCancelling(true);
+    try {
+      await axiosInstance.post(`/api/orders/${reference}/cancel`, { email });
+      const refreshed = await axiosInstance.get(`/api/orders/reference/${reference}`);
+      setOrder(refreshed.data.order);
+    } catch (error) {
+      await notify({
+        title: "Couldn't cancel the order",
+        message: error.response?.data?.message || "Something went wrong. Please try again.",
+        tone: "error",
+      });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   // Bank-transfer orders (paid straight to the seller) can be waiting for the
   // seller to confirm, or turned down. Everything else keeps the old behaviour.
   const isTransfer = order?.paymentMethod === "bank_transfer" || status === "awaiting" || status === "rejected";
@@ -55,6 +99,8 @@ function PaymentStatusPage() {
       ? "awaiting"
       : order.status === "payment_rejected"
       ? "rejected"
+      : order.status === "cancelled"
+      ? "cancelled"
       : "success"
     : status === "success"
     ? "success"
@@ -63,12 +109,14 @@ function PaymentStatusPage() {
   const isSuccess = mode === "success";
   const isAwaiting = mode === "awaiting";
   const isRejected = mode === "rejected";
+  const isCancelled = mode === "cancelled";
   const lastRejection = order?.paymentRejections?.[order.paymentRejections.length - 1];
   const sellerName = order?.vendors?.[0]?.businessName || "the seller";
 
   const statusLabels = {
     awaiting_confirmation: "Waiting for seller to confirm payment",
     payment_rejected: "Payment not confirmed",
+    cancelled: "Cancelled",
   };
 
   // The WhatsApp message the customer sends the seller: everything the seller
@@ -280,6 +328,8 @@ function PaymentStatusPage() {
                 ? "Order received"
                 : isRejected
                 ? "Payment not confirmed"
+                : isCancelled
+                ? "Order cancelled"
                 : "Payment didn't go through"}
             </motion.h1>
 
@@ -295,6 +345,8 @@ function PaymentStatusPage() {
                 ? `${sellerName} will check their bank and confirm your payment. We will email you as soon as they do.`
                 : isRejected
                 ? `${sellerName} could not confirm your payment. You can upload a new receipt below.`
+                : isCancelled
+                ? "This order was cancelled. If you already sent money to the seller, ask them for a refund. OJA247 can't return it for you."
                 : "No charge was made. You can try again, or reach out if this keeps happening."}
             </motion.p>
 
@@ -364,6 +416,19 @@ function PaymentStatusPage() {
                   Tip: when WhatsApp opens, tap the attach (paperclip) icon and add a photo or PDF of your payment
                   receipt, so the seller can confirm faster.
                 </p>
+              </div>
+            )}
+
+            {(isAwaiting || isRejected) && order && (
+              <div className="mb-6">
+                <button
+                  type="button"
+                  onClick={cancelOrder}
+                  disabled={cancelling}
+                  className="inline-flex items-center min-h-11 text-sm font-semibold text-gray-500 hover:text-red-600 underline disabled:opacity-60"
+                >
+                  {cancelling ? "Cancelling…" : "Cancel this order"}
+                </button>
               </div>
             )}
 

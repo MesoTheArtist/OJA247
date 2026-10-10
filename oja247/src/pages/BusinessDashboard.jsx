@@ -204,6 +204,19 @@ const BusinessDashboard = () => {
     try {
       const res = await axiosInstance.patch(`/api/orders/${order.reference}/payment/confirm`);
       mergeOrder(res.data.order);
+
+      // The order took more stock than was left for some item. Stock is now 0
+      // for it, so the vendor needs to know to sort it out with the customer.
+      const oversold = res.data.stockWarnings || [];
+      if (oversold.length > 0) {
+        await notify({
+          title: "You may not have enough stock",
+          message: oversold
+            .map((w) => `${w.name}: the order needed ${w.wanted} but you only had ${w.hadLeft} left. Its stock is now 0.`)
+            .join(" ") + " Please contact the customer if you can't supply the full amount.",
+          tone: "error",
+        });
+      }
     } catch (error) {
       await notify({
         title: "Couldn't confirm the payment",
@@ -789,6 +802,7 @@ const BusinessDashboard = () => {
                               {{
                                 awaiting_confirmation: "Needs your confirmation",
                                 payment_rejected: "Rejected",
+                                cancelled: "Cancelled by customer",
                               }[order.paymentStatus] || order.paymentStatus}
                             </span>
 
@@ -824,7 +838,31 @@ const BusinessDashboard = () => {
                                     >
                                       View receipt{(order.paymentReceipts || []).length > 1 ? ` ${idx + 1}` : ""}
                                     </a>
+                                  ) : receipt.purgedAt ? (
+                                    <p key={receipt.publicId} className="text-xs text-gray-400">
+                                      Receipt{(order.paymentReceipts || []).length > 1 ? ` ${idx + 1}` : ""} deleted after the retention period
+                                    </p>
                                   ) : null
+                                )}
+
+                                {order.paymentStatus === "awaiting_confirmation" && (order.stockShort || []).length > 0 && (
+                                  <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                                    {order.stockShort
+                                      .map((s) =>
+                                        s.hasLeft === 0
+                                          ? `${s.name} is sold out, but this order needs ${s.needs}.`
+                                          : `Only ${s.hasLeft} left of ${s.name}, but this order needs ${s.needs}.`
+                                      )
+                                      .join(" ")}{" "}
+                                    If you can't supply it, reject the payment and tell the customer why.
+                                  </p>
+                                )}
+
+                                {order.paymentStatus === "cancelled" && (
+                                  <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5">
+                                    The customer cancelled this order. If their money reached your account, please refund them.
+                                    OJA247 can't do that for you.
+                                  </p>
                                 )}
 
                                 {order.paymentStatus === "awaiting_confirmation" && (
