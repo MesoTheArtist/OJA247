@@ -67,7 +67,10 @@ const configuredFrontendOrigins = (process.env.FRONTEND_URL || "")
   .filter(Boolean);
 const allowedFrontendOrigins = new Set([
   "https://oja247.store",
+  "https://www.oja247.store",
+  "https://oja247.vercel.app",
   "http://localhost:5173",
+  "http://127.0.0.1:5173",
   ...configuredFrontendOrigins,
 ]);
 
@@ -88,7 +91,8 @@ app.use((req, res, next) => {
   const unsafeMethod = !["GET", "HEAD", "OPTIONS"].includes(req.method);
   const origin = req.headers.origin;
   if (unsafeMethod && origin && !allowedFrontendOrigins.has(origin)) {
-    return res.status(403).json({ message: "Origin is not allowed" });
+    console.warn(`Blocked request from unconfigured frontend origin: ${origin}`);
+    return res.status(403).json({ message: `Origin is not allowed: ${origin}` });
   }
   return next();
 });
