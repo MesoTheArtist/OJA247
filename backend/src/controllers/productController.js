@@ -30,10 +30,6 @@ export const getProductsByBusiness = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(businessId)) {
       return res.status(400).json({ message: "Invalid business ID" });
     }
-    if (!canManageBusiness(req.user, businessId)) {
-      return res.status(403).json({ message: "Not authorized to manage this business's products." });
-    }
-
     const products = await Product.find({ businessId })
       .populate("businessId", "name logo location deliveryFeeInState deliveryFeeOutState")
       .sort({ createdAt: -1 });
