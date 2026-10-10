@@ -265,7 +265,7 @@ const BusinessForm = () => {
                       disabled={!done}
                       aria-label={done ? `Back to step ${s.n}: ${s.label}` : `Step ${s.n}: ${s.label}`}
                       aria-current={isCurrent ? "step" : undefined}
-                      className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold transition ${
+                      className={`relative after:absolute after:-inset-1.5 after:content-[''] w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold transition ${
                         done
                           ? "bg-green-600 text-white hover:bg-green-700"
                           : isCurrent
@@ -332,7 +332,7 @@ const BusinessForm = () => {
                       <button
                         type="button"
                         onClick={() => setShowPassword((prev) => !prev)}
-                        className="absolute right-0 top-1/2 -translate-y-1/2 p-3 text-gray-500 hover:text-gray-700"
+                        className="absolute right-0 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-11 min-h-11 text-gray-500 hover:text-gray-700"
                         aria-label={showPassword ? "Hide password" : "Show password"}
                         tabIndex={-1}
                       >
@@ -357,7 +357,7 @@ const BusinessForm = () => {
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword((prev) => !prev)}
-                        className="absolute right-0 top-1/2 -translate-y-1/2 p-3 text-gray-500 hover:text-gray-700"
+                        className="absolute right-0 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-11 min-h-11 text-gray-500 hover:text-gray-700"
                         aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                         tabIndex={-1}
                       >
@@ -695,7 +695,7 @@ const BusinessForm = () => {
                   <button
                     type="button"
                     onClick={() => navigate("/login")}
-                    className="py-2 -my-2 text-green-600 font-semibold hover:text-green-700"
+                    className="min-h-11 py-3 -my-3 text-green-600 font-semibold hover:text-green-700"
                   >
                     Login here
                   </button>

@@ -33,7 +33,7 @@ function CartPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Your Cart</h1>
           <button
             onClick={clearCart}
-            className="text-sm text-red-600 hover:text-red-700 font-medium inline-block py-2 -my-2"
+            className="text-sm text-red-600 hover:text-red-700 font-medium inline-block min-h-11 py-3 -my-3"
           >
             Clear cart
           </button>
@@ -70,14 +70,14 @@ function CartPage() {
                     <div className="inline-flex items-center border border-gray-200 rounded-lg overflow-hidden">
                       <button
                         onClick={() => updateQuantity(item._id, -1)}
-                        className="px-3 py-2 text-lg text-gray-700 hover:bg-gray-100"
+                        className="px-3 py-2 min-w-11 text-lg text-gray-700 hover:bg-gray-100"
                       >
                         −
                       </button>
                       <span className="min-w-10 text-center text-sm font-medium">{item.quantity}</span>
                       <button
                         onClick={() => updateQuantity(item._id, 1)}
-                        className="px-3 py-2 text-lg text-gray-700 hover:bg-gray-100"
+                        className="px-3 py-2 min-w-11 text-lg text-gray-700 hover:bg-gray-100"
                       >
                         +
                       </button>

@@ -287,7 +287,7 @@ const LoginPage = () => {
                     setTotpCode('');
                     setTotpError('');
                   }}
-                  className="w-full py-2 -my-2 text-sm text-gray-500 hover:text-gray-700 transition"
+                  className="w-full min-h-11 py-3 -my-3 text-sm text-gray-500 hover:text-gray-700 transition"
                 >
                   ← Back to login
                 </button>
@@ -350,7 +350,7 @@ const LoginPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 p-3 text-gray-400 hover:text-gray-600"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-11 min-h-11 text-gray-400 hover:text-gray-600"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -359,7 +359,7 @@ const LoginPage = () => {
             </motion.div>
 
             <div className="text-right -mt-2">
-              <Link to="/forgot-password" className="text-sm text-green-600 hover:text-green-700 font-medium inline-block py-2 -my-2">
+              <Link to="/forgot-password" className="text-sm text-green-600 hover:text-green-700 font-medium inline-block min-h-11 py-3 -my-3">
                 Forgot password?
               </Link>
             </div>
@@ -415,14 +415,14 @@ const LoginPage = () => {
                   Don't have an account?{' '}
                   <Link
                     to="/business-form"
-                    className="text-green-600 font-semibold hover:text-green-700 transition inline-block py-2 -my-2"
+                    className="text-green-600 font-semibold hover:text-green-700 transition inline-block min-h-11 py-3 -my-3"
                   >
                     Register your business
                   </Link>
                   {' '}or{' '}
                   <Link
                     to="/register-marketer"
-                    className="text-green-600 font-semibold hover:text-green-700 transition inline-block py-2 -my-2"
+                    className="text-green-600 font-semibold hover:text-green-700 transition inline-block min-h-11 py-3 -my-3"
                   >
                     register as a marketer
                   </Link>
@@ -437,7 +437,7 @@ const LoginPage = () => {
               >
                 <Link
                   to="/"
-                  className="text-sm text-gray-500 hover:text-gray-700 transition inline-block py-2 -my-2"
+                  className="text-sm text-gray-500 hover:text-gray-700 transition inline-block min-h-11 py-3 -my-3"
                 >
                   ← Back to Home
                 </Link>

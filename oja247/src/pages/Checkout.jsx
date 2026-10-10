@@ -266,7 +266,7 @@ function Checkout() {
       <div className="max-w-6xl mx-auto">
         <button
           onClick={() => (step === "payment" ? setStep("details") : navigate("/cart"))}
-          className="mb-4 -mt-2 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
+          className="mb-3 -mt-3 py-3 text-sm font-medium text-gray-600 hover:text-gray-800"
         >
           {step === "payment" ? "← Back to your details" : "← Back to cart"}
         </button>

@@ -451,7 +451,7 @@ const LandingPage = () => {
                 type="submit"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="m-1.5 sm:m-2 px-4 sm:px-8 py-2 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-full shadow-lg hover:shadow-xl transition flex-shrink-0"
+                className="m-1.5 sm:m-2 px-4 sm:px-8 py-2 sm:py-3 min-h-11 text-sm sm:text-base bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-full shadow-lg hover:shadow-xl transition flex-shrink-0"
               >
                 Search
               </motion.button>
@@ -498,7 +498,7 @@ const LandingPage = () => {
           animate={{ opacity: 1 }}
           transition={{ delay: 1.6 }}
           onClick={() => navigate("/join")}
-          className="relative z-10 block mx-auto mt-3 py-2 text-sm text-gray-500 hover:text-gray-700 underline underline-offset-2 transition"
+          className="relative z-10 block mx-auto mt-2 py-3 text-sm text-gray-500 hover:text-gray-700 underline underline-offset-2 transition"
         >
           Not a business? Join OJA247
         </motion.button>
@@ -722,7 +722,7 @@ const LandingPage = () => {
 
                   <button
                     onClick={() => navigate("/marketer-login")}
-                    className="py-2 -my-2 text-sm font-semibold text-white/90 hover:text-white underline underline-offset-4"
+                    className="min-h-11 py-3 -my-3 text-sm font-semibold text-white/90 hover:text-white underline underline-offset-4"
                   >
                     Already a marketer? Log in
                   </button>

@@ -74,7 +74,7 @@ const JoinPage = () => {
 
         <button
           onClick={() => navigate(withRef("/business-form"))}
-          className="mt-8 py-2 inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition"
+          className="mt-7 py-3 inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition"
         >
           <Store size={14} /> Actually, I want to register a business
         </button>

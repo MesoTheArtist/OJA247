@@ -270,7 +270,7 @@ const CustomerAuthPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 p-3 text-gray-400 hover:text-gray-600"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-11 min-h-11 text-gray-400 hover:text-gray-600"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -280,7 +280,7 @@ const CustomerAuthPage = () => {
 
             {mode === 'signin' && (
               <div className="text-right -mt-1">
-                <Link to="/customer-forgot-password" className="text-sm text-green-600 hover:text-green-700 font-medium inline-block py-2 -my-2">
+                <Link to="/customer-forgot-password" className="text-sm text-green-600 hover:text-green-700 font-medium inline-block min-h-11 py-3 -my-3">
                   Forgot password?
                 </Link>
               </div>
@@ -309,7 +309,7 @@ const CustomerAuthPage = () => {
           </form>
 
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6 text-center">
-            <Link to="/" className="text-sm text-gray-500 hover:text-gray-700 transition">
+            <Link to="/" className="inline-block min-h-11 py-3 -my-3 text-sm text-gray-500 hover:text-gray-700 transition">
               ← Continue browsing without an account
             </Link>
           </motion.div>

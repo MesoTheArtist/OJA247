@@ -150,7 +150,7 @@ const MarketerLoginPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 p-3 text-gray-500 hover:text-gray-700"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-11 min-h-11 text-gray-500 hover:text-gray-700"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   tabIndex={-1}
                 >
@@ -158,7 +158,7 @@ const MarketerLoginPage = () => {
                 </button>
               </div>
               <div className="text-right mt-2">
-                <Link to="/marketer-forgot-password" className="text-sm text-green-600 hover:text-green-700 font-medium inline-block py-2 -my-2">
+                <Link to="/marketer-forgot-password" className="text-sm text-green-600 hover:text-green-700 font-medium inline-block min-h-11 py-3 -my-3">
                   Forgot password?
                 </Link>
               </div>
@@ -182,7 +182,7 @@ const MarketerLoginPage = () => {
                 <button
                   type="button"
                   onClick={() => navigate("/register-marketer")}
-                  className="py-2 -my-2 text-green-600 font-semibold hover:text-green-700"
+                  className="min-h-11 -my-3 text-green-600 font-semibold hover:text-green-700"
                 >
                   Register here
                 </button>

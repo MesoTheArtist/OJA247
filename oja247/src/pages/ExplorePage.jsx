@@ -315,7 +315,7 @@ const ExplorePage = () => {
                       event.stopPropagation();
                       navigate(`/business/${business.slug || business._id}`, { state: { internalNav: true } });
                     }}
-                    className="w-full py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-xl transition shadow-md"
+                    className="w-full py-2 min-h-11 bg-green-600 hover:bg-green-700 text-white font-medium rounded-xl transition shadow-md"
                   >
                     View Store
                   </button>

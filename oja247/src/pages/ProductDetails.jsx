@@ -145,7 +145,7 @@ function ProductDetails() {
       <div className="sticky top-0 z-20 bg-gray-50/90 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition"
+          className="flex items-center gap-1.5 min-h-11 text-sm font-medium text-gray-600 hover:text-gray-900 transition"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -155,7 +155,7 @@ function ProductDetails() {
 
         <a
           href="/cart"
-          className="inline-flex items-center justify-center bg-gray-900 hover:bg-gray-800 text-white p-2.5 rounded-full shadow-sm relative"
+          className="inline-flex items-center justify-center bg-gray-900 hover:bg-gray-800 text-white p-3 rounded-full shadow-sm relative"
           aria-label="View cart"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -174,11 +174,11 @@ function ProductDetails() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-5 flex-wrap">
-          <Link to="/" className="py-2 -my-2 hover:text-gray-700 transition-colors">
+          <Link to="/" className="min-h-11 py-3 -my-3 hover:text-gray-700 transition-colors">
             Home
           </Link>
           <span>/</span>
-          <Link to="/products" className="py-2 -my-2 hover:text-gray-700 transition-colors">
+          <Link to="/products" className="min-h-11 py-3 -my-3 hover:text-gray-700 transition-colors">
             All Products
           </Link>
           {product.category && (
@@ -186,7 +186,7 @@ function ProductDetails() {
               <span>/</span>
               <Link
                 to={`/products?category=${encodeURIComponent(product.category)}`}
-                className="py-2 -my-2 hover:text-gray-700 transition-colors"
+                className="min-h-11 py-3 -my-3 hover:text-gray-700 transition-colors"
               >
                 {product.category}
               </Link>
@@ -273,7 +273,7 @@ function ProductDetails() {
               <button
                 type="button"
                 onClick={handleShare}
-                className="shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors"
+                className="shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 hover:bg-gray-50 rounded-full px-4 py-1.5 min-h-11 transition-colors"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path

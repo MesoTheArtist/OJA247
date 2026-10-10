@@ -145,7 +145,8 @@ const Navbar = () => {
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-gray-900 backdrop-blur-md bg-gray-100/70 rounded-xl"
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              className="md:hidden p-2.5 text-gray-900 backdrop-blur-md bg-gray-100/70 rounded-xl"
             >
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </motion.button>

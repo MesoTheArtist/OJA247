@@ -552,7 +552,7 @@ function BusinessDetails() {
               <button
                 type="button"
                 onClick={handleShare}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-200 hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-200 hover:bg-gray-50 rounded-full px-4 py-1.5 min-h-11 transition-colors"
               >
                 <svg
                   className="w-4 h-4"
@@ -574,7 +574,7 @@ function BusinessDetails() {
               <button
                 type="button"
                 onClick={handleFollowToggle}
-                className={`inline-flex items-center gap-1.5 text-sm font-medium rounded-full px-4 py-1.5 transition-colors ${
+                className={`inline-flex items-center gap-1.5 text-sm font-medium rounded-full px-5 py-1.5 min-h-11 transition-colors ${
                   isFollowing
                     ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     : "bg-green-600 text-white hover:bg-green-700"
@@ -611,7 +611,7 @@ function BusinessDetails() {
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                    className={`whitespace-nowrap px-4 py-2 min-h-11 rounded-full text-sm font-medium border transition-colors ${
                       selectedCategory === cat
                         ? "bg-green-600 border-green-600 text-white shadow-sm"
                         : "bg-white border-gray-300 text-gray-600 hover:bg-gray-100"
@@ -726,7 +726,7 @@ function BusinessDetails() {
                       {product.category}
                     </span>
                   )}
-                  <Link to={`/product/${product._id}`}>
+                  <Link to={`/product/${product._id}`} className="block py-2.5 -my-2.5">
                     <h3 className="font-semibold text-sm sm:text-lg text-gray-900 mb-1 line-clamp-1 hover:text-green-700 transition-colors">
                       {product.name}
                     </h3>
@@ -745,7 +745,7 @@ function BusinessDetails() {
                     type="button"
                     onClick={() => handleAddToCart(product)}
                     disabled={!product.inStock}
-                    className={`flex items-center justify-center gap-2 w-full text-center py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
+                    className={`flex items-center justify-center gap-2 w-full text-center py-2 min-h-11 rounded-lg text-sm sm:text-base font-medium transition-colors ${
                       product.inStock
                         ? "bg-green-600 hover:bg-green-700 text-white"
                         : "bg-gray-200 text-gray-500 cursor-not-allowed"

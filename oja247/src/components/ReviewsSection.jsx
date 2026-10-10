@@ -68,7 +68,7 @@ const ReviewsSection = ({ business }) => {
         </div>
         <button
           onClick={handleWriteReview}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-green-700 border border-green-200 rounded-xl hover:bg-green-50 transition"
+          className="flex items-center gap-1.5 px-4 py-2 min-h-11 text-sm font-semibold text-green-700 border border-green-200 rounded-xl hover:bg-green-50 transition"
         >
           <MessageSquare size={15} /> Write a review
         </button>

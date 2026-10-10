@@ -426,7 +426,7 @@ function PaymentStatusPage() {
                 <button
                   onClick={() => setHidePrompt(true)}
                   aria-label="Dismiss"
-                  className="absolute top-1 right-2 p-3 text-gray-400 hover:text-gray-600 text-xl leading-none"
+                  className="absolute top-1 right-2 inline-flex items-center justify-center min-w-11 min-h-11 text-gray-400 hover:text-gray-600 text-xl leading-none"
                 >
                   ×
                 </button>
@@ -444,7 +444,7 @@ function PaymentStatusPage() {
                   </button>
                   <button
                     onClick={() => navigate("/account?redirect=/orders")}
-                    className="text-sm font-semibold text-green-700 hover:text-green-800"
+                    className="min-h-11 text-sm font-semibold text-green-700 hover:text-green-800"
                   >
                     Sign in instead
                   </button>

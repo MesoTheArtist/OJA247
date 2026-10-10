@@ -175,7 +175,7 @@ function Products() {
             <button
               type="button"
               onClick={() => setShowFilters((prev) => !prev)}
-              className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border font-medium text-sm shrink-0 transition-colors ${
+              className={`inline-flex items-center justify-center gap-2 px-4 py-2 min-h-11 rounded-lg border font-medium text-sm shrink-0 transition-colors ${
                 showFilters
                   ? "bg-green-600 border-green-600 text-white"
                   : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -344,7 +344,7 @@ function Products() {
                     {product.category}
                   </span>
                 )}
-                <Link to={`/product/${product._id}`}>
+                <Link to={`/product/${product._id}`} className="block py-2.5 -my-2.5">
                   <h3 className="font-semibold text-sm sm:text-lg text-gray-900 mb-1 line-clamp-1 hover:text-green-700 transition-colors">
                     {product.name}
                   </h3>
