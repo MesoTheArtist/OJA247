@@ -62,6 +62,16 @@ export const paymentDetailsLimiter = rateLimit({
   message: { message: "Too many requests. Please try again in a few minutes." },
 });
 
+// Order references are not authentication credentials. Add an email match and
+// constrain public status lookups to limit enumeration attempts.
+export const orderLookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many order lookups. Please try again in a few minutes." },
+});
+
 // Placing a bank-transfer order or re-uploading a receipt.
 export const directOrderLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -82,4 +92,14 @@ export const bankChangeLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { status: false, message: "Too many attempts. Please try again in a few minutes." },
+});
+
+// Paystack account-name resolution is only used during signed-in vendor setup;
+// constrain repeated lookups that could otherwise enumerate bank accounts.
+export const accountResolveLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: false, message: "Too many account checks. Please try again in a few minutes." },
 });

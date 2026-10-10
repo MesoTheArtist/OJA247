@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import Order from "../models/Order.js";
 import { sendPasswordResetEmail, sendCustomerVerificationEmail, sendPasswordChangedEmail } from "../services/emailService.js";
 import { linkGuestOrders } from "../services/orderLinking.js";
+import { clearSessionCookies, setUserSessionCookie } from "../middleware/sessionCookies.js";
 
 // Deliberately a separate controller from authController.js rather than
 // extending register/login/googleLogin there — customer accounts skip
@@ -14,8 +15,8 @@ import { linkGuestOrders } from "../services/orderLinking.js";
 // Mixing the two would mean threading a "is this a customer request"
 // branch through logic that was written to not need one.
 
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
+const generateToken = (id, authVersion = 1) => {
+  return jwt.sign({ id, authVersion }, process.env.JWT_SECRET, { expiresIn: "30d" });
 };
 
 // Guest-order linking lives in services/orderLinking.js and only links for a
@@ -95,10 +96,10 @@ export const customerRegister = async (req, res) => {
     // works straight away (low friction); past guest orders attach once the
     // person confirms the email — see customerVerifyEmail.
     await sendVerificationLink(user);
+    setUserSessionCookie(res, generateToken(user._id, user.authVersion));
 
     res.status(201).json({
       success: true,
-      token: generateToken(user._id),
       user: publicUser(user),
     });
   } catch (error) {
@@ -143,10 +144,10 @@ export const customerLogin = async (req, res) => {
     }
 
     await linkGuestOrders(user);
+    setUserSessionCookie(res, generateToken(user._id, user.authVersion));
 
     res.json({
       success: true,
-      token: generateToken(user._id),
       user: publicUser(user),
     });
   } catch (error) {
@@ -212,6 +213,7 @@ export const customerGoogleAuth = async (req, res) => {
       // keeps access through Google.
       if (user.password) {
         user.password = undefined;
+        user.authVersion += 1;
         user.resetPasswordTokenHash = null;
         user.resetPasswordExpires = null;
       }
@@ -224,10 +226,10 @@ export const customerGoogleAuth = async (req, res) => {
     }
 
     await linkGuestOrders(user);
+    setUserSessionCookie(res, generateToken(user._id, user.authVersion));
 
     res.json({
       success: true,
-      token: generateToken(user._id),
       user: publicUser(user),
     });
   } catch (error) {
@@ -294,12 +296,14 @@ export const customerResetPassword = async (req, res) => {
     }
 
     user.password = password;
+    user.authVersion += 1;
     user.resetPasswordTokenHash = null;
     user.resetPasswordExpires = null;
     // The reset link only reaches the email's owner, so using it proves
     // ownership just as the confirmation link does.
     markEmailVerified(user);
     await user.save();
+    clearSessionCookies(res);
     await linkGuestOrders(user);
 
     sendPasswordChangedEmail({ to: user.email, name: user.fullName }).catch((err) =>

@@ -1,6 +1,5 @@
 import express from "express";
 import {
-  createOrder,
   getOrderByReference,
   lookupOrderForDispute,
   verifyOrderPayment,
@@ -24,11 +23,9 @@ import {
   cancelTransferOrder,
 } from "../controllers/directOrderController.js";
 import { protect, requireCustomer } from "../middleware/authMiddleware.js";
-import { authLimiter, paymentDetailsLimiter, directOrderLimiter } from "../middleware/rateLimiters.js";
+import { authLimiter, orderLookupLimiter, paymentDetailsLimiter, directOrderLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
-
-router.post("/", createOrder);
 
 // Direct bank transfer: the customer pays the vendor's own bank account,
 // uploads a receipt, and the vendor confirms or rejects it.
@@ -41,7 +38,7 @@ router.patch("/:reference/payment/reject", protect, rejectTransferPayment);
 router.post("/verify/:reference", verifyOrderPayment);
 // Public — Paystack calls this directly, verified via signature, not a user token
 router.post("/webhook", handlePaystackWebhook);
-router.get("/reference/:reference", getOrderByReference);
+router.get("/reference/:reference", orderLookupLimiter, getOrderByReference);
 // Email-verified lookup — see lookupOrderForDispute's comment for why this
 // is separate from the bare-reference endpoint above.
 router.get("/lookup", lookupOrderForDispute);

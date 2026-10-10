@@ -1,36 +1,33 @@
 import axios from 'axios';
+import { attachCsrfToken, rememberCsrfToken } from './csrf';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Create axios instance with base configuration
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add token to requests if it exists (for authenticated routes). Only
-// applies the stored session token when the caller hasn't already set an
-// explicit Authorization header — needed for the TOTP pre-auth flow, which
-// must use its own short-lived token instead of whatever's in localStorage.
-axiosInstance.interceptors.request.use((config) => {
-  if (!config.headers.Authorization) {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+axiosInstance.interceptors.request.use(attachCsrfToken);
+axiosInstance.interceptors.response.use(
+  rememberCsrfToken,
+  (error) => {
+    if (error.response) rememberCsrfToken(error.response);
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
 // Business API calls
 export const getAllBusinesses = () => axiosInstance.get('/api/businesses');
 export const getBusinessById = (id) => axiosInstance.get(`/api/businesses/${id}`);
+export const getBusinessDashboard = (id) => axiosInstance.get(`/api/businesses/${id}/dashboard`);
 export const getFollowStatus = (businessId) => axiosInstance.get(`/api/follows/status/${businessId}`);
 export const followBusiness = (businessId) => axiosInstance.post(`/api/follows/${businessId}`);
 export const unfollowBusiness = (businessId) => axiosInstance.delete(`/api/follows/${businessId}`);
-export const createBusiness = (businessData) => axiosInstance.post('/api/businesses', businessData);
 export const updateBusiness = (id, businessData) => axiosInstance.put(`/api/businesses/${id}`, businessData);
 export const deleteBusiness = (id) => axiosInstance.delete(`/api/businesses/${id}`);
 

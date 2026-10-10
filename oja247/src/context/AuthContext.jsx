@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axiosInstance from '../services/api';
+import { clearCsrfToken } from '../services/csrf';
 
 const AuthContext = createContext();
 
@@ -14,15 +15,13 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [business, setBusiness] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  // Which /me endpoint to call on refresh — customers and vendors/admins
-  // share the same token storage (see the comment on customerLogin below
-  // for why), so this is what tells loadUser() which one is actually
-  // stored right now.
   const [authRole, setAuthRole] = useState(localStorage.getItem('authRole') || 'vendor');
+  const [token, setToken] = useState(Boolean(localStorage.getItem('authRole')));
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('marketerToken');
     if (token) {
       loadUser();
     } else {
@@ -60,12 +59,11 @@ export const AuthProvider = ({ children }) => {
         acceptedSellerTerms
       });
 
-      const { token, user, business } = response.data;
+      const { user, business } = response.data;
 
-      localStorage.setItem('token', token);
       localStorage.setItem('authRole', 'vendor');
       setAuthRole('vendor');
-      setToken(token);
+      setToken(true);
       setUser(user);
       setBusiness(business);
 
@@ -100,12 +98,11 @@ export const AuthProvider = ({ children }) => {
         };
       }
 
-      const { token, user, business } = response.data;
+      const { user, business } = response.data;
 
-      localStorage.setItem('token', token);
       localStorage.setItem('authRole', 'vendor');
       setAuthRole('vendor');
-      setToken(token);
+      setToken(true);
       setUser(user);
       setBusiness(business);
 
@@ -135,12 +132,11 @@ export const AuthProvider = ({ children }) => {
         };
       }
 
-      const { token, user, business } = response.data;
+      const { user, business } = response.data;
 
-      localStorage.setItem('token', token);
       localStorage.setItem('authRole', 'vendor');
       setAuthRole('vendor');
-      setToken(token);
+      setToken(true);
       setUser(user);
       setBusiness(business);
 
@@ -154,10 +150,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   // --- Customer auth ---
-  // Shares the same token/localStorage plumbing as vendor auth above
-  // (see authRole comment near the top) rather than a fully separate
-  // session — simpler, at the cost of only one active identity per
-  // browser at a time. No TOTP branch here; that's admin-only.
+  // Customers and vendors share the HttpOnly session cookie; authRole only
+  // selects the correct /me endpoint after a page refresh.
 
   const customerRegister = async (email, password, fullName, phone) => {
     try {
@@ -168,11 +162,10 @@ export const AuthProvider = ({ children }) => {
         phone,
       });
 
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
+      const { user } = response.data;
       localStorage.setItem('authRole', 'customer');
       setAuthRole('customer');
-      setToken(token);
+      setToken(true);
       setUser(user);
       setBusiness(null);
 
@@ -189,11 +182,10 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axiosInstance.post('/api/customer-auth/login', { email, password });
 
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
+      const { user } = response.data;
       localStorage.setItem('authRole', 'customer');
       setAuthRole('customer');
-      setToken(token);
+      setToken(true);
       setUser(user);
       setBusiness(null);
 
@@ -213,11 +205,10 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axiosInstance.post('/api/customer-auth/google', { credential });
 
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
+      const { user } = response.data;
       localStorage.setItem('authRole', 'customer');
       setAuthRole('customer');
-      setToken(token);
+      setToken(true);
       setUser(user);
       setBusiness(null);
 
@@ -254,11 +245,10 @@ export const AuthProvider = ({ children }) => {
         { code },
         { headers: { Authorization: `Bearer ${preAuthToken}` } }
       );
-      const { token, user, business } = response.data;
-      localStorage.setItem('token', token);
+      const { user, business } = response.data;
       localStorage.setItem('authRole', 'vendor');
       setAuthRole('vendor');
-      setToken(token);
+      setToken(true);
       setUser(user);
       setBusiness(business);
       return { success: true, user, business };
@@ -275,11 +265,10 @@ export const AuthProvider = ({ children }) => {
         { code },
         { headers: { Authorization: `Bearer ${preAuthToken}` } }
       );
-      const { token, user, business } = response.data;
-      localStorage.setItem('token', token);
+      const { user, business } = response.data;
       localStorage.setItem('authRole', 'vendor');
       setAuthRole('vendor');
-      setToken(token);
+      setToken(true);
       setUser(user);
       setBusiness(business);
       return { success: true, user, business };
@@ -289,6 +278,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    axiosInstance.post('/api/auth/logout').catch(() => {});
+    clearCsrfToken();
     localStorage.removeItem('token');
     localStorage.removeItem('authRole');
     setToken(null);

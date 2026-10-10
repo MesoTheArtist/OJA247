@@ -379,6 +379,17 @@ export const verifySubscriptionPayment = async (req, res) => {
       return res.status(400).json({ message: "Payment reference is required" });
     }
 
+    const payment = await SubscriptionPayment.findOne({ paystackReference: reference });
+    if (!payment) {
+      return res.status(404).json({ message: "Subscription payment not found" });
+    }
+    if (
+      req.user.role !== "admin" &&
+      req.user.businessId?.toString() !== payment.businessId.toString()
+    ) {
+      return res.status(403).json({ message: "Not authorized to verify this subscription payment." });
+    }
+
     const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
     if (!paystackSecretKey) {
       return res.status(500).json({ message: "Paystack secret key is not configured on the backend" });
@@ -396,14 +407,11 @@ export const verifySubscriptionPayment = async (req, res) => {
     );
     const verificationData = await verificationResponse.json();
 
-    const payment = await SubscriptionPayment.findOne({ paystackReference: reference });
-    if (!payment) {
-      return res.status(404).json({ message: "Subscription payment not found" });
-    }
-
     if (!verificationResponse.ok || !verificationData.status || verificationData.data?.status !== "success") {
-      payment.status = "failed";
-      await payment.save();
+      await SubscriptionPayment.findOneAndUpdate(
+        { _id: payment._id, status: "pending" },
+        { $set: { status: "failed" } }
+      );
       return res.status(400).json({ message: "Payment verification failed", verification: verificationData });
     }
 

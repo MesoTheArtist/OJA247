@@ -12,10 +12,11 @@ import {
 } from "../services/referralService.js";
 import { sendVendorWelcomeEmail, sendPasswordResetEmail, sendPasswordChangedEmail } from "../services/emailService.js";
 import { sanitizeSocialLinks, sanitizeHighlights } from "../services/businessProfile.js";
+import { clearSessionCookies, setUserSessionCookie } from "../middleware/sessionCookies.js";
 
 // Generate JWT Token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+const generateToken = (id, authVersion = 1) => {
+  return jwt.sign({ id, authVersion }, process.env.JWT_SECRET, {
     expiresIn: "30d"
   });
 };
@@ -23,8 +24,8 @@ const generateToken = (id) => {
 // Short-lived token issued after password verification but before TOTP is
 // confirmed — only usable against the TOTP setup/verify endpoints (see
 // requireTotpPendingToken in authMiddleware.js), never a real session.
-const generatePreAuthToken = (id) => {
-  return jwt.sign({ id, purpose: "totp_pending" }, process.env.JWT_SECRET, {
+const generatePreAuthToken = (id, authVersion = 1) => {
+  return jwt.sign({ id, authVersion, purpose: "totp_pending" }, process.env.JWT_SECRET, {
     expiresIn: "10m"
   });
 };
@@ -72,14 +73,13 @@ export const register = async (req, res) => {
     );
 
     const normalizedBusinessData = {
-      ...businessData,
       name: String(businessData.name).trim(),
       description: businessData.description ? String(businessData.description).trim() : "",
       category: String(businessData.category).trim(),
       location: String(businessData.location).trim(),
       contact: String(businessData.contact).trim(),
-      logo: businessData.logo || "",
-      banner: businessData.banner || "",
+      logo: typeof businessData.logo === "string" ? businessData.logo : "",
+      banner: typeof businessData.banner === "string" ? businessData.banner : "",
       socialLinks: cleanLinks.value,
       highlights: cleanHighlights.value
     };
@@ -117,11 +117,11 @@ export const register = async (req, res) => {
     // Fire-and-forget — a mail server hiccup should never block registration.
     await sendVendorWelcomeEmail({ to: savedUser.email, businessName: savedBusiness.name });
 
-    const token = generateToken(savedUser._id);
+    const token = generateToken(savedUser._id, savedUser.authVersion);
+    setUserSessionCookie(res, token);
 
     res.status(201).json({
       success: true,
-      token,
       user: {
         id: savedUser._id,
         email: savedUser.email,
@@ -184,7 +184,7 @@ export const login = async (req, res) => {
     // a normal token below. An admin who hasn't set up TOTP yet is routed
     // to setup instead of being let in; one who has must supply a code.
     if (user.role === "admin") {
-      const preAuthToken = generatePreAuthToken(user._id);
+      const preAuthToken = generatePreAuthToken(user._id, user.authVersion);
       if (!user.totpEnabled) {
         return res.json({ success: true, requiresTotpSetup: true, preAuthToken });
       }
@@ -192,11 +192,11 @@ export const login = async (req, res) => {
     }
 
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, user.authVersion);
+    setUserSessionCookie(res, token);
 
     res.json({
       success: true,
-      token,
       user: {
         id: user._id,
         email: user.email,
@@ -253,18 +253,18 @@ export const googleLogin = async (req, res) => {
 
     // Same TOTP gate as password login — Google sign-in doesn't bypass 2FA.
     if (user.role === "admin") {
-      const preAuthToken = generatePreAuthToken(user._id);
+      const preAuthToken = generatePreAuthToken(user._id, user.authVersion);
       if (!user.totpEnabled) {
         return res.json({ success: true, requiresTotpSetup: true, preAuthToken });
       }
       return res.json({ success: true, requiresTotpCode: true, preAuthToken });
     }
 
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, user.authVersion);
+    setUserSessionCookie(res, token);
 
     res.json({
       success: true,
-      token,
       user: {
         id: user._id,
         email: user.email,
@@ -328,10 +328,10 @@ export const totpSetupVerify = async (req, res) => {
     user.totpEnabled = true;
     await user.save();
 
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, user.authVersion);
+    setUserSessionCookie(res, token);
     res.json({
       success: true,
-      token,
       user: { id: user._id, email: user.email, businessId: null, role: user.role },
       business: null
     });
@@ -356,10 +356,10 @@ export const totpVerifyLogin = async (req, res) => {
       return res.status(401).json({ message: "Invalid or expired code" });
     }
 
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, user.authVersion);
+    setUserSessionCookie(res, token);
     res.json({
       success: true,
-      token,
       user: { id: user._id, email: user.email, businessId: null, role: user.role },
       business: null
     });
@@ -407,7 +407,9 @@ export const updatePassword = async (req, res) => {
 
     // Update password
     user.password = newPassword;
+    user.authVersion += 1;
     await user.save();
+    setUserSessionCookie(res, generateToken(user._id, user.authVersion));
 
     res.json({ success: true, message: "Password updated successfully" });
   } catch (error) {
@@ -476,9 +478,11 @@ export const resetPassword = async (req, res) => {
     }
 
     user.password = password; // pre-save hook hashes it
+    user.authVersion += 1;
     user.resetPasswordTokenHash = null;
     user.resetPasswordExpires = null;
     await user.save();
+    clearSessionCookies(res);
 
     sendPasswordChangedEmail({ to: user.email, name: "" }).catch((err) =>
       console.error("Password-changed email failed:", err)
@@ -489,4 +493,9 @@ export const resetPassword = async (req, res) => {
     console.error("Reset password error:", error);
     res.status(500).json({ message: error.message });
   }
+};
+
+export const logout = (req, res) => {
+  clearSessionCookies(res);
+  return res.json({ success: true });
 };

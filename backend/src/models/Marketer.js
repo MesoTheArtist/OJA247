@@ -18,6 +18,7 @@ const MarketerSchema = new mongoose.Schema(
     // schema-level validation would only be redundant there and wrong here.
     // Mirrors the same pattern already used on User.js for customers/vendors.
     password: { type: String, minlength: 6 },
+    authVersion: { type: Number, default: 1 },
     // Same reasoning as password: Google only hands us name + email, no
     // phone number. registerMarketer still requires it at the controller
     // level for the normal signup form; Google-created marketers start with

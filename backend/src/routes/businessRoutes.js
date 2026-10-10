@@ -2,7 +2,7 @@ import express from "express";
 import {
   getBusinesses,
   getBusiness,
-  createBusiness,
+  getBusinessDashboard,
   updateBusiness,
   updateBusinessReferralCode,
   getEarningsSummary,
@@ -13,8 +13,8 @@ import { protect, checkBusinessOwnership } from "../middleware/authMiddleware.js
 const router = express.Router();
 
 router.get("/", getBusinesses);
+router.get("/:id/dashboard", protect, checkBusinessOwnership, getBusinessDashboard);
 router.get("/:id", getBusiness);
-router.post("/", createBusiness);
 router.put("/:id", protect, checkBusinessOwnership, updateBusiness);
 router.patch("/:id/referral-code", protect, checkBusinessOwnership, updateBusinessReferralCode);
 router.get("/:id/earnings-summary", protect, checkBusinessOwnership, getEarningsSummary);

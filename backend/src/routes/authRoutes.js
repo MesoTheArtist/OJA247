@@ -10,6 +10,7 @@ import {
   totpSetupInit,
   totpSetupVerify,
   totpVerifyLogin,
+  logout,
 } from "../controllers/authController.js";
 import { protect, requireTotpPendingToken } from "../middleware/authMiddleware.js";
 import { authLimiter, totpLimiter } from "../middleware/rateLimiters.js";
@@ -22,6 +23,7 @@ router.post("/login", authLimiter, login);
 router.post("/google", authLimiter, googleLogin);
 router.post("/forgot-password", authLimiter, forgotPassword);
 router.post("/reset-password", authLimiter, resetPassword);
+router.post("/logout", logout);
 
 // TOTP steps — use the short-lived pre-auth token issued by /login, not a
 // normal session token (see requireTotpPendingToken).

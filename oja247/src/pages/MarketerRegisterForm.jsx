@@ -13,8 +13,7 @@ const MarketerRegisterForm = () => {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleGoogleSuccess = (data) => {
-    localStorage.setItem("marketerToken", data.token);
+  const handleGoogleSuccess = () => {
     navigate("/marketer-dashboard");
   };
 
@@ -25,10 +24,10 @@ const MarketerRegisterForm = () => {
     setError("");
     setLoading(true);
     try {
-      const { data } = await axiosInstance.post("/api/marketers/google", {
+      await axiosInstance.post("/api/marketers/google", {
         credential: googleResponse.credential,
       });
-      handleGoogleSuccess(data);
+      handleGoogleSuccess();
     } catch (err) {
       setError(err.response?.data?.message || "Google sign-in failed");
     } finally {
@@ -111,10 +110,7 @@ const MarketerRegisterForm = () => {
         password: formData.password,
       });
 
-      const { token, marketer } = response.data;
-      // Stored under a separate key from the business owner's "token" —
-      // marketer sessions are a distinct account type (see marketerAuthMiddleware.js)
-      localStorage.setItem("marketerToken", token);
+      const { marketer } = response.data;
 
       await notify({
         title: "You're registered!",

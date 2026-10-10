@@ -6,6 +6,7 @@ import { SELLER_TERMS_VERSION } from "../config/sellerTerms.js";
 import Business from "../models/Business.js";
 import { sendPayoutHoldEmail, sendBankDetailsUpdatedEmail } from "../services/emailService.js";
 import { verifyNin, ninNameMatchesAccount } from "../services/ninVerificationService.js";
+import { sniffReceiptType } from "../services/receiptStorage.js";
 
 // Simple in-memory cache — bank list changes rarely, no need to hit
 // Paystack on every page load. Swap for Redis if you're running multiple
@@ -61,28 +62,22 @@ export const getBanks = async (req, res) => {
 // Used by the frontend to auto-fill the account name once the vendor
 // enters their account number, so they can confirm it's correct before
 // submitting.
-export const resolveAccount = async (req, res) => {
+async function resolvePaystackAccount(req, res) {
   const { account_number, bank_code } = req.query;
-
-  if (!account_number || !bank_code) {
+  if (typeof account_number !== "string" || !/^\d{10}$/.test(account_number) ||
+      typeof bank_code !== "string" || !/^[a-zA-Z0-9_-]{1,20}$/.test(bank_code)) {
     return res.status(400).json({
       status: false,
-      message: "account_number and bank_code are required",
+      message: "A valid 10-digit account number and bank code are required.",
     });
   }
 
   try {
     const response = await axios.get("https://api.paystack.co/bank/resolve", {
       params: { account_number, bank_code },
-      headers: {
-        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-      },
+      headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
     });
-
-    return res.json({
-      status: true,
-      data: { account_name: response.data.data.account_name },
-    });
+    return res.json({ status: true, data: { account_name: response.data.data.account_name } });
   } catch (error) {
     console.error("Account resolve failed:", error.response?.data || error.message);
     return res.status(400).json({
@@ -90,7 +85,16 @@ export const resolveAccount = async (req, res) => {
       message: "Could not verify this account number. Double-check it and try again.",
     });
   }
+}
+
+export const resolveAccount = async (req, res) => {
+  if (req.user.role !== "owner" && req.user.role !== "admin") {
+    return res.status(403).json({ status: false, message: "Business owner access is required." });
+  }
+  return resolvePaystackAccount(req, res);
 };
+
+export const resolveMarketerAccount = async (req, res) => resolvePaystackAccount(req, res);
 
 // Basic tier fields are required. Verified tier fields (CAC, address proof,
 // selfie) are optional at submission — vendor can upgrade later.
@@ -151,15 +155,33 @@ async function updatePaystackSubaccount(subaccountCode, { businessName, bankCode
 
 function uploadBufferToCloudinary(fileBuffer, filename, resourceType = "auto") {
   return new Promise((resolve, reject) => {
+    const safeBase = String(filename || "document")
+      .split(/[\\/]/)
+      .pop()
+      .split(".")[0]
+      .replace(/[^a-zA-Z0-9_-]/g, "")
+      .slice(0, 40) || "document";
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: "oja247/vendor-docs",
         resource_type: resourceType, // "auto" handles both images and PDFs; selfies are forced to "image"
-        public_id: `${Date.now()}-${filename.split(".")[0]}`,
+        type: "authenticated",
+        public_id: `${Date.now()}-${safeBase}`,
       },
       (error, result) => {
         if (error) reject(error);
-        else resolve(result);
+        else {
+          resolve({
+            ...result,
+            secure_url: cloudinary.url(result.public_id, {
+              resource_type: result.resource_type || resourceType,
+              type: "authenticated",
+              sign_url: true,
+              secure: true,
+              ...(result.format ? { format: result.format } : {}),
+            }),
+          });
+        }
       }
     );
     uploadStream.end(fileBuffer);
@@ -293,6 +315,17 @@ export const onboardVendor = async (req, res) => {
     const cacFile = req.files?.cac_document?.[0];
     const addressProofFile = req.files?.address_proof?.[0];
     const selfieFile = req.files?.selfie?.[0];
+
+    for (const file of [cacFile, addressProofFile, selfieFile].filter(Boolean)) {
+      const detectedType = sniffReceiptType(file.buffer);
+      const isSelfie = file.fieldname === "selfie";
+      if (!detectedType || (isSelfie && detectedType.ext === "pdf")) {
+        return res.status(400).json({
+          status: false,
+          message: `The ${file.fieldname.replaceAll("_", " ")} must be a valid supported image${isSelfie ? "" : " or PDF"}.`,
+        });
+      }
+    }
 
     const [cacUpload, addressProofUpload, selfieUpload] = await Promise.all([
       cacFile ? uploadBufferToCloudinary(cacFile.buffer, cacFile.originalname) : Promise.resolve(null),

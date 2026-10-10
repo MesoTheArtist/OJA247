@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import axiosInstance, { getBusinessById } from "../services/api";
+import axiosInstance, { getBusinessDashboard } from "../services/api";
 import AddProductForm from "../components/AddProductForm.jsx";
 import ProductList from "../components/ProductList.jsx";
 import VendorOnboardingForm from "../components/Vendoronboardingform.jsx";
@@ -117,7 +117,7 @@ const BusinessDashboard = () => {
 
   const fetchBusiness = async () => {
     try {
-      const response = await getBusinessById(businessId);
+      const response = await getBusinessDashboard(businessId);
       setBusiness(response.data);
     } catch (error) {
       console.error("Error fetching business:", error);

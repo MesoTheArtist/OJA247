@@ -4,9 +4,11 @@ import { OAuth2Client } from "google-auth-library";
 import Marketer from "../models/Marketer.js";
 import { generateUniqueMarketerCode } from "../services/referralService.js";
 import { sendMarketerWelcomeEmail, sendPasswordResetEmail, sendPasswordChangedEmail } from "../services/emailService.js";
+import { setMarketerSessionCookie } from "../middleware/sessionCookies.js";
+import { clearSessionCookies } from "../middleware/sessionCookies.js";
 
-const generateToken = (id) => {
-  return jwt.sign({ id, type: "marketer" }, process.env.JWT_SECRET, {
+const generateToken = (id, authVersion = 1) => {
+  return jwt.sign({ id, authVersion, type: "marketer" }, process.env.JWT_SECRET, {
     expiresIn: "30d",
   });
 };
@@ -42,13 +44,13 @@ export const registerMarketer = async (req, res) => {
     });
 
     const saved = await marketer.save();
-    const token = generateToken(saved._id);
+    const token = generateToken(saved._id, saved.authVersion);
+    setMarketerSessionCookie(res, token);
 
     await sendMarketerWelcomeEmail({ to: saved.email, name: saved.name, referralCode: saved.referralCode });
 
     res.status(201).json({
       success: true,
-      token,
       marketer: {
         id: saved._id,
         name: saved.name,
@@ -91,11 +93,11 @@ export const loginMarketer = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    const token = generateToken(marketer._id);
+    const token = generateToken(marketer._id, marketer.authVersion);
+    setMarketerSessionCookie(res, token);
 
     res.json({
       success: true,
-      token,
       marketer: {
         id: marketer._id,
         name: marketer.name,
@@ -168,11 +170,11 @@ export const marketerGoogleAuth = async (req, res) => {
       });
     }
 
-    const token = generateToken(marketer._id);
+    const token = generateToken(marketer._id, marketer.authVersion);
+    setMarketerSessionCookie(res, token);
 
     res.json({
       success: true,
-      token,
       marketer: {
         id: marketer._id,
         name: marketer.name,
@@ -246,9 +248,11 @@ export const resetMarketerPassword = async (req, res) => {
     }
 
     marketer.password = password;
+    marketer.authVersion += 1;
     marketer.resetPasswordTokenHash = null;
     marketer.resetPasswordExpires = null;
     await marketer.save();
+    clearSessionCookies(res);
 
     sendPasswordChangedEmail({ to: marketer.email, name: marketer.name }).catch((err) =>
       console.error("Password-changed email failed:", err)

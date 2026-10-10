@@ -5,6 +5,10 @@ import Follow from "../models/Follow.js";
 import User from "../models/User.js";
 import { sendNewProductFollowerEmail } from "../services/emailService.js";
 
+function canManageBusiness(user, businessId) {
+  return user.role === "admin" || user.businessId?.toString() === String(businessId);
+}
+
 // Get all products across all businesses
 export const getAllProducts = async (req, res) => {
   try {
@@ -25,6 +29,9 @@ export const getProductsByBusiness = async (req, res) => {
 
     if (!mongoose.Types.ObjectId.isValid(businessId)) {
       return res.status(400).json({ message: "Invalid business ID" });
+    }
+    if (!canManageBusiness(req.user, businessId)) {
+      return res.status(403).json({ message: "Not authorized to manage this business's products." });
     }
 
     const products = await Product.find({ businessId })
@@ -152,26 +159,43 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const updates = req.body || {};
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid product ID" });
     }
 
-    if (updates.stock !== undefined) {
-      updates.inStock = updates.stock > 0;
+    const product = await Product.findById(id).select("businessId");
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    if (!canManageBusiness(req.user, product.businessId)) {
+      return res.status(403).json({ message: "Not authorized to manage this product." });
     }
 
-    const product = await Product.findByIdAndUpdate(id, updates, {
+    const allowedFields = ["name", "description", "price", "category", "images", "stock", "specifications", "tags"];
+    const sanitizedUpdates = Object.fromEntries(
+      allowedFields
+        .filter((field) => updates[field] !== undefined)
+        .map((field) => [field, updates[field]])
+    );
+    if (sanitizedUpdates.stock !== undefined) {
+      sanitizedUpdates.inStock = Number(sanitizedUpdates.stock) > 0;
+    }
+    if (Object.keys(sanitizedUpdates).length === 0) {
+      return res.status(400).json({ message: "No editable product fields provided" });
+    }
+
+    const updatedProduct = await Product.findByIdAndUpdate(id, sanitizedUpdates, {
       new: true,
       runValidators: true,
     });
 
-    if (!product) {
+    if (!updatedProduct) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    res.json(product);
+    res.json(updatedProduct);
   } catch (error) {
     console.error("Update product error:", error);
     res.status(400).json({ message: error.message });
@@ -187,7 +211,10 @@ export const deleteProduct = async (req, res) => {
       return res.status(400).json({ message: "Invalid product ID" });
     }
 
-    const product = await Product.findByIdAndDelete(id);
+    const query = req.user.role === "admin"
+      ? { _id: id }
+      : { _id: id, businessId: req.user.businessId };
+    const product = await Product.findOneAndDelete(query);
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }

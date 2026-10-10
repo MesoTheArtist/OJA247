@@ -33,6 +33,7 @@ const UserSchema = new mongoose.Schema(
       enum: ["owner", "admin", "customer"],
       default: "owner"
     },
+    authVersion: { type: Number, default: 1 },
     // Customer-only fields (owners/admins keep this info on the Business/
     // Vendor records instead). Both optional — a Google signup only has
     // fullName from the Google profile; phone gets added later if/when

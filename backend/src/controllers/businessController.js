@@ -8,6 +8,50 @@ import { isValidCustomReferralCode, isBusinessReferralCodeTaken } from "../servi
 import { sendBusinessReferralCodeChangedEmail } from "../services/emailService.js";
 import { sanitizeSocialLinks, sanitizeHighlights } from "../services/businessProfile.js";
 
+const PUBLIC_BUSINESS_FIELDS = [
+  "_id",
+  "name",
+  "description",
+  "category",
+  "location",
+  "contact",
+  "images",
+  "logo",
+  "banner",
+  "themeColor",
+  "socialLinks",
+  "highlights",
+  "deliveryFeeInState",
+  "deliveryFeeOutState",
+  "featured",
+  "verified",
+  "rating",
+  "reviewCount",
+  "slug",
+  "tags",
+  "hours",
+  "delivery",
+  "createdAt",
+];
+
+function toPublicBusiness(business) {
+  const source = business.toObject ? business.toObject() : business;
+  return Object.fromEntries(
+    PUBLIC_BUSINESS_FIELDS
+      .filter((field) => source[field] !== undefined)
+      .map((field) => [field, source[field]])
+  );
+}
+
+function isBusinessPubliclyVisible(business, settings, now = Date.now()) {
+  if (business.isHidden) return false;
+  if (!settings.enforceSubscriptionVisibility || business.visibilityExempt) return true;
+  if (business.grandfatherExemptUntil && now <= new Date(business.grandfatherExemptUntil).getTime()) {
+    return true;
+  }
+  return Boolean(business.subscriptionExpiresAt && now <= new Date(business.subscriptionExpiresAt).getTime());
+}
+
 // Looks up the business owner's login email — Business itself only stores
 // a public contact phone, not an email. Same pattern as the identically-
 // named helper in subscriptionController.js/subscriptionExpiryCronController.js.
@@ -27,25 +71,6 @@ const slugify = (text) =>
     .replace(/-+/g, "-") // collapse multiple hyphens
     .replace(/^-|-$/g, ""); // trim leading/trailing hyphen
 
-// Generates a unique slug, appending -2, -3, etc. if the base slug is taken.
-// excludeId lets an update skip colliding with the business's own current slug.
-const generateUniqueSlug = async (name, excludeId = null) => {
-  const base = slugify(name) || "store";
-  let slug = base;
-  let suffix = 2;
-
-  while (true) {
-    const query = { slug };
-    if (excludeId) query._id = { $ne: excludeId };
-
-    const existing = await Business.findOne(query);
-    if (!existing) return slug;
-
-    slug = `${base}-${suffix}`;
-    suffix += 1;
-  }
-};
-
 // GET all — excludes businesses an admin has hidden, and (only when the
 // enforceSubscriptionVisibility kill switch is ON — see PlatformSettings.js
 // and /api/admin/settings) businesses without a currently-active paid
@@ -57,26 +82,21 @@ const generateUniqueSlug = async (name, excludeId = null) => {
 // gates the public listing, not account access.
 export const getBusinesses = async (req, res) => {
   try {
-    const businesses = await Business.find({ isHidden: { $ne: true } }).lean();
-
     const settings = await PlatformSettings.getSettings();
-    if (!settings.enforceSubscriptionVisibility) {
-      return res.json(businesses); // kill switch is off — subscription status doesn't affect visibility
-    }
-
-    const now = Date.now();
-    const visible = businesses.filter((b) => {
-      // Kill-switch tab override — always shown regardless of subscription.
-      if (b.visibilityExempt) return true;
-      // Grandfather tab override — shown until the exemption date passes.
-      if (b.grandfatherExemptUntil && now <= new Date(b.grandfatherExemptUntil).getTime()) {
-        return true;
-      }
-      if (!b.subscriptionExpiresAt) return false;
-      return now <= new Date(b.subscriptionExpiresAt).getTime();
-    });
-
-    res.json(visible);
+    const businesses = await Business.find({ isHidden: { $ne: true } })
+      .select([
+        ...PUBLIC_BUSINESS_FIELDS,
+        "isHidden",
+        "visibilityExempt",
+        "grandfatherExemptUntil",
+        "subscriptionExpiresAt",
+      ].join(" "))
+      .lean();
+    res.json(
+      businesses
+        .filter((business) => isBusinessPubliclyVisible(business, settings))
+        .map(toPublicBusiness)
+    );
   } catch (error) {
     res.status(500).json({ message: "Error fetching businesses" });
   }
@@ -88,11 +108,23 @@ export const getBusiness = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const publicProjection = [
+      ...PUBLIC_BUSINESS_FIELDS,
+      "isHidden",
+      "visibilityExempt",
+      "grandfatherExemptUntil",
+      "subscriptionExpiresAt",
+    ].join(" ");
     const business = mongoose.Types.ObjectId.isValid(id)
-      ? await Business.findById(id)
-      : await Business.findOne({ slug: id });
+      ? await Business.findById(id).select(publicProjection)
+      : await Business.findOne({ slug: id }).select(publicProjection);
 
     if (!business) return res.status(404).json({ message: "Not found" });
+
+    const settings = await PlatformSettings.getSettings();
+    if (!isBusinessPubliclyVisible(business, settings)) {
+      return res.status(404).json({ message: "Not found" });
+    }
 
     // Follower count is public info (shown to guests too, same as any
     // other social-proof number) — this route stays unauthenticated on
@@ -107,28 +139,13 @@ export const getBusiness = async (req, res) => {
     // affects visibility at all before it nudges an unsubscribed vendor to
     // pay (see AccountAlertsPopup's "neverSubscribed" case) — no point
     // warning them about invisibility while the kill switch is off.
-    const settings = await PlatformSettings.getSettings();
-
     res.json({
-      ...business.toObject(),
+      ...toPublicBusiness(business),
       followerCount,
       enforceSubscriptionVisibility: settings.enforceSubscriptionVisibility,
     });
   } catch (error) {
     res.status(500).json({ message: "Error fetching business" });
-  }
-};
-
-// POST new
-export const createBusiness = async (req, res) => {
-  try {
-    const slug = await generateUniqueSlug(req.body.name || "store");
-
-    const newBusiness = new Business({ ...req.body, slug });
-    const saved = await newBusiness.save();
-    res.status(201).json(saved);
-  } catch (error) {
-    res.status(400).json({ message: "Error creating business" });
   }
 };
 
@@ -307,5 +324,22 @@ export const updateBusinessReferralCode = async (req, res) => {
       return res.status(400).json({ message: "That referral code is already taken. Try another." });
     }
     res.status(400).json({ message: error.message });
+  }
+};
+
+// GET /api/businesses/:id/dashboard — private owner/admin business data.
+export const getBusinessDashboard = async (req, res) => {
+  try {
+    const business = await Business.findById(req.params.id);
+    if (!business) return res.status(404).json({ message: "Business not found" });
+
+    const settings = await PlatformSettings.getSettings();
+    return res.json({
+      ...business.toObject(),
+      enforceSubscriptionVisibility: settings.enforceSubscriptionVisibility,
+    });
+  } catch (error) {
+    console.error("Get business dashboard error:", error);
+    return res.status(500).json({ message: "Error fetching business" });
   }
 };

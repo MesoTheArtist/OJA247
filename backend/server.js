@@ -30,10 +30,10 @@ import followRoutes from "./src/routes/followRoutes.js";
 import reviewRoutes from "./src/routes/reviewRoutes.js";
 import { verifyEmailTransporter } from "./src/services/emailService.js";
 import { generalLimiter } from "./src/middleware/rateLimiters.js";
+import { addCsrfResponseHeader } from "./src/middleware/sessionCookies.js";
 
 console.log("=== Environment Variables Check ===");
 console.log("CLOUDINARY_CLOUD_NAME:", process.env.CLOUDINARY_CLOUD_NAME);
-console.log("CLOUDINARY_API_KEY:", process.env.CLOUDINARY_API_KEY);
 console.log(
   "CLOUDINARY_API_SECRET:",
   process.env.CLOUDINARY_API_SECRET ? "EXISTS" : "MISSING"
@@ -61,12 +61,38 @@ app.use(
 );
 
 // CORS configuration for production
+const configuredFrontendOrigins = (process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const allowedFrontendOrigins = new Set([
+  "https://oja247.store",
+  "http://localhost:5173",
+  ...configuredFrontendOrigins,
+]);
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "*",
+    origin: (origin, callback) => {
+      if (!origin || allowedFrontendOrigins.has(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
     credentials: true,
+    exposedHeaders: ["X-CSRF-Token"],
   })
 );
+
+app.use((req, res, next) => {
+  const unsafeMethod = !["GET", "HEAD", "OPTIONS"].includes(req.method);
+  const origin = req.headers.origin;
+  if (unsafeMethod && origin && !allowedFrontendOrigins.has(origin)) {
+    return res.status(403).json({ message: "Origin is not allowed" });
+  }
+  return next();
+});
+app.use(addCsrfResponseHeader);
 
 // Increased body size limit (default is 100kb, bumped up for image/file payloads)
 // The `verify` callback stashes the raw bytes on req.rawBody — needed to check

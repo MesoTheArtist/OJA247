@@ -558,14 +558,18 @@ export const lookupOrderForDispute = async (req, res) => {
 export const getOrderByReference = async (req, res) => {
   try {
     const { reference } = req.params;
-    const order = await Order.findOne({ reference });
-
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+    const email = String(req.query.email || "").trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ message: "Order email is required" });
     }
 
-    // This lookup is public (reference only), so never include the payment
-    // receipts: they can show the customer's name and bank details.
+    const order = await Order.findOne({ reference });
+
+    if (!order || order.customer?.email?.trim().toLowerCase() !== email) {
+      return res.status(404).json({ message: "No matching order found" });
+    }
+
+    // Never include the payment receipts: they can show payment details.
     const publicOrder = order.toObject();
     delete publicOrder.paymentReceipts;
     delete publicOrder.duplicateReceiptOf;

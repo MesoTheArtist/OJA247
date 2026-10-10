@@ -38,7 +38,9 @@ function PaymentStatusPage() {
       }
 
       try {
-        const response = await axiosInstance.get(`/api/orders/reference/${reference}`);
+        const response = await axiosInstance.get(`/api/orders/reference/${reference}`, {
+          params: { email: emailFromLink },
+        });
         setOrder(response.data.order);
       } catch (error) {
         console.error("Error fetching order status", error);
@@ -48,7 +50,7 @@ function PaymentStatusPage() {
     };
 
     fetchOrder();
-  }, [reference]);
+  }, [reference, emailFromLink]);
 
   // The customer cancels an order the seller hasn't confirmed yet. The email
   // must match the one on the order (asked for here if it isn't in the link).
@@ -78,7 +80,7 @@ function PaymentStatusPage() {
     setCancelling(true);
     try {
       await axiosInstance.post(`/api/orders/${reference}/cancel`, { email });
-      const refreshed = await axiosInstance.get(`/api/orders/reference/${reference}`);
+      const refreshed = await axiosInstance.get(`/api/orders/reference/${reference}`, { params: { email } });
       setOrder(refreshed.data.order);
     } catch (error) {
       await notify({
@@ -171,7 +173,9 @@ function PaymentStatusPage() {
       await axiosInstance.post(`/api/orders/${reference}/receipt`, form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      const refreshed = await axiosInstance.get(`/api/orders/reference/${reference}`);
+      const refreshed = await axiosInstance.get(`/api/orders/reference/${reference}`, {
+        params: { email: confirmEmail },
+      });
       setOrder(refreshed.data.order);
       setReceiptFile(null);
     } catch (error) {

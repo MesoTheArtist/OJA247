@@ -16,8 +16,7 @@ const MarketerLoginPage = () => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleLoginSuccess = (data) => {
-    localStorage.setItem("marketerToken", data.token);
+  const handleLoginSuccess = () => {
     navigate("/marketer-dashboard");
   };
 
@@ -26,8 +25,8 @@ const MarketerLoginPage = () => {
     setError("");
     setLoading(true);
     try {
-      const { data } = await marketerApi.post("/api/marketers/login", formData);
-      handleLoginSuccess(data);
+      await marketerApi.post("/api/marketers/login", formData);
+      handleLoginSuccess();
     } catch (err) {
       setError(err.response?.data?.message || "Login failed. Please check your details.");
     } finally {
@@ -42,10 +41,10 @@ const MarketerLoginPage = () => {
     setError("");
     setLoading(true);
     try {
-      const { data } = await marketerApi.post("/api/marketers/google", {
+      await marketerApi.post("/api/marketers/google", {
         credential: googleResponse.credential,
       });
-      handleLoginSuccess(data);
+      handleLoginSuccess();
     } catch (err) {
       setError(err.response?.data?.message || "Google sign-in failed");
     } finally {

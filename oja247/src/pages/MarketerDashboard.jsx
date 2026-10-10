@@ -99,7 +99,6 @@ const MarketerDashboard = () => {
       .then((res) => setData(res.data))
       .catch((err) => {
         if (err.response?.status === 401) {
-          localStorage.removeItem("marketerToken");
           navigate("/marketer-login");
           return;
         }
@@ -109,11 +108,6 @@ const MarketerDashboard = () => {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("marketerToken");
-    if (!token) {
-      navigate("/marketer-login");
-      return;
-    }
     loadDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
@@ -141,7 +135,7 @@ const MarketerDashboard = () => {
     setResolving(true);
     const timeout = setTimeout(() => {
       marketerApi
-        .get("/api/vendors/resolve-account", {
+        .get("/api/vendors/resolve-account/marketer", {
           params: { account_number: accountNumber, bank_code: bankCode },
         })
         .then(({ data: res }) => {
@@ -164,8 +158,7 @@ const MarketerDashboard = () => {
   }, [bankCode, accountNumber]);
 
   const handleLogout = () => {
-    localStorage.removeItem("marketerToken");
-    navigate("/marketer-login");
+    marketerApi.post("/api/auth/logout").finally(() => navigate("/marketer-login"));
   };
 
   const referralLink = data
