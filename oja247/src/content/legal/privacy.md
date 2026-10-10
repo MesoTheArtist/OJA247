@@ -36,18 +36,31 @@ Receipts and verification documents are stored privately. They are not public, a
 
 We keep information for as long as we need it for the purposes above, including handling disputes and meeting our legal and accounting obligations, and then delete it or remove what identifies you.
 
-## 6. Keeping it safe
+Payment receipts are deleted on a schedule:
+
+- About six months after the seller confirmed the order.
+- About three months after an order that was rejected or cancelled and never paid.
+- If an order had a dispute, we keep its receipt until about a year after the dispute was last updated.
+- We never delete a receipt while the order is still waiting for the seller.
+
+Only the receipt file is deleted. A record that the order happened, with its amount and date, is kept for as long as we need it for the reasons above.
+
+## 6. Cookies and similar storage
+
+We use cookies and similar browser storage that the site needs in order to work: to keep you signed in, to remember what is in your cart, and to remember that you have seen our cookie notice. If you sign in with Google, Google may set its own cookies while you do. We do not use advertising or tracking cookies. You can clear this storage in your browser settings, but you may then be signed out and your cart will be emptied.
+
+## 7. Keeping it safe
 
 We use sensible technical and organisational measures to protect your information, including protected passwords, private storage for sensitive files, and access limits. No system is completely secure, so please use a strong password and keep it private.
 
-## 7. Your choices and rights
+## 8. Your choices and rights
 
 You can ask us to show you the information we hold about you, to correct it, or to delete it, and you can object to how we use it, subject to what we must keep by law. You can unsubscribe from marketing emails at any time. Email support@oja247.store and we will respond.
 
-## 8. Changes
+## 9. Changes
 
 We may update this policy and will show the date of the latest version above. For important changes we will also tell you by email or on the site.
 
-## 9. Contact
+## 10. Contact
 
 Questions about your information: support@oja247.store.

@@ -3,6 +3,7 @@ import PageWrapper from "./components/PageWrapper.jsx";
 import ScrollToTop from "./components/ScrollToTop.jsx";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import CookieNotice from "./components/CookieNotice";
 import LandingPage from "./pages/LandingPage";
 import ExplorePage from "./pages/ExplorePage";
 import Products from "./pages/Products";
@@ -90,6 +91,7 @@ function App() {
         </Routes>
       </PageWrapper>
       <Footer />
+      <CookieNotice />
     </Router>
   );
 }
