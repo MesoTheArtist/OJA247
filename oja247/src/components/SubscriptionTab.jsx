@@ -212,14 +212,14 @@ function SubscriptionTab({ businessId, business, email }) {
             key={plan.key}
             type="button"
             onClick={() => setSelectedPlan(plan.key)}
-            className={`relative text-left p-4 rounded-xl border-2 transition-colors ${
+            className={`relative text-left p-4 pt-8 rounded-xl border-2 transition-colors ${
               selectedPlan === plan.key
                 ? "border-green-600 bg-green-50"
                 : "border-gray-200 hover:border-gray-300"
             }`}
           >
             {plan.key === bestValuePlanKey && (
-              <span className="absolute -top-2 right-3 bg-green-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+              <span className="absolute top-2 right-2 bg-green-600 text-white text-xs font-bold px-2 py-1 rounded-md">
                 Best value
               </span>
             )}
