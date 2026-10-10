@@ -165,6 +165,7 @@ const AdminDashboard = () => {
   const [payoutStatusFilter, setPayoutStatusFilter] = useState("to_pay"); // to_pay | paid | rejected
   const [payoutBusyId, setPayoutBusyId] = useState(null);
   const [payoutRefDrafts, setPayoutRefDrafts] = useState({});
+  const [expandedPayoutRows, setExpandedPayoutRows] = useState({}); // marketer rows opened to show each referral payout
 
   // Toast replaces alert() for non-blocking confirmations/errors.
   const [toast, setToast] = useState(null); // { message, type: "success" | "error" }
@@ -329,6 +330,36 @@ const AdminDashboard = () => {
       fetchPayouts();
     } catch (err) {
       showToast(err.response?.data?.message || "Couldn't mark as paid.", "error");
+    } finally {
+      setPayoutBusyId(null);
+    }
+  };
+
+  // Decline ONE referral payout inside a marketer's row, leaving their other
+  // payouts alone. The reason is required and emailed to the marketer.
+  const rejectSinglePayout = async (row, payout) => {
+    const reason = await prompt({
+      title: "Reject this referral payout?",
+      message: `This cancels ₦${Number(payout.amount).toLocaleString()}${
+        payout.referred ? ` earned from ${payout.referred}` : ""
+      } for ${row.party}. Their other payouts are not affected. They will be emailed your reason.`,
+      placeholder: "Reason (they will see this)",
+      multiline: true,
+      confirmLabel: "Reject this payout",
+      tone: "danger",
+    });
+    if (reason === null) return; // cancelled
+    if (!reason.trim()) {
+      showToast("A reason is required.", "error");
+      return;
+    }
+    setPayoutBusyId(payout.id);
+    try {
+      await axiosInstance.post(`/api/admin/marketer-payouts/${payout.id}/reject`, { reason: reason.trim() });
+      showToast("Payout rejected — marketer notified");
+      fetchPayouts();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Couldn't reject this payout.", "error");
     } finally {
       setPayoutBusyId(null);
     }
@@ -1802,8 +1833,48 @@ const AdminDashboard = () => {
                           </td>
                           <td data-label="Amount" className="p-4">
                             <p className="font-semibold text-gray-900">₦{Number(row.amount).toLocaleString()}</p>
-                            {row.kind === "marketer" && row.count > 1 && (
-                              <p className="text-xs text-gray-500">{row.count} referral payouts</p>
+                            {row.kind === "marketer" && row.payouts?.length > 0 ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedPayoutRows((prev) => ({ ...prev, [row.rowId]: !prev[row.rowId] }))}
+                                  aria-expanded={Boolean(expandedPayoutRows[row.rowId])}
+                                  className="mt-0.5 text-xs font-medium text-green-700 hover:text-green-800 underline underline-offset-2"
+                                >
+                                  {expandedPayoutRows[row.rowId] ? "Hide" : "View"} {row.payouts.length} referral payout
+                                  {row.payouts.length === 1 ? "" : "s"}
+                                </button>
+                                {expandedPayoutRows[row.rowId] && (
+                                  <ul className="mt-2 space-y-2">
+                                    {row.payouts.map((pay) => (
+                                      <li
+                                        key={pay.id}
+                                        className="flex items-start justify-between gap-3 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2"
+                                      >
+                                        <div className="min-w-0 text-left text-xs text-gray-600">
+                                          <p className="font-semibold text-gray-900">₦{Number(pay.amount).toLocaleString()}</p>
+                                          <p className="break-words">{pay.referred || "Referral"}</p>
+                                          <p className="text-gray-400">
+                                            {new Date(pay.date).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
+                                          </p>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => rejectSinglePayout(row, pay)}
+                                          disabled={payoutBusyId === pay.id}
+                                          className="shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-red-300 text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                                        >
+                                          {payoutBusyId === pay.id ? "Working…" : "Reject"}
+                                        </button>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </>
+                            ) : (
+                              row.kind === "marketer" && row.count > 1 && (
+                                <p className="text-xs text-gray-500">{row.count} referral payouts</p>
+                              )
                             )}
                             {row.kind === "vendor" && <p className="text-xs text-gray-500">Points withdrawal</p>}
                           </td>
@@ -1835,7 +1906,7 @@ const AdminDashboard = () => {
                                   disabled={payoutBusyId === row.rowId}
                                   className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-300 text-red-600 hover:bg-red-50 transition disabled:opacity-50"
                                 >
-                                  Reject
+                                  {row.kind === "marketer" && row.count > 1 ? "Reject all" : "Reject"}
                                 </button>
                               </div>
                             ) : (

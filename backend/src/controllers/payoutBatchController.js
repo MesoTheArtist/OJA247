@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import MarketerPayout from "../models/MarketerPayout.js";
 import Marketer from "../models/Marketer.js";
 import PointsLedger from "../models/PointsLedger.js";
@@ -135,9 +136,22 @@ export const getPayouts = async (req, res) => {
     if (type !== "vendor") {
       const query = MarketerPayout.find({ status: marketerStatus })
         .sort({ updatedAt: -1 })
-        .populate("marketerId", "name email phone bankCode bankName accountNumber accountName");
+        .populate("marketerId", "name email phone bankCode bankName accountNumber accountName")
+        .populate("referralAttributionId", "referredBusinessId");
       if (status !== "to_pay") query.limit(HISTORY_CAP * 5);
       const payouts = await query;
+
+      // For the to-pay list, name the business behind each payout so an admin
+      // can judge (and reject) a single referral rather than a marketer's whole
+      // balance.
+      const nameByBusiness = new Map();
+      if (status === "to_pay") {
+        const ids = payouts.map((pay) => pay.referralAttributionId?.referredBusinessId).filter(Boolean);
+        if (ids.length) {
+          const named = await Business.find({ _id: { $in: ids } }).select("name").lean();
+          for (const b of named) nameByBusiness.set(String(b._id), b.name);
+        }
+      }
 
       const groups = new Map();
       for (const pay of payouts) {
@@ -162,11 +176,20 @@ export const getPayouts = async (req, res) => {
             date: when || pay.updatedAt,
             reference: status === "paid" ? pay.transferReference : "",
             reason: status === "rejected" ? pay.rejectionReason : "",
+            payouts: [],
           });
         }
         const g = groups.get(key);
         g.amount += pay.amount;
         g.count += 1;
+        if (status === "to_pay") {
+          g.payouts.push({
+            id: pay._id,
+            amount: pay.amount,
+            date: pay.createdAt || pay.updatedAt,
+            referred: nameByBusiness.get(String(pay.referralAttributionId?.referredBusinessId)) || "",
+          });
+        }
       }
       rows.push(...groups.values());
     }
@@ -226,6 +249,53 @@ export const getPayouts = async (req, res) => {
   }
 };
 
+// Tell a marketer that a payout (or a group of them) was declined. Never throws.
+async function emailMarketerRejection(marketerId, amount, reason) {
+  try {
+    const marketer = await Marketer.findById(marketerId).select("email name");
+    if (marketer?.email) {
+      await sendMarketerPayoutRejectedEmail({ to: marketer.email, name: marketer.name, amount, reason });
+    }
+  } catch (err) {
+    console.error("Marketer payout-rejected email failed:", err);
+  }
+}
+
+// POST /api/admin/marketer-payouts/:payoutId/reject   Body: { reason }
+// Decline ONE referral payout that is waiting to be paid, leaving the same
+// marketer's other payouts alone. Same rules as rejecting a whole marketer:
+// reason required and emailed, row kept as "rejected" so the referral can never
+// create a second payout, and the status flip is atomic so a double click or a
+// Mark paid racing it can't count the payout twice.
+export const rejectSingleMarketerPayout = async (req, res) => {
+  try {
+    const { payoutId } = req.params;
+    const reason = String(req.body?.reason || "").trim().slice(0, 300);
+    if (!mongoose.Types.ObjectId.isValid(payoutId)) {
+      return res.status(404).json({ message: "Payout not found." });
+    }
+    if (!reason) {
+      return res.status(400).json({ message: "A reason is required — the marketer will see it." });
+    }
+
+    const payout = await MarketerPayout.findOneAndUpdate(
+      { _id: payoutId, status: "batched" },
+      { status: "rejected", rejectedAt: new Date(), rejectionReason: reason },
+      { new: true }
+    );
+    if (!payout) {
+      return res.status(404).json({ message: "That payout isn't waiting to be paid (it may already be paid or rejected)." });
+    }
+
+    emailMarketerRejection(payout.marketerId, payout.amount, reason);
+
+    res.json({ success: true, amount: payout.amount, message: `Rejected a ₦${payout.amount.toLocaleString()} payout` });
+  } catch (error) {
+    console.error("Reject single marketer payout error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // POST /api/admin/payout-batches/:marketerId/reject   Body: { reason }
 // Decline everything currently waiting to be paid to this marketer (e.g. a
 // suspected self-referral). The payout rows are kept with status "rejected",
@@ -263,12 +333,7 @@ export const rejectMarketerPayouts = async (req, res) => {
     }
     const total = claimed.reduce((sum, p) => sum + p.amount, 0);
 
-    const marketer = await Marketer.findById(marketerId).select("email name");
-    if (marketer?.email) {
-      sendMarketerPayoutRejectedEmail({ to: marketer.email, name: marketer.name, amount: total, reason }).catch((err) =>
-        console.error("Marketer payout-rejected email failed:", err)
-      );
-    }
+    emailMarketerRejection(marketerId, total, reason);
 
     res.json({ success: true, message: `Rejected ${claimed.length} payout(s) totalling ₦${total.toLocaleString()}`, total });
   } catch (error) {

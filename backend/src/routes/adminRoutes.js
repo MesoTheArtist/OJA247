@@ -34,7 +34,7 @@ import {
   deleteCustomerAdmin,
   adminVerifyCustomerEmail,
 } from "../controllers/adminController.js";
-import { getPayoutBatches, markPayoutBatchPaid, getPayouts, rejectMarketerPayouts } from "../controllers/payoutBatchController.js";
+import { getPayoutBatches, markPayoutBatchPaid, getPayouts, rejectMarketerPayouts, rejectSingleMarketerPayout } from "../controllers/payoutBatchController.js";
 import {
   getAudienceCounts,
   sendTestCampaign,
@@ -97,6 +97,7 @@ router.patch("/vendors/:id/review", reviewVendor);
 router.get("/payout-batches", getPayoutBatches);
 router.post("/payout-batches/:marketerId/mark-paid", markPayoutBatchPaid);
 router.post("/payout-batches/:marketerId/reject", rejectMarketerPayouts);
+router.post("/marketer-payouts/:payoutId/reject", rejectSingleMarketerPayout);
 // One list of everything to pay, marketers and vendors together (the Payouts tab)
 router.get("/payouts", getPayouts);
 
