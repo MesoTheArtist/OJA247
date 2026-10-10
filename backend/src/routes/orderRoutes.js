@@ -21,6 +21,7 @@ import {
   rejectTransferPayment,
   resubmitReceipt,
   handleReceiptUpload,
+  cancelTransferOrder,
 } from "../controllers/directOrderController.js";
 import { protect, requireCustomer } from "../middleware/authMiddleware.js";
 import { authLimiter, paymentDetailsLimiter, directOrderLimiter } from "../middleware/rateLimiters.js";
@@ -34,6 +35,7 @@ router.post("/", createOrder);
 router.get("/payment-details/:businessId", paymentDetailsLimiter, getPaymentDetails);
 router.post("/direct", directOrderLimiter, handleReceiptUpload, createDirectOrder);
 router.post("/:reference/receipt", directOrderLimiter, handleReceiptUpload, resubmitReceipt);
+router.post("/:reference/cancel", directOrderLimiter, cancelTransferOrder);
 router.patch("/:reference/payment/confirm", protect, confirmTransferPayment);
 router.patch("/:reference/payment/reject", protect, rejectTransferPayment);
 router.post("/verify/:reference", verifyOrderPayment);

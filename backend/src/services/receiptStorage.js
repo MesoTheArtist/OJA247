@@ -52,7 +52,7 @@ export function uploadReceipt(buffer, originalName) {
 
 // A link a vendor or admin can open to see one receipt.
 export function signedReceiptUrl(receipt) {
-  if (!receipt?.publicId) return null;
+  if (!receipt?.publicId || receipt.purgedAt) return null;
   const options = {
     resource_type: receipt.resourceType || "image",
     type: "authenticated",
@@ -74,4 +74,17 @@ export function withReceiptLinks(order) {
       url: signedReceiptUrl(r),
     })),
   };
+}
+
+// Deletes one receipt file from storage. A file that is already gone counts as
+// success, so a retry after a half-finished run is harmless.
+export async function deleteReceiptFile(receipt) {
+  const result = await cloudinary.uploader.destroy(receipt.publicId, {
+    resource_type: receipt.resourceType || "image",
+    type: "authenticated",
+    invalidate: true,
+  });
+  if (result?.result !== "ok" && result?.result !== "not found") {
+    throw new Error(`Receipt delete returned "${result?.result}"`);
+  }
 }

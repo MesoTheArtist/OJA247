@@ -1,5 +1,6 @@
 import Order from "../models/Order.js";
 import { UNCONFIRMED_PAYMENT_DAYS } from "../models/Dispute.js";
+import { purgeExpiredReceipts } from "../services/receiptRetention.js";
 import User from "../models/User.js";
 import {
   sendVendorTransferReminderEmail,
@@ -106,7 +107,17 @@ export const runTransferFollowUpCheck = async (req, res) => {
       }
     }
 
-    res.json({ checked: waiting.length, reminded, adminAlerted });
+    // Daily housekeeping in the same run (one scheduled job, not two): delete
+    // receipt files past their retention period. A failure here must not hide
+    // the reminder results above.
+    let receipts = null;
+    try {
+      receipts = await purgeExpiredReceipts();
+    } catch (purgeError) {
+      console.error("Receipt retention run failed:", purgeError);
+    }
+
+    res.json({ checked: waiting.length, reminded, adminAlerted, receipts });
   } catch (error) {
     console.error("Transfer follow-up cron error:", error);
     res.status(500).json({ message: "Error running transfer follow-up check" });

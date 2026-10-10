@@ -12,7 +12,10 @@ import {
   sendVendorTransferOrderEmail,
   sendCustomerTransferOrderReceivedEmail,
   sendPaymentRejectedCustomerEmail,
+  sendVendorOrderCancelledEmail,
+  sendCustomerOrderCancelledEmail,
 } from "../services/emailService.js";
+import { reduceStockForOrder } from "../services/stock.js";
 import { sendVendorNewOrderWhatsApp } from "../services/whatsappService.js";
 
 const SITE_URL = process.env.SITE_URL || "https://oja247.store";
@@ -158,6 +161,16 @@ export const createDirectOrder = async (req, res) => {
     const outOfStock = products.find((pr) => pr.inStock === false);
     if (outOfStock) {
       return res.status(400).json({ message: `${outOfStock.name} is out of stock.` });
+    }
+
+    // Stock only comes off when the vendor confirms (so unpaid orders can't
+    // lock it), but an order for more than is left is turned away up front.
+    // A product with no count (stock 0 but still listed) is left alone.
+    const overOrdered = products.find((pr) => pr.stock > 0 && wanted.get(String(pr._id)) > pr.stock);
+    if (overOrdered) {
+      return res.status(400).json({
+        message: `Only ${overOrdered.stock} left of ${overOrdered.name}. Please lower the quantity and try again.`,
+      });
     }
 
     const result = await loadPayableVendor(businessId);
@@ -392,7 +405,20 @@ export const confirmTransferPayment = async (req, res) => {
       }
     ).catch((err) => console.error("Auto-resolve payment dispute failed:", err));
 
-    res.json({ message: "Payment confirmed.", order: paid });
+    // Take the quantities off stock, once. The flag is claimed atomically, so
+    // a double tap or two admins confirming at once can't take it off twice.
+    let stockWarnings = [];
+    try {
+      const claimed = await Order.findOneAndUpdate(
+        { _id: order._id, stockAdjustedAt: null },
+        { stockAdjustedAt: new Date() }
+      );
+      if (claimed) stockWarnings = await reduceStockForOrder(order);
+    } catch (stockError) {
+      console.error("Stock adjustment failed:", stockError);
+    }
+
+    res.json({ message: "Payment confirmed.", order: paid, stockWarnings });
   } catch (error) {
     console.error("Confirm transfer payment error:", error);
     res.status(500).json({ message: "Error confirming payment" });
@@ -514,5 +540,77 @@ export const resubmitReceipt = async (req, res) => {
   } catch (error) {
     console.error("Resubmit receipt error:", error);
     res.status(500).json({ message: "We could not upload your receipt. Please try again." });
+  }
+};
+
+// POST /api/orders/:reference/cancel   body: { email }   (customer, no login)
+// A customer cancels an order the vendor has not confirmed yet. The email must
+// match the one on the order, like the receipt re-upload. An order the vendor
+// already confirmed can't be cancelled here: that is a dispute.
+export const cancelTransferOrder = async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const order = await Order.findOne({ reference: req.params.reference });
+    if (!order || !email || String(order.customer?.email || "").trim().toLowerCase() !== email) {
+      return res.status(404).json({ message: "We couldn't find that order with that email address." });
+    }
+    if (order.paymentMethod !== "bank_transfer") {
+      return res.status(400).json({ message: "This order can't be cancelled here." });
+    }
+    if (order.status === "cancelled") {
+      return res.json({ message: "This order was already cancelled.", order });
+    }
+    if (!["awaiting_confirmation", "payment_rejected"].includes(order.status)) {
+      return res.status(400).json({
+        message: "Only an order the seller hasn't confirmed yet can be cancelled. If something is wrong with it, report a problem instead.",
+      });
+    }
+
+    // Atomic: if the vendor confirms at the same moment, only one of the two wins.
+    const updated = await Order.findOneAndUpdate(
+      { _id: order._id, status: { $in: ["awaiting_confirmation", "payment_rejected"] } },
+      { status: "cancelled", paymentStatus: "cancelled", cancelledAt: new Date(), cancelledBy: "customer" },
+      { new: true }
+    );
+    if (!updated) {
+      return res.status(409).json({ message: "This order just changed. Please refresh and check its status." });
+    }
+
+    // A "vendor hasn't confirmed" dispute has nothing left to decide.
+    await Dispute.updateMany(
+      { orderId: order._id, reason: "payment_not_confirmed", status: { $in: ["open", "escalated"] } },
+      {
+        status: "resolved",
+        "adminResolution.note": "The customer cancelled the order.",
+        "adminResolution.resolvedAt": new Date(),
+      }
+    ).catch((err) => console.error("Auto-resolve on cancel failed:", err));
+
+    // Tell both sides. Best effort: a failed email never undoes the cancel.
+    const businessId = order.vendors?.[0]?.businessId;
+    const businessName = order.vendors?.[0]?.businessName || "the seller";
+    const vendor = businessId ? await Vendor.findOne({ businessId }).select("contactEmail") : null;
+    if (vendor?.contactEmail) {
+      sendVendorOrderCancelledEmail({
+        to: vendor.contactEmail,
+        businessName,
+        customerName: order.customer?.fullName,
+        reference: order.reference,
+        total: order.total,
+        dashboardUrl: `${SITE_URL}/dashboard/${businessId}`,
+      }).catch((err) => console.error("Cancel vendor email failed:", err));
+    }
+    sendCustomerOrderCancelledEmail({
+      to: order.customer.email,
+      customerName: order.customer.fullName,
+      businessName,
+      reference: order.reference,
+      total: order.total,
+    }).catch((err) => console.error("Cancel customer email failed:", err));
+
+    res.json({ message: "Order cancelled.", order: updated });
+  } catch (error) {
+    console.error("Cancel transfer order error:", error);
+    res.status(500).json({ message: "We couldn't cancel your order. Please try again." });
   }
 };

@@ -1503,3 +1503,46 @@ export async function sendAdminUnconfirmedTransferEmail({ businessName, vendorEm
     ),
   });
 }
+
+// To the vendor when the customer cancels an order that was still unconfirmed.
+// The vendor may already have received the money, so the email says what to
+// check. OJA247 cannot move that money, which is why it is spelled out.
+export async function sendVendorOrderCancelledEmail({ to, businessName, customerName, reference, total, dashboardUrl }) {
+  return sendEmail({
+    to,
+    subject: `Order ${reference} was cancelled by the customer`,
+    html: layout(
+      `
+      ${h1("An order was cancelled")}
+      ${p(`Hi ${esc(businessName)}, ${esc(customerName) || "a customer"} cancelled order <strong>${esc(reference)}</strong> (${NAIRA(total)}) before you confirmed their payment. You don't need to do anything to the order.`)}
+      <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 16px; margin:20px 0;">
+        <p style="margin:0; font-size:13px; color:#92400e; line-height:1.6;">
+          <strong>Check your bank.</strong> If the customer's money did arrive, please send it back to them.
+          OJA247 can't refund payments made to your account, so this is between you and the customer.
+        </p>
+      </div>
+      ${button("Open your dashboard", dashboardUrl)}
+      `,
+      { preheader: `${customerName || "A customer"} cancelled order ${reference}.` }
+    ),
+  });
+}
+
+// To the customer after they cancel, so they have it in writing, including the
+// reminder that OJA247 cannot return money paid to the seller.
+export async function sendCustomerOrderCancelledEmail({ to, customerName, businessName, reference, total }) {
+  return sendEmail({
+    to,
+    subject: `Your order ${reference} was cancelled`,
+    html: layout(
+      `
+      ${h1("Your order was cancelled")}
+      ${p(`Hi ${esc(customerName) || "there"}, order <strong>${esc(reference)}</strong> (${NAIRA(total)}) from <strong>${esc(businessName)}</strong> has been cancelled, as you asked.`)}
+      ${p("If you already sent money to the seller, OJA247 can't return it, because it went straight to their bank account. Please contact the seller and ask for a refund. If they don't answer, you can report the order and we will follow up with them.")}
+      ${button("Report a problem", `${SITE_URL}/report-problem?reference=${encodeURIComponent(reference)}`)}
+      ${small("Cancelled by mistake? Just place the order again from the store.")}
+      `,
+      { preheader: `Order ${reference} was cancelled. If you already paid, ask the seller for a refund.` }
+    ),
+  });
+}

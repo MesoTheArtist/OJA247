@@ -114,6 +114,9 @@ const OrderSchema = new mongoose.Schema(
         // SHA-256 of the file, to spot the same receipt used on another order.
         fileHash: { type: String, default: "" },
         uploadedAt: { type: Date, default: Date.now },
+        // Set when the file was deleted from storage under the retention
+        // rules (config/retention.js). The record stays; the file is gone.
+        purgedAt: { type: Date, default: null },
         _id: false,
       },
     ],
@@ -137,6 +140,12 @@ const OrderSchema = new mongoose.Schema(
     // Set when the latest receipt file is byte-for-byte the same as one on
     // another order. Internal only (the vendor just sees a warning flag).
     duplicateReceiptOf: { type: String, default: "" },
+    // Set when the customer cancelled an order that was still unconfirmed.
+    cancelledAt: { type: Date, default: null },
+    cancelledBy: { type: String, default: "" },
+    // Set once stock has been taken off for this order (on the vendor's
+    // confirmation), so it can never be taken off twice.
+    stockAdjustedAt: { type: Date, default: null },
     paymentConfirmedAt: { type: Date, default: null },
     // For the daily follow-up job on unconfirmed bank-transfer orders.
     lastVendorReminderAt: { type: Date, default: null },

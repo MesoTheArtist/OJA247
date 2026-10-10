@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import Order from "../models/Order.js";
 import Vendor from "../models/Vendor.js";
+import Product from "../models/Product.js";
 import Business from "../models/Business.js";
 import TaxLedger from "../models/TaxLedger.js";
 import { sendOrderConfirmationEmail, sendVendorNewOrderEmail, sendOrderPaymentFailedEmail } from "../services/emailService.js";
@@ -616,10 +617,40 @@ export const getOrdersByBusiness = async (req, res) => {
     const vendorNow = await Vendor.findOne({ businessId }).select("accountNumber");
     const currentAccount = String(vendorNow?.accountNumber || "");
 
+    // For orders still waiting on the vendor: which items they'd run out of if
+    // they confirmed, so they can see it before tapping Payment received.
+    const waitingProductIds = [
+      ...new Set(
+        orders
+          .filter((o) => o.paymentStatus === "awaiting_confirmation")
+          .flatMap((o) => (o.items || []).map((i) => String(i.productId || "")))
+          .filter(Boolean)
+      ),
+    ];
+    const stockById = new Map(
+      (waitingProductIds.length
+        ? await Product.find({ _id: { $in: waitingProductIds } }).select("name stock inStock")
+        : []
+      ).map((p) => [String(p._id), p])
+    );
+
     // Signed, private links to each payment receipt so the vendor can open them.
     res.json(
       orders.map((order) => {
         const plain = withReceiptLinks(order);
+        plain.stockShort =
+          plain.paymentStatus === "awaiting_confirmation"
+            ? (plain.items || [])
+                .map((i) => {
+                  const p = stockById.get(String(i.productId));
+                  if (!p) return null;
+                  const needs = Number(i.quantity) || 0;
+                  const soldOut = p.stock === 0 && p.inStock === false;
+                  if (!soldOut && !(p.stock > 0 && needs > p.stock)) return null;
+                  return { name: p.name, needs, hasLeft: soldOut ? 0 : p.stock };
+                })
+                .filter(Boolean)
+            : [];
         const told = String(plain.paymentInstructions?.accountNumber || "");
         plain.payToChanged = Boolean(told && currentAccount && told !== currentAccount);
         // Only a yes/no for the vendor, never another order's reference.
