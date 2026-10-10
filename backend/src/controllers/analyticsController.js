@@ -76,12 +76,19 @@ export const getSubscriptionBreakdown = async (req, res) => {
 // GET /api/admin/analytics/marketer-leaderboard
 export const getMarketerLeaderboard = async (req, res) => {
   try {
+    const earnedStatuses = ["pending", "batched", "paid"];
     const payoutAgg = await MarketerPayout.aggregate([
       {
         $group: {
           _id: "$marketerId",
-          totalEarned: { $sum: "$amount" },
-          totalConversions: { $sum: 1 },
+          totalEarned: {
+            $sum: { $cond: [{ $in: ["$status", earnedStatuses] }, "$amount", 0] },
+          },
+          paidOut: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] } },
+          outstanding: {
+            $sum: { $cond: [{ $in: ["$status", ["pending", "batched"]] }, "$amount", 0] },
+          },
+          rejectedPayouts: { $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] } },
         },
       },
       { $sort: { totalEarned: -1 } },
@@ -97,7 +104,13 @@ export const getMarketerLeaderboard = async (req, res) => {
       Marketer.find({ _id: { $in: marketerIds } }).select("name referralCode"),
       ReferralAttribution.aggregate([
         { $match: { referrerType: "marketer", referrerId: { $in: marketerIds } } },
-        { $group: { _id: "$referrerId", totalReferred: { $sum: 1 } } },
+        {
+          $group: {
+            _id: "$referrerId",
+            totalReferred: { $sum: 1 },
+            totalConversions: { $sum: { $cond: [{ $eq: ["$status", "converted"] }, 1, 0] } },
+          },
+        },
       ]),
     ]);
 
@@ -112,8 +125,11 @@ export const getMarketerLeaderboard = async (req, res) => {
         name: marketer?.name || "(deleted marketer)",
         referralCode: marketer?.referralCode || "",
         totalEarned: p.totalEarned,
-        totalConversions: p.totalConversions,
-        totalReferred: referredMap[key] || 0,
+        totalConversions: referredMap[key]?.totalConversions || 0,
+        totalReferred: referredMap[key]?.totalReferred || 0,
+        paidOut: p.paidOut,
+        outstanding: p.outstanding,
+        rejectedPayouts: p.rejectedPayouts,
       };
     });
 

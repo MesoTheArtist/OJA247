@@ -4,6 +4,7 @@ import Marketer from "../models/Marketer.js";
 import PointsLedger from "../models/PointsLedger.js";
 import Vendor from "../models/Vendor.js";
 import Business from "../models/Business.js";
+import ReferralAttribution from "../models/ReferralAttribution.js";
 import { sendMarketerPayoutPaidEmail, sendMarketerPayoutRejectedEmail } from "../services/emailService.js";
 
 // GET /api/cron/payout-batch  (called weekly by Vercel Cron — see vercel.json)
@@ -137,23 +138,31 @@ export const getPayouts = async (req, res) => {
       const query = MarketerPayout.find({ status: marketerStatus })
         .sort({ updatedAt: -1 })
         .populate("marketerId", "name email phone bankCode bankName accountNumber accountName")
-        .populate("referralAttributionId", "referredBusinessId");
+        .populate({
+          path: "referralAttributionId",
+          select: "referredBusinessId referralCode status convertedAt conversionBaseAmount conversionPlanType conversionPaymentId conversionPaymentReference",
+          populate: { path: "referredBusinessId", select: "name" },
+        });
       if (status !== "to_pay") query.limit(HISTORY_CAP * 5);
       const payouts = await query;
 
-      // For the to-pay list, name the business behind each payout so an admin
-      // can judge (and reject) a single referral rather than a marketer's whole
-      // balance.
-      const nameByBusiness = new Map();
-      if (status === "to_pay") {
-        const ids = payouts.map((pay) => pay.referralAttributionId?.referredBusinessId).filter(Boolean);
-        if (ids.length) {
-          const named = await Business.find({ _id: { $in: ids } }).select("name").lean();
-          for (const b of named) nameByBusiness.set(String(b._id), b.name);
-        }
-      }
-
       const groups = new Map();
+      const marketerIds = [...new Set(payouts.map((pay) => pay.marketerId?._id?.toString()).filter(Boolean))]
+        .map((id) => new mongoose.Types.ObjectId(id));
+      const referralCounts = marketerIds.length
+        ? await ReferralAttribution.aggregate([
+            { $match: { referrerType: "marketer", referrerId: { $in: marketerIds } } },
+            {
+              $group: {
+                _id: "$referrerId",
+                totalReferrals: { $sum: 1 },
+                convertedReferrals: { $sum: { $cond: [{ $eq: ["$status", "converted"] }, 1, 0] } },
+              },
+            },
+          ])
+        : [];
+      const referralCountByMarketer = new Map(referralCounts.map((entry) => [String(entry._id), entry]));
+
       for (const pay of payouts) {
         const m = pay.marketerId;
         if (!m) continue;
@@ -172,6 +181,8 @@ export const getPayouts = async (req, res) => {
             hasBank: Boolean(m.bankCode && m.accountNumber),
             amount: 0,
             count: 0,
+            totalReferrals: referralCountByMarketer.get(String(m._id))?.totalReferrals || 0,
+            convertedReferrals: referralCountByMarketer.get(String(m._id))?.convertedReferrals || 0,
             status,
             date: when || pay.updatedAt,
             reference: status === "paid" ? pay.transferReference : "",
@@ -182,14 +193,25 @@ export const getPayouts = async (req, res) => {
         const g = groups.get(key);
         g.amount += pay.amount;
         g.count += 1;
-        if (status === "to_pay") {
-          g.payouts.push({
-            id: pay._id,
-            amount: pay.amount,
-            date: pay.createdAt || pay.updatedAt,
-            referred: nameByBusiness.get(String(pay.referralAttributionId?.referredBusinessId)) || "",
-          });
-        }
+        const attribution = pay.referralAttributionId;
+        const referredBusiness = attribution?.referredBusinessId;
+        const conversionAmount = pay.conversionAmount ?? attribution?.conversionBaseAmount ?? null;
+        const storedRate = pay.commissionRate;
+        g.payouts.push({
+          id: pay._id,
+          businessId: referredBusiness?._id || referredBusiness || null,
+          businessName: referredBusiness?.name || "(business unavailable)",
+          referralCode: attribution?.referralCode || "",
+          referralStatus: attribution?.status || "unknown",
+          planType: pay.planType || attribution?.conversionPlanType || null,
+          conversionAmount,
+          commissionRate: storedRate ?? (conversionAmount ? pay.amount / conversionAmount : null),
+          amount: pay.amount,
+          paymentReference: pay.paymentReference || attribution?.conversionPaymentReference || "",
+          subscriptionPaymentId: pay.subscriptionPaymentId || attribution?.conversionPaymentId || null,
+          status: pay.status,
+          date: pay.createdAt || pay.updatedAt,
+        });
       }
       rows.push(...groups.values());
     }

@@ -192,7 +192,7 @@ export async function attributeReferral({ businessId, referralCodeUsed, ownerEma
  * actually runs, so a second call for the same business is a no-op below
  * regardless of which payment number it is.
  */
-export async function handleSubscriptionConversion({ businessId, amountPaid, planType }) {
+export async function handleSubscriptionConversion({ businessId, amountPaid, planType, paymentId, paymentReference }) {
   const attribution = await ReferralAttribution.findOne({
     referredBusinessId: businessId,
     status: "pending",
@@ -202,6 +202,9 @@ export async function handleSubscriptionConversion({ businessId, amountPaid, pla
   attribution.status = "converted";
   attribution.convertedAt = new Date();
   attribution.conversionBaseAmount = amountPaid;
+  attribution.conversionPlanType = planType;
+  attribution.conversionPaymentId = paymentId || null;
+  attribution.conversionPaymentReference = paymentReference || "";
   await attribution.save();
 
   if (attribution.referrerType === "marketer") {
@@ -215,6 +218,11 @@ export async function handleSubscriptionConversion({ businessId, amountPaid, pla
       marketerId: attribution.referrerId,
       referralAttributionId: attribution._id,
       amount: payoutAmount,
+      planType,
+      conversionAmount: amountPaid,
+      commissionRate: rate,
+      paymentReference: paymentReference || "",
+      subscriptionPaymentId: paymentId || null,
     });
 
     const marketer = await Marketer.findById(attribution.referrerId).select("email name");

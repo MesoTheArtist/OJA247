@@ -9,7 +9,12 @@ const MarketerPayoutSchema = new mongoose.Schema(
       required: true,
       unique: true, // one payout per conversion — hard stop against double-paying
     },
-    amount: { type: Number, required: true }, // 50% of the referral's first subscription payment
+    amount: { type: Number, required: true }, // Plan-tiered commission on eligible subscription cash
+    planType: { type: String, enum: ["monthly", "six_month", "yearly"], default: null },
+    conversionAmount: { type: Number, default: null },
+    commissionRate: { type: Number, default: null },
+    paymentReference: { type: String, default: "" },
+    subscriptionPaymentId: { type: mongoose.Schema.Types.ObjectId, ref: "SubscriptionPayment", default: null },
 
     status: {
       type: String,

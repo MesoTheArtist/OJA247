@@ -32,6 +32,9 @@ const ReferralAttributionSchema = new mongoose.Schema(
     // payment amount), captured at conversion time for an accurate audit trail
     // even if the subscription fee changes later.
     conversionBaseAmount: { type: Number, default: null },
+    conversionPlanType: { type: String, enum: ["monthly", "six_month", "yearly"], default: null },
+    conversionPaymentId: { type: mongoose.Schema.Types.ObjectId, ref: "SubscriptionPayment", default: null },
+    conversionPaymentReference: { type: String, default: "" },
   },
   { timestamps: true }
 );

@@ -19,6 +19,21 @@ const PLAN_DURATIONS_DAYS = {
   yearly: 365,
 };
 
+const PLAN_MONTHS = { monthly: 1, six_month: 6, yearly: 12 };
+
+export const getSubscriptionPlans = (req, res) => {
+  const labels = { monthly: "Monthly", six_month: "6 Months", yearly: "Yearly" };
+  res.json({
+    plans: Object.entries(PLAN_PRICES).map(([key, price]) => ({
+      key,
+      label: labels[key],
+      price,
+      months: PLAN_MONTHS[key],
+      durationDays: PLAN_DURATIONS_DAYS[key],
+    })),
+  });
+};
+
 // Runs a follow-up step that must never undo or fail an activation that has
 // already happened (points bookkeeping, the receipt email). A failure is logged
 // loudly with the label so it can be fixed by hand, and nothing is thrown.
@@ -108,7 +123,7 @@ async function deductAppliedPoints(payment) {
 async function safeHandleSubscriptionConversion(details) {
   const { paymentId, ...conversionArgs } = details;
   try {
-    await handleSubscriptionConversion(conversionArgs);
+    await handleSubscriptionConversion({ ...conversionArgs, paymentId });
   } catch (err) {
     console.error(
       `Referral conversion failed for subscription payment ${paymentId} (business ${conversionArgs.businessId}, plan ${conversionArgs.planType}) — subscription is still active, but no marketer payout/points were recorded:`,
@@ -351,6 +366,7 @@ async function markSubscriptionPaid(reference, paystackData = null) {
   if (cashCollected > 0) {
     await safeHandleSubscriptionConversion({
       paymentId: payment._id,
+      paymentReference: payment.paystackReference,
       businessId: payment.businessId,
       amountPaid: cashCollected,
       planType: payment.planType,

@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  getSubscriptionPlans,
   initiateSubscription,
   verifySubscriptionPayment,
   handleSubscriptionWebhook,
@@ -9,6 +10,7 @@ import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
+router.get("/plans", getSubscriptionPlans);
 router.post("/initiate", protect, initiateSubscription);
 router.post("/verify/:reference", protect, verifySubscriptionPayment);
 router.post("/auto-renew/cancel", protect, cancelSubscriptionAutoRenew);

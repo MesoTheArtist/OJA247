@@ -39,6 +39,8 @@ import {
   Wallet,
   UserCircle,
   Mail,
+  Download,
+  RefreshCw,
 } from "lucide-react";
 import {
   LineChart,
@@ -103,6 +105,75 @@ const formatChartDate = (isoDate) => {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
+const csvCell = (value) => {
+  const text = String(value ?? "");
+  const protectedText = /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text;
+  return `"${protectedText.replaceAll('"', '""')}"`;
+};
+
+function exportAnalyticsCsv(analytics) {
+  if (!analytics) return;
+  const rows = [["Record type", "Date", "Metric", "Value", "Details"]];
+  const seriesByDate = new Map();
+  const metrics = [
+    ["New users", "userGrowth"],
+    ["New businesses", "businessGrowth"],
+    ["Paid order value by order date (NGN)", "revenueGrowth"],
+    ["Referral conversions", "conversionGrowth"],
+  ];
+  for (const [label, key] of metrics) {
+    for (const point of analytics.growth[key] || []) {
+      if (!seriesByDate.has(point.date)) seriesByDate.set(point.date, []);
+      seriesByDate.get(point.date).push(["Growth", point.date, label, point.count, ""]);
+    }
+  }
+  for (const dailyRows of seriesByDate.values()) rows.push(...dailyRows);
+
+  for (const [label, value] of [
+    ["Active subscriptions", analytics.subscriptions.active],
+    ["Expired subscriptions", analytics.subscriptions.expired],
+    ["Never subscribed", analytics.subscriptions.neverSubscribed],
+  ]) {
+    rows.push(["Subscriptions", "", label, value, "Current count"]);
+  }
+  for (const marketer of analytics.leaderboard || []) {
+    rows.push([
+      "Marketer",
+      "",
+      marketer.name,
+      marketer.totalEarned,
+      `${marketer.referralCode}; ${marketer.totalReferred} referred; ${marketer.totalConversions} converted; ₦${marketer.paidOut} paid; ₦${marketer.outstanding} outstanding; ${marketer.rejectedPayouts} rejected`,
+    ]);
+  }
+  for (const event of analytics.activity || []) {
+    rows.push(["Recent activity", event.timestamp, event.type, "", event.label]);
+  }
+
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `oja247-growth-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function dailyGrowthRecords(growth) {
+  const byDate = new Map();
+  for (const [key, label] of [
+    ["userGrowth", "users"],
+    ["businessGrowth", "businesses"],
+    ["revenueGrowth", "revenue"],
+    ["conversionGrowth", "conversions"],
+  ]) {
+    for (const point of growth[key] || []) {
+      if (!byDate.has(point.date)) byDate.set(point.date, { date: point.date });
+      byDate.get(point.date)[label] = point.count;
+    }
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
 const AdminDashboard = () => {
   const { confirm, prompt, notify } = useDialog();
   const { user, logout } = useAuth();
@@ -125,6 +196,8 @@ const AdminDashboard = () => {
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsDays, setAnalyticsDays] = useState(30);
+  const [showAnalyticsRecords, setShowAnalyticsRecords] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
@@ -228,11 +301,10 @@ const AdminDashboard = () => {
     fetchAllData();
   }, [user]);
 
-  useEffect(() => {
-    if (activeTab !== "analytics" || analytics) return; // only fetch once, on first visit to the tab
+  const fetchAnalytics = (days = analyticsDays) => {
     setAnalyticsLoading(true);
     Promise.all([
-      axiosInstance.get("/api/admin/analytics/growth"),
+      axiosInstance.get("/api/admin/analytics/growth", { params: { days } }),
       axiosInstance.get("/api/admin/analytics/subscriptions"),
       axiosInstance.get("/api/admin/analytics/marketer-leaderboard"),
       axiosInstance.get("/api/admin/analytics/recent-activity"),
@@ -245,9 +317,13 @@ const AdminDashboard = () => {
           activity: activityRes.data.events,
         });
       })
-      .catch(() => showToast("Couldn't load analytics. Try switching tabs and back.", "error"))
+      .catch(() => showToast("Couldn't load analytics. Try refreshing the report.", "error"))
       .finally(() => setAnalyticsLoading(false));
-  }, [activeTab]);
+  };
+
+  useEffect(() => {
+    if (activeTab === "analytics") fetchAnalytics(analyticsDays);
+  }, [activeTab, analyticsDays]);
 
   // Kill Switch + Grandfather Exemptions both need the unfiltered business
   // list — fetch once, shared between both tabs.
@@ -1045,6 +1121,47 @@ const AdminDashboard = () => {
 
           {activeTab === "analytics" && (
             <div>
+              <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Growth Analytics</h2>
+                  <p className="text-sm text-gray-500 mt-1">Daily acquisition, paid order value, referrals, subscriptions, and recent activity.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="sr-only" htmlFor="analytics-days">Analytics date range</label>
+                  <select
+                    id="analytics-days"
+                    value={analyticsDays}
+                    onChange={(event) => setAnalyticsDays(Number(event.target.value))}
+                    className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-700"
+                  >
+                    {[30, 60, 90].map((days) => <option key={days} value={days}>Last {days} days</option>)}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => fetchAnalytics(analyticsDays)}
+                    disabled={analyticsLoading}
+                    className="inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <RefreshCw size={15} className={analyticsLoading ? "animate-spin" : ""} /> Refresh
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportAnalyticsCsv(analytics)}
+                    disabled={!analytics}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                  >
+                    <Download size={15} /> Export CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAnalyticsRecords((visible) => !visible)}
+                    disabled={!analytics}
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {showAnalyticsRecords ? "Hide records" : "View records"}
+                  </button>
+                </div>
+              </div>
               {analyticsLoading && !analytics && (
                 <div className="flex items-center justify-center py-24">
                   <p className="text-gray-500 text-sm">Loading analytics...</p>
@@ -1058,7 +1175,7 @@ const AdminDashboard = () => {
                     {[
                       { key: "userGrowth", title: "Users Onboarded", color: "#16a34a", type: "line" },
                       { key: "businessGrowth", title: "Businesses Onboarded", color: "#0ea5e9", type: "line" },
-                      { key: "revenueGrowth", title: "Revenue", color: "#eab308", type: "bar", isCurrency: true },
+                      { key: "revenueGrowth", title: "Paid Order Value by Order Date", color: "#eab308", type: "bar", isCurrency: true },
                       { key: "conversionGrowth", title: "Referral Conversions", color: "#a855f7", type: "bar" },
                     ].map((chart) => {
                       const data = (analytics.growth[chart.key] || []).map((d) => ({
@@ -1120,6 +1237,37 @@ const AdminDashboard = () => {
                     })}
                   </div>
 
+                  {showAnalyticsRecords && (
+                    <div className="bg-white border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
+                      <div className="p-5 border-b border-gray-200">
+                        <h3 className="font-bold text-gray-900">Daily growth records</h3>
+                        <p className="mt-1 text-xs text-gray-500">Paid order value is grouped by order creation date; amounts are in NGN.</p>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[680px] admin-table">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              {["Date", "New users", "New businesses", "Paid order value", "Referral conversions"].map((label) => (
+                                <th key={label} className="p-3 text-left text-xs font-semibold uppercase text-gray-500">{label}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {dailyGrowthRecords(analytics.growth).map((record) => (
+                              <tr key={record.date} className="border-t border-gray-100">
+                                <td className="p-3 text-sm text-gray-700">{formatChartDate(record.date)}</td>
+                                <td className="p-3 text-sm text-gray-700">{record.users || 0}</td>
+                                <td className="p-3 text-sm text-gray-700">{record.businesses || 0}</td>
+                                <td className="p-3 text-sm text-gray-700">₦{Number(record.revenue || 0).toLocaleString()}</td>
+                                <td className="p-3 text-sm text-gray-700">{record.conversions || 0}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Subscription status breakdown */}
                   <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6">
                     <h3 className="font-bold text-gray-900 mb-4">Subscription Status</h3>
@@ -1156,6 +1304,9 @@ const AdminDashboard = () => {
                                   <p className="font-semibold text-gray-900 text-sm">{m.name}</p>
                                   <p className="text-xs text-gray-500">
                                     {m.referralCode} · {m.totalReferred} referred · {m.totalConversions} converted
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    ₦{Number(m.paidOut || 0).toLocaleString()} paid · ₦{Number(m.outstanding || 0).toLocaleString()} outstanding · {m.rejectedPayouts || 0} rejected
                                   </p>
                                 </div>
                               </div>
@@ -1800,6 +1951,11 @@ const AdminDashboard = () => {
                           <td data-label="Who" data-stack="true" className="p-4">
                             <p className="font-medium text-gray-900">{row.party}</p>
                             <p className="text-xs text-gray-500">{row.email}</p>
+                            {row.kind === "marketer" && (
+                              <p className="mt-1 text-xs text-gray-600">
+                                {row.totalReferrals} referrals · {row.convertedReferrals} converted
+                              </p>
+                            )}
                             <span
                               className={`mt-1 inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
                                 row.kind === "marketer"
@@ -1849,23 +2005,29 @@ const AdminDashboard = () => {
                                     {row.payouts.map((pay) => (
                                       <li
                                         key={pay.id}
-                                        className="flex items-start justify-between gap-3 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2"
+                                          className="flex flex-col gap-2 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2"
                                       >
-                                        <div className="min-w-0 text-left text-xs text-gray-600">
-                                          <p className="font-semibold text-gray-900">₦{Number(pay.amount).toLocaleString()}</p>
-                                          <p className="break-words">{pay.referred || "Referral"}</p>
-                                          <p className="text-gray-400">
-                                            {new Date(pay.date).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
-                                          </p>
+                                        <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-left text-xs text-gray-600">
+                                          <p className="font-semibold text-gray-900">Business: {pay.businessName}</p>
+                                          <p>Referral code: <span className="font-mono">{pay.referralCode || "(not recorded)"}</span></p>
+                                          <p>Plan: {pay.planType || "Legacy record"}</p>
+                                          <p>Referral status: {pay.referralStatus}</p>
+                                          <p>Cash basis: {pay.conversionAmount == null ? "Not recorded" : `₦${Number(pay.conversionAmount).toLocaleString()}`}</p>
+                                          <p>Commission: {pay.commissionRate == null ? "Not recorded" : `${(Number(pay.commissionRate) * 100).toFixed(1)}%`} · ₦{Number(pay.amount).toLocaleString()}</p>
+                                          <p>Earned: {new Date(pay.date).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</p>
+                                          <p>Payout status: {pay.status}</p>
+                                          <p className="sm:col-span-2 break-all">Subscription payment ref: {pay.paymentReference || "Not recorded"}</p>
                                         </div>
-                                        <button
-                                          type="button"
-                                          onClick={() => rejectSinglePayout(row, pay)}
-                                          disabled={payoutBusyId === pay.id}
-                                          className="shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-red-300 text-red-600 hover:bg-red-50 transition disabled:opacity-50"
-                                        >
-                                          {payoutBusyId === pay.id ? "Working…" : "Reject"}
-                                        </button>
+                                        {payoutStatusFilter === "to_pay" && (
+                                          <button
+                                            type="button"
+                                            onClick={() => rejectSinglePayout(row, pay)}
+                                            disabled={payoutBusyId === pay.id}
+                                            className="self-start px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-red-300 text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                                          >
+                                            {payoutBusyId === pay.id ? "Working…" : "Reject this referral"}
+                                          </button>
+                                        )}
                                       </li>
                                     ))}
                                   </ul>

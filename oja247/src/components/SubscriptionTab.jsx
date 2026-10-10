@@ -1,12 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../services/api";
 
-const PLANS = [
-  { key: "monthly", label: "Monthly", price: 1999, blurb: "Billed every month" },
-  { key: "six_month", label: "6 Months", price: 9999, blurb: "≈ ₦1,666/month — save ~17%" },
-  { key: "yearly", label: "Yearly", price: 17999, blurb: "≈ ₦1,500/month — save ~25%", recommended: true },
-];
-
 const STATUS_LABELS = {
   inactive: { text: "No active subscription", color: "text-gray-500" },
   active: { text: "Active", color: "text-green-600" },
@@ -16,6 +10,8 @@ const STATUS_LABELS = {
 function SubscriptionTab({ businessId, business, email }) {
   const paystackPublicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
   const [paystackReady, setPaystackReady] = useState(false);
+  const [plans, setPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState("yearly");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -23,6 +19,13 @@ function SubscriptionTab({ businessId, business, email }) {
   const [usePoints, setUsePoints] = useState(false);
 
   const pointsBalance = business?.pointsBalance || 0;
+
+  useEffect(() => {
+    axiosInstance.get("/api/subscriptions/plans")
+      .then(({ data }) => setPlans(data.plans || []))
+      .catch(() => setError("Subscription plans could not be loaded. Please refresh and try again."))
+      .finally(() => setPlansLoading(false));
+  }, []);
 
   useEffect(() => {
     const existingScript = document.querySelector("script[src='https://js.paystack.co/v1/inline.js']");
@@ -38,9 +41,16 @@ function SubscriptionTab({ businessId, business, email }) {
     document.body.appendChild(script);
   }, []);
 
-  const currentPlan = PLANS.find((p) => p.key === selectedPlan);
+  const currentPlan = plans.find((plan) => plan.key === selectedPlan) || { key: selectedPlan, price: 0, months: 1 };
   const appliedPoints = usePoints ? Math.min(pointsBalance, currentPlan.price) : 0;
   const amountDue = currentPlan.price - appliedPoints;
+  const monthlyPrice = plans.find((plan) => plan.key === "monthly")?.price || 0;
+  const bestValuePlanKey = plans.length
+    ? plans.reduce((best, plan) => plan.price / plan.months < best.price / best.months ? plan : best).key
+    : null;
+  const planBlurb = (plan) => plan.months === 1
+    ? "Billed every month"
+    : `₦${(plan.price / plan.months).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month · save ${((1 - plan.price / (monthlyPrice * plan.months)) * 100).toFixed(1)}%`;
 
   const status = STATUS_LABELS[business?.subscriptionStatus] || STATUS_LABELS.inactive;
   const expiresAt = business?.subscriptionExpiresAt
@@ -52,6 +62,7 @@ function SubscriptionTab({ businessId, business, email }) {
     : null;
 
   const handleSubscribe = async () => {
+    if (plansLoading || !currentPlan.price) return;
     setError("");
     setLoading(true);
 
@@ -163,7 +174,7 @@ function SubscriptionTab({ businessId, business, email }) {
         {business?.subscriptionStatus === "active" && business?.subscriptionAutoRenew && (
           <div className="mt-3 text-sm text-gray-600">
             <p>
-              Auto-renew is on for the {PLANS.find((plan) => plan.key === business.subscriptionAutoRenewPlanType)?.label || "selected"} plan
+              Auto-renew is on for the {plans.find((plan) => plan.key === business.subscriptionAutoRenewPlanType)?.label || "selected"} plan
               {business.subscriptionCardBrand && business.subscriptionCardLast4
                 ? ` using ${business.subscriptionCardBrand} ending in ${business.subscriptionCardLast4}`
                 : " using your saved card"}.
@@ -196,7 +207,7 @@ function SubscriptionTab({ businessId, business, email }) {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        {PLANS.map((plan) => (
+        {plans.map((plan) => (
           <button
             key={plan.key}
             type="button"
@@ -207,7 +218,7 @@ function SubscriptionTab({ businessId, business, email }) {
                 : "border-gray-200 hover:border-gray-300"
             }`}
           >
-            {plan.recommended && (
+            {plan.key === bestValuePlanKey && (
               <span className="absolute -top-2 right-3 bg-green-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                 Best value
               </span>
@@ -216,7 +227,7 @@ function SubscriptionTab({ businessId, business, email }) {
             <p className="text-2xl font-extrabold text-gray-900 mt-1">
               ₦{plan.price.toLocaleString()}
             </p>
-            <p className="text-xs text-gray-500 mt-1">{plan.blurb}</p>
+            <p className="text-xs text-gray-500 mt-1">{planBlurb(plan)}</p>
           </button>
         ))}
       </div>
@@ -271,7 +282,7 @@ function SubscriptionTab({ businessId, business, email }) {
 
       <button
         onClick={handleSubscribe}
-        disabled={loading}
+        disabled={loading || plansLoading || !currentPlan.price}
         className={`w-full py-3 rounded-lg font-bold text-white transition-colors ${
           loading
             ? "bg-gray-400 cursor-not-allowed"
@@ -280,6 +291,8 @@ function SubscriptionTab({ businessId, business, email }) {
       >
         {loading
           ? "Processing..."
+          : plansLoading
+          ? "Loading plans..."
           : amountDue <= 0
           ? "Pay with Points"
           : `Subscribe — ${currentPlan?.label}${appliedPoints > 0 ? ` (₦${amountDue.toLocaleString()} due)` : ""}`}
