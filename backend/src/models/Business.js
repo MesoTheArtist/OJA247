@@ -65,6 +65,18 @@ const BusinessSchema = new mongoose.Schema(
     },
     subscriptionExpiresAt: { type: Date, default: null },
     hasPaidFirstSubscription: { type: Boolean, default: false }, // gates the marketer payout rule
+    subscriptionAutoRenew: { type: Boolean, default: false },
+    subscriptionAutoRenewPlanType: {
+      type: String,
+      enum: ["monthly", "six_month", "yearly", null],
+      default: null,
+    },
+    subscriptionAutoRenewAmount: { type: Number, default: null },
+    subscriptionAuthorizationCode: { type: String, default: null, select: false },
+    subscriptionCustomerCode: { type: String, default: null, select: false },
+    subscriptionCardBrand: { type: String, default: null },
+    subscriptionCardLast4: { type: String, default: null },
+    subscriptionAutoRenewAttemptedFor: { type: Date, default: null },
 
     // Tracks which subscription-expiry emails have already gone out for the
     // CURRENT subscriptionExpiresAt value, so the daily cron doesn't re-send

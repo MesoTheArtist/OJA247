@@ -19,6 +19,7 @@ function SubscriptionTab({ businessId, business, email }) {
   const [selectedPlan, setSelectedPlan] = useState("yearly");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [usePoints, setUsePoints] = useState(false);
 
   const pointsBalance = business?.pointsBalance || 0;
@@ -60,6 +61,7 @@ function SubscriptionTab({ businessId, business, email }) {
         businessId,
         planType: selectedPlan,
         pointsToApply: appliedPoints,
+        autoRenew: amountDue > 0,
       });
       reference = data.reference;
       amount = data.amount;
@@ -93,6 +95,7 @@ function SubscriptionTab({ businessId, business, email }) {
       email,
       amount: Math.round(amount * 100), // kobo
       currency: "NGN",
+      channels: ["card"],
       ref: reference,
       metadata: {
         custom_fields: [
@@ -107,6 +110,11 @@ function SubscriptionTab({ businessId, business, email }) {
               `/api/subscriptions/verify/${response.reference}`
             );
             if (verification.data?.payment?.status === "success") {
+              if (amountDue > 0 && !verification.data.autoRenewEnabled) {
+                setNotice("Payment succeeded, but this card could not be enrolled for automatic renewal. Your subscription is active; auto-renew is off.");
+                setLoading(false);
+                return;
+              }
               window.location.reload(); // simplest way to reflect the new subscriptionStatus/expiry
               return;
             }
@@ -125,6 +133,23 @@ function SubscriptionTab({ businessId, business, email }) {
     handler.openIframe();
   };
 
+  const handleCancelAutoRenew = async () => {
+    const confirmed = window.confirm(
+      "Cancel automatic renewal? This stops future charges only. There is no refund, and your subscription stays active until its current expiry date."
+    );
+    if (!confirmed) return;
+
+    setLoading(true);
+    setError("");
+    try {
+      await axiosInstance.post("/api/subscriptions/auto-renew/cancel", { businessId });
+      window.location.reload();
+    } catch (err) {
+      setLoading(false);
+      setError(err.response?.data?.message || "Could not cancel automatic renewal. Please try again.");
+    }
+  };
+
   return (
     <div className="max-w-2xl">
       <div className="bg-white rounded-2xl shadow-sm border p-4 sm:p-6 mb-6">
@@ -135,7 +160,34 @@ function SubscriptionTab({ businessId, business, email }) {
             {business?.subscriptionStatus === "active" ? "Renews / expires" : "Expired"} on {expiresAt}
           </p>
         )}
+        {business?.subscriptionStatus === "active" && business?.subscriptionAutoRenew && (
+          <div className="mt-3 text-sm text-gray-600">
+            <p>
+              Auto-renew is on for the {PLANS.find((plan) => plan.key === business.subscriptionAutoRenewPlanType)?.label || "selected"} plan
+              {business.subscriptionCardBrand && business.subscriptionCardLast4
+                ? ` using ${business.subscriptionCardBrand} ending in ${business.subscriptionCardLast4}`
+                : " using your saved card"}.
+            </p>
+            <button
+              type="button"
+              onClick={handleCancelAutoRenew}
+              disabled={loading}
+              className="mt-2 text-sm font-semibold text-red-700 underline disabled:opacity-50"
+            >
+              Cancel renewal
+            </button>
+            <p className="mt-1 text-xs text-gray-500">
+              Cancels future card charges only. No refund; access continues until {expiresAt}.
+            </p>
+          </div>
+        )}
       </div>
+
+      {notice && (
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-green-800 text-sm">
+          {notice}
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
@@ -206,6 +258,16 @@ function SubscriptionTab({ businessId, business, email }) {
           )}
         </div>
       )}
+
+      <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-900">
+        {amountDue > 0 ? (
+          <p>
+            Your card will be charged ₦{currentPlan.price.toLocaleString()} automatically every {currentPlan.key === "monthly" ? "month" : currentPlan.key === "yearly" ? "year" : "6 months"} to renew this plan. Cancel auto-renew any time; your current paid period remains active.
+          </p>
+        ) : (
+          <p>This payment is covered by points, so no card is saved and this plan will not renew automatically.</p>
+        )}
+      </div>
 
       <button
         onClick={handleSubscribe}

@@ -25,6 +25,8 @@ const SubscriptionPaymentSchema = new mongoose.Schema(
     // than actually charged. Deducted from the business's balance only once
     // the payment (or the points-only path) actually succeeds.
     pointsApplied: { type: Number, default: 0 },
+    autoRenewRequested: { type: Boolean, default: false },
+    autoRenewActivated: { type: Boolean, default: false },
 
     // Critical for the marketer payout rule: the tiered payout % applies to
     // the referral's FIRST successful payment only, never on renewals.

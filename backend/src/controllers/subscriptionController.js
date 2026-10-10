@@ -125,7 +125,7 @@ async function safeHandleSubscriptionConversion(details) {
 // and the frontend skips the payment popup entirely.
 export const initiateSubscription = async (req, res) => {
   try {
-    const { businessId, planType, pointsToApply } = req.body;
+    const { businessId, planType, pointsToApply, autoRenew } = req.body;
 
     if (!businessId || !planType) {
       return res.status(400).json({ message: "businessId and planType are required" });
@@ -153,6 +153,9 @@ export const initiateSubscription = async (req, res) => {
       planPrice
     );
     const chargeAmount = planPrice - appliedPoints;
+    if (autoRenew === true && chargeAmount <= 0) {
+      return res.status(400).json({ message: "A card payment is required to enable automatic renewal." });
+    }
 
     const isFirstPayment = !business.hasPaidFirstSubscription;
     const reference = `oja247-sub-${Date.now()}`;
@@ -163,6 +166,7 @@ export const initiateSubscription = async (req, res) => {
       amount: planPrice, // always the full plan value, for accounting/marketer-payout accuracy
       pointsApplied: appliedPoints,
       isFirstPayment,
+      autoRenewRequested: autoRenew === true,
       paystackReference: reference,
       status: chargeAmount <= 0 ? "success" : "pending",
     });
@@ -241,7 +245,7 @@ export const initiateSubscription = async (req, res) => {
 // Shared by /verify and the webhook — idempotent, safe to call twice for
 // the same reference (e.g. if the user's browser confirms AND the webhook
 // fires). Only ever processes a payment from pending -> success once.
-async function markSubscriptionPaid(reference) {
+async function markSubscriptionPaid(reference, paystackData = null) {
   // Claim the payment atomically. The browser's verify call and Paystack's
   // webhook usually arrive within milliseconds of each other; a plain
   // read-then-write let both see "pending" and both run the code below, which
@@ -269,15 +273,46 @@ async function markSubscriptionPaid(reference) {
     periodEnd = period.periodEnd;
     payment.periodStart = period.periodStart;
     payment.periodEnd = period.periodEnd;
+    const authorization = paystackData?.authorization;
+    const autoRenewActivated = Boolean(
+      payment.autoRenewRequested &&
+      authorization?.reusable === true &&
+      authorization.authorization_code
+    );
+    payment.autoRenewActivated = autoRenewActivated;
     await payment.save();
 
-    await Business.findByIdAndUpdate(payment.businessId, {
+    const businessUpdate = {
       subscriptionStatus: "active",
       subscriptionExpiresAt: periodEnd,
       hasPaidFirstSubscription: true,
       subscriptionReminderSentAt: null,
       subscriptionExpiredEmailSentAt: null,
-    });
+    };
+    if (autoRenewActivated) {
+      Object.assign(businessUpdate, {
+        subscriptionAutoRenew: true,
+        subscriptionAutoRenewPlanType: payment.planType,
+        subscriptionAutoRenewAmount: payment.amount,
+        subscriptionAuthorizationCode: authorization.authorization_code,
+        subscriptionCustomerCode: paystackData.customer?.customer_code || null,
+        subscriptionCardBrand: authorization.brand || null,
+        subscriptionCardLast4: authorization.last4 || null,
+        subscriptionAutoRenewAttemptedFor: null,
+      });
+    } else if (payment.autoRenewRequested) {
+      Object.assign(businessUpdate, {
+        subscriptionAutoRenew: false,
+        subscriptionAutoRenewPlanType: null,
+        subscriptionAutoRenewAmount: null,
+        subscriptionAuthorizationCode: null,
+        subscriptionCustomerCode: null,
+        subscriptionCardBrand: null,
+        subscriptionCardLast4: null,
+        subscriptionAutoRenewAttemptedFor: null,
+      });
+    }
+    await Business.findByIdAndUpdate(payment.businessId, businessUpdate);
   } catch (err) {
     console.error(`Subscription activation failed for payment ${payment._id} (${reference}) — returning it to pending so it can be retried:`, err);
     try {
@@ -380,11 +415,12 @@ export const verifySubscriptionPayment = async (req, res) => {
       return res.status(400).json({ message: "The amount paid does not match this plan, so the subscription was not activated. Please contact support." });
     }
 
-    const paidPayment = await markSubscriptionPaid(reference);
+    const paidPayment = await markSubscriptionPaid(reference, verificationData.data);
 
     return res.json({
       message: "Subscription payment verified successfully",
       payment: paidPayment,
+      autoRenewEnabled: Boolean(paidPayment?.autoRenewActivated),
     });
   } catch (error) {
     console.error("Verify subscription payment error:", error);
@@ -427,12 +463,193 @@ export const handleSubscriptionWebhook = async (req, res) => {
         );
         return res.sendStatus(200);
       }
-      await markSubscriptionPaid(event.data.reference);
+      await markSubscriptionPaid(event.data.reference, event.data);
     }
 
     return res.sendStatus(200);
   } catch (error) {
     console.error("Subscription webhook error:", error.message);
     return res.sendStatus(500); // non-2xx so Paystack retries
+  }
+};
+
+// Owners can stop future charges without losing the already-paid subscription period.
+export const cancelSubscriptionAutoRenew = async (req, res) => {
+  try {
+    const { businessId } = req.body;
+    if (!businessId) {
+      return res.status(400).json({ message: "businessId is required" });
+    }
+    if (req.user.role !== "admin" && req.user.businessId?.toString() !== businessId) {
+      return res.status(403).json({ message: "Not authorized to manage this subscription." });
+    }
+
+    const business = await Business.findByIdAndUpdate(
+      businessId,
+      {
+        $set: { subscriptionAutoRenew: false },
+        $unset: {
+          subscriptionAutoRenewPlanType: "",
+          subscriptionAutoRenewAmount: "",
+          subscriptionAuthorizationCode: "",
+          subscriptionCustomerCode: "",
+          subscriptionCardBrand: "",
+          subscriptionCardLast4: "",
+          subscriptionAutoRenewAttemptedFor: "",
+        },
+      },
+      { new: true }
+    );
+    if (!business) {
+      return res.status(404).json({ message: "Business not found" });
+    }
+    return res.json({ message: "Automatic renewal cancelled. Your current subscription remains active until it expires." });
+  } catch (error) {
+    console.error("Cancel subscription auto-renew error:", error);
+    return res.status(500).json({ message: "Could not cancel automatic renewal" });
+  }
+};
+
+// GET /api/cron/subscription-auto-renew
+// Charges reusable card authorizations shortly before their selected plan term ends.
+export const runSubscriptionAutoRenewal = async (req, res) => {
+  try {
+    const cronSecret = req.headers["authorization"];
+    if (!process.env.CRON_SECRET || cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const secret = process.env.PAYSTACK_SECRET_KEY;
+    if (!secret) {
+      return res.status(500).json({ message: "Paystack secret key is not configured on the backend" });
+    }
+
+    const now = new Date();
+    const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const dueBusinesses = await Business.find({
+      subscriptionAutoRenew: true,
+      subscriptionExpiresAt: { $lte: cutoff },
+      subscriptionAuthorizationCode: { $exists: true, $ne: null },
+    }).select(
+      "name subscriptionExpiresAt subscriptionAutoRenewPlanType subscriptionAutoRenewAmount subscriptionAutoRenewAttemptedFor +subscriptionAuthorizationCode"
+    );
+
+    let renewed = 0;
+    let failed = 0;
+    for (const candidate of dueBusinesses) {
+      const expiresAt = candidate.subscriptionExpiresAt;
+      const business = await Business.findOneAndUpdate(
+        {
+          _id: candidate._id,
+          subscriptionAutoRenew: true,
+          subscriptionExpiresAt: expiresAt,
+          $or: [
+            { subscriptionAutoRenewAttemptedFor: null },
+            { subscriptionAutoRenewAttemptedFor: { $ne: expiresAt } },
+          ],
+        },
+        { $set: { subscriptionAutoRenewAttemptedFor: expiresAt } },
+        { new: true }
+      ).select(
+        "name subscriptionExpiresAt subscriptionAutoRenewPlanType subscriptionAutoRenewAmount +subscriptionAuthorizationCode"
+      );
+      if (!business) continue;
+
+      const planType = business.subscriptionAutoRenewPlanType;
+      const amount = business.subscriptionAutoRenewAmount || PLAN_PRICES[planType];
+      if (!PLAN_PRICES[planType] || !amount) {
+        failed += 1;
+        await Business.findByIdAndUpdate(business._id, {
+          $set: { subscriptionAutoRenew: false },
+          $unset: { subscriptionAuthorizationCode: "", subscriptionCustomerCode: "" },
+        });
+        continue;
+      }
+
+      const reference = `oja247-renew-${business._id}-${expiresAt.getTime()}`;
+      let payment;
+      try {
+        payment = await SubscriptionPayment.findOneAndUpdate(
+          { paystackReference: reference },
+          {
+            $setOnInsert: {
+              businessId: business._id,
+              planType,
+              amount,
+              pointsApplied: 0,
+              isFirstPayment: false,
+              autoRenewRequested: false,
+              paystackReference: reference,
+              status: "pending",
+            },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        if (payment.status === "success") {
+          renewed += 1;
+          continue;
+        }
+
+        const email = await getOwnerEmail(business._id);
+        const chargeResponse = await fetch("https://api.paystack.co/transaction/charge_authorization", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${secret}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            authorization_code: business.subscriptionAuthorizationCode,
+            email,
+            amount: Math.round(amount * 100),
+            currency: "NGN",
+            reference,
+          }),
+        });
+        const chargeResult = await chargeResponse.json();
+        if (
+          !chargeResponse.ok ||
+          !chargeResult.status ||
+          chargeResult.data?.status !== "success" ||
+          !paidEnough(payment, chargeResult.data)
+        ) {
+          payment.status = "failed";
+          await payment.save();
+          failed += 1;
+          await Business.findByIdAndUpdate(business._id, {
+            $set: { subscriptionAutoRenew: false },
+            $unset: {
+              subscriptionAuthorizationCode: "",
+              subscriptionCustomerCode: "",
+              subscriptionCardBrand: "",
+              subscriptionCardLast4: "",
+            },
+          });
+          continue;
+        }
+
+        const paidPayment = await markSubscriptionPaid(reference, chargeResult.data);
+        if (paidPayment?.status === "success") renewed += 1;
+      } catch (error) {
+        console.error(`Automatic renewal failed for business ${business._id}:`, error);
+        if (payment?.status === "pending") {
+          payment.status = "failed";
+          await payment.save();
+        }
+        await Business.findByIdAndUpdate(business._id, {
+          $set: { subscriptionAutoRenew: false },
+          $unset: {
+            subscriptionAuthorizationCode: "",
+            subscriptionCustomerCode: "",
+            subscriptionCardBrand: "",
+            subscriptionCardLast4: "",
+          },
+        });
+        failed += 1;
+      }
+    }
+
+    return res.json({ success: true, renewed, failed });
+  } catch (error) {
+    console.error("Subscription auto-renew cron error:", error);
+    return res.status(500).json({ message: "Subscription renewal processing failed" });
   }
 };
