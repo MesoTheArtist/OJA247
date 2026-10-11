@@ -1546,3 +1546,58 @@ export async function sendCustomerOrderCancelledEmail({ to, customerName, busine
     ),
   });
 }
+
+// Sent a few days before a card renewal, to vendors on automatic renewal,
+// INSTEAD of the generic "your subscription is expiring" email (which would
+// tell them to pay again and could make them pay twice).
+export async function sendSubscriptionRenewalNoticeEmail({ to, businessName, planType, amount, cardBrand, cardLast4, expiresAt }) {
+  const planLabel = PLAN_LABELS[planType] || planType;
+  const card = cardLast4 ? `your ${esc(cardBrand || "card")} ending in <strong>${esc(cardLast4)}</strong>` : "your saved card";
+  return sendEmail({
+    to,
+    subject: "Your OJA247 subscription renews soon",
+    html: layout(
+      `
+      ${h1("Your subscription renews soon")}
+      ${p(`Hi ${esc(businessName)}, your ${esc(planLabel)} ends on <strong>${formatDate(expiresAt)}</strong>. Shortly before then we will charge ${card} <strong>${NAIRA(amount)}</strong> to renew it, so your store stays visible without a break. You don't need to do anything.`)}
+      ${p("Don't want to renew? You can switch off automatic renewal from your dashboard before the charge. Your store then stays live until the date above and is hidden after that.")}
+      ${button("Manage my subscription", `${SITE_URL}/dashboard`)}
+      `,
+      { preheader: `We'll renew your ${planLabel} (${NAIRA(amount)}) around ${formatDate(expiresAt)}` }
+    ),
+  });
+}
+
+// Sent when a card renewal is declined. Not the last try: says when we will
+// try again and that the store stays visible until then. The last try: says
+// automatic renewal has been switched off and the card forgotten.
+export async function sendSubscriptionRenewalFailedEmail({ to, businessName, planType, amount, cardBrand, cardLast4, retryDate, graceUntil, final }) {
+  const planLabel = PLAN_LABELS[planType] || planType;
+  const card = cardLast4 ? `your ${esc(cardBrand || "card")} ending in ${esc(cardLast4)}` : "your saved card";
+  const subject = final
+    ? "We couldn't renew your subscription"
+    : "Your subscription payment didn't go through";
+  const body = final
+    ? `
+      ${h1("We couldn't renew your subscription")}
+      ${p(`Hi ${esc(businessName)}, we tried several times to charge ${card} <strong>${NAIRA(amount)}</strong> for your ${esc(planLabel)}, but it was declined each time. Automatic renewal is now switched off and we have removed the saved card.`)}
+      ${p("Your store is hidden from customers until you renew. Pay again with a card from your dashboard and it goes live straight away. You can turn automatic renewal back on at the same time.")}
+      ${button("Renew now", `${SITE_URL}/dashboard`)}
+      `
+    : `
+      ${h1("Your subscription payment didn't go through")}
+      ${p(`Hi ${esc(businessName)}, we tried to charge ${card} <strong>${NAIRA(amount)}</strong> to renew your ${esc(planLabel)}, but the bank declined it. This is often a low balance or a card limit.`)}
+      <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 16px; margin:20px 0;">
+        <p style="margin:0; font-size:13px; color:#92400e; line-height:1.6;">
+          We will try again on <strong>${formatDate(retryDate)}</strong>. Your store stays visible to customers until <strong>${formatDate(graceUntil)}</strong> while we do.
+          To avoid any gap, make sure the card has enough balance, or pay now with a different card.
+        </p>
+      </div>
+      ${button("Pay with a card now", `${SITE_URL}/dashboard`)}
+      `;
+  return sendEmail({
+    to,
+    subject,
+    html: layout(body, { preheader: final ? "Automatic renewal is off and your store is hidden until you renew." : `We'll try again on ${formatDate(retryDate)}.` }),
+  });
+}

@@ -77,6 +77,13 @@ const BusinessSchema = new mongoose.Schema(
     subscriptionCardBrand: { type: String, default: null },
     subscriptionCardLast4: { type: String, default: null },
     subscriptionAutoRenewAttemptedFor: { type: Date, default: null },
+    // Failed-renewal bookkeeping. How many times in a row the saved card has
+    // been declined for this renewal (0 when all is well), when the next retry
+    // is due (or, briefly, the lease of a run in progress), and how long the
+    // store stays visible while retries are still running.
+    subscriptionRenewalFailures: { type: Number, default: 0 },
+    subscriptionRenewalNextRetryAt: { type: Date, default: null },
+    subscriptionGraceUntil: { type: Date, default: null },
 
     // Tracks which subscription-expiry emails have already gone out for the
     // CURRENT subscriptionExpiresAt value, so the daily cron doesn't re-send

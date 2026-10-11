@@ -5,6 +5,7 @@ import {
   sendSubscriptionExpiringEmail,
   sendSubscriptionExpiredEmail,
   sendNeverSubscribedReminderEmail,
+  sendSubscriptionRenewalNoticeEmail,
   sendExemptionEndingEmail,
 } from "../services/emailService.js";
 
@@ -91,12 +92,34 @@ export const runSubscriptionExpiryCheck = async (req, res) => {
       subscriptionExpiresAt: { $gte: now, $lte: reminderCutoff },
       subscriptionReminderSentAt: null,
       ...notExempt,
-    }).select("name subscriptionExpiresAt");
+    }).select("name subscriptionExpiresAt subscriptionAutoRenew subscriptionCardBrand subscriptionCardLast4 subscriptionAutoRenewPlanType subscriptionAutoRenewAmount");
 
     let remindersSent = 0;
     for (const business of expiringSoon) {
       const daysLeft = Math.ceil((business.subscriptionExpiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       const to = await getOwnerEmail(business._id);
+
+      // On automatic card renewal: don't say "renew now" (they might pay twice).
+      // Tell them what will be charged and when instead.
+      if (business.subscriptionAutoRenew && business.subscriptionCardLast4) {
+        const { settled, sent } = await deliver("Renewal notice", business._id, to, () =>
+          sendSubscriptionRenewalNoticeEmail({
+            to,
+            businessName: business.name,
+            planType: business.subscriptionAutoRenewPlanType,
+            amount: business.subscriptionAutoRenewAmount,
+            cardBrand: business.subscriptionCardBrand,
+            cardLast4: business.subscriptionCardLast4,
+            expiresAt: business.subscriptionExpiresAt,
+          })
+        );
+        if (!settled) continue;
+        if (sent) remindersSent += 1;
+        business.subscriptionReminderSentAt = now;
+        await business.save();
+        continue;
+      }
+
       // One bad send shouldn't abort the whole run and skip every other vendor
       // still waiting on today's reminder, so a failure just moves on.
       const { settled, sent } = await deliver("Expiring-soon reminder", business._id, to, () =>
@@ -114,9 +137,12 @@ export const runSubscriptionExpiryCheck = async (req, res) => {
     }
 
     // --- Pass 2: already expired (not yet notified) ---
+    // Skip anyone still on automatic renewal: the renewal job is about to charge
+    // (or is retrying) their card, and tells them itself if it gives up.
     const expired = await Business.find({
       subscriptionExpiresAt: { $lt: now },
       subscriptionExpiredEmailSentAt: null,
+      subscriptionAutoRenew: { $ne: true },
       ...notExempt,
     }).select("name");
 

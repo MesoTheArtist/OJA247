@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import PaystackPop from "@paystack/inline-js";
 import axiosInstance from "../services/api";
 
 const STATUS_LABELS = {
@@ -8,8 +9,6 @@ const STATUS_LABELS = {
 };
 
 function SubscriptionTab({ businessId, business, email }) {
-  const paystackPublicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
-  const [paystackReady, setPaystackReady] = useState(false);
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState("yearly");
@@ -25,20 +24,6 @@ function SubscriptionTab({ businessId, business, email }) {
       .then(({ data }) => setPlans(data.plans || []))
       .catch(() => setError("Subscription plans could not be loaded. Please refresh and try again."))
       .finally(() => setPlansLoading(false));
-  }, []);
-
-  useEffect(() => {
-    const existingScript = document.querySelector("script[src='https://js.paystack.co/v1/inline.js']");
-    if (existingScript) {
-      if (window.PaystackPop) setPaystackReady(true);
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://js.paystack.co/v1/inline.js";
-    script.async = true;
-    script.onload = () => setPaystackReady(true);
-    script.onerror = () => setPaystackReady(false);
-    document.body.appendChild(script);
   }, []);
 
   const currentPlan = plans.find((plan) => plan.key === selectedPlan) || { key: selectedPlan, price: 0, months: 1 };
@@ -66,7 +51,7 @@ function SubscriptionTab({ businessId, business, email }) {
     setError("");
     setLoading(true);
 
-    let reference, amount, fullyPaidWithPoints;
+    let accessCode, fullyPaidWithPoints;
     try {
       const { data } = await axiosInstance.post("/api/subscriptions/initiate", {
         businessId,
@@ -74,8 +59,7 @@ function SubscriptionTab({ businessId, business, email }) {
         pointsToApply: appliedPoints,
         autoRenew: amountDue > 0,
       });
-      reference = data.reference;
-      amount = data.amount;
+      accessCode = data.accessCode;
       fullyPaidWithPoints = data.fullyPaidWithPoints;
     } catch (err) {
       setLoading(false);
@@ -90,35 +74,21 @@ function SubscriptionTab({ businessId, business, email }) {
       return;
     }
 
-    if (!paystackPublicKey) {
+    if (!accessCode) {
       setLoading(false);
-      setError("Paystack public key is missing. Add VITE_PAYSTACK_PUBLIC_KEY to your .env file.");
-      return;
-    }
-    if (!paystackReady || !window.PaystackPop) {
-      setLoading(false);
-      setError("Paystack is still loading. Please wait a moment and try again.");
+      setError("We couldn't start the card payment. Please try again.");
       return;
     }
 
-    const handler = window.PaystackPop.setup({
-      key: paystackPublicKey,
-      email,
-      amount: Math.round(amount * 100), // kobo
-      currency: "NGN",
-      channels: ["card"],
-      ref: reference,
-      metadata: {
-        custom_fields: [
-          { display_name: "Business ID", variable_name: "business_id", value: businessId },
-          { display_name: "Plan", variable_name: "plan_type", value: selectedPlan },
-        ],
-      },
-      callback: function (response) {
+    // The server already started this payment, restricted to card and with the
+    // right amount, so the popup only has to finish it.
+    const popup = new PaystackPop();
+    popup.resumeTransaction(accessCode, {
+      onSuccess: (transaction) => {
         (async function () {
           try {
             const verification = await axiosInstance.post(
-              `/api/subscriptions/verify/${response.reference}`
+              `/api/subscriptions/verify/${transaction.reference}`
             );
             if (verification.data?.payment?.status === "success") {
               if (amountDue > 0 && !verification.data.autoRenewEnabled) {
@@ -136,12 +106,14 @@ function SubscriptionTab({ businessId, business, email }) {
           setLoading(false);
         })();
       },
-      onClose: function () {
+      onCancel: () => {
         setLoading(false);
       },
+      onError: () => {
+        setLoading(false);
+        setError("The payment window could not load. Please try again.");
+      },
     });
-
-    handler.openIframe();
   };
 
   const handleCancelAutoRenew = async () => {

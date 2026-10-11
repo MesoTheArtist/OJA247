@@ -49,6 +49,11 @@ function isBusinessPubliclyVisible(business, settings, now = Date.now()) {
   if (business.grandfatherExemptUntil && now <= new Date(business.grandfatherExemptUntil).getTime()) {
     return true;
   }
+  // The saved card was declined but the renewal is still being retried, so the
+  // store stays visible until the last retry has had its chance.
+  if (business.subscriptionGraceUntil && now <= new Date(business.subscriptionGraceUntil).getTime()) {
+    return true;
+  }
   return Boolean(business.subscriptionExpiresAt && now <= new Date(business.subscriptionExpiresAt).getTime());
 }
 
@@ -90,6 +95,7 @@ export const getBusinesses = async (req, res) => {
         "visibilityExempt",
         "grandfatherExemptUntil",
         "subscriptionExpiresAt",
+        "subscriptionGraceUntil",
       ].join(" "))
       .lean();
     res.json(
@@ -114,6 +120,7 @@ export const getBusiness = async (req, res) => {
       "visibilityExempt",
       "grandfatherExemptUntil",
       "subscriptionExpiresAt",
+        "subscriptionGraceUntil",
     ].join(" ");
     const business = mongoose.Types.ObjectId.isValid(id)
       ? await Business.findById(id).select(publicProjection)
