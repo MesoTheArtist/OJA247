@@ -5,6 +5,8 @@ import Order from "../models/Order.js";
 import Dispute from "../models/Dispute.js";
 import Vendor from "../models/Vendor.js";
 import Business from "../models/Business.js";
+import User from "../models/User.js";
+import { isOwnStoreCustomer } from "../services/ownStoreCheck.js";
 import Product from "../models/Product.js";
 import { markOrderPaid } from "./orderController.js";
 import { MAX_RECEIPT_BYTES, sniffReceiptType, uploadReceipt } from "../services/receiptStorage.js";
@@ -176,6 +178,13 @@ export const createDirectOrder = async (req, res) => {
     const result = await loadPayableVendor(businessId);
     if (result.error) return res.status(result.status).json({ message: result.error });
     const { business, vendor } = result;
+
+    // A vendor can't buy from their own store (it would unlock a "verified
+    // purchase" review for themselves).
+    const ownerAccount = await User.findOne({ businessId }).select("email");
+    if (isOwnStoreCustomer({ customer, vendor, ownerEmail: ownerAccount?.email })) {
+      return res.status(403).json({ message: "You can't place an order on your own store." });
+    }
 
     // This store may have blocked this customer.
     const customerEmail = String(customer.email).trim();

@@ -84,8 +84,10 @@ export const withdrawPoints = async (req, res) => {
     const { amount } = req.body;
 
     const requestedAmount = Number(amount);
-    if (!requestedAmount || requestedAmount <= 0) {
-      return res.status(400).json({ message: "A valid withdrawal amount is required" });
+    // Whole points only: 1 point = N1, and fractions (0.5, 0.001...) would let
+    // someone fill the admin inbox with tiny requests and muddy the ledger.
+    if (!Number.isInteger(requestedAmount) || requestedAmount <= 0) {
+      return res.status(400).json({ message: "Enter a whole number of points to withdraw" });
     }
 
     const vendor = await Vendor.findOne({ businessId });

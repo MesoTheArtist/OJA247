@@ -11,6 +11,7 @@ if (process.env.NODE_ENV !== "production") {
 
 import express from "express";
 import cors from "cors";
+import { rejectMongoOperators } from "./src/middleware/rejectMongoOperators.js";
 import helmet from "helmet";
 import { connectDB } from "./src/db.js";
 import businessRoutes from "./src/routes/businessRoutes.js";
@@ -111,6 +112,10 @@ app.use(
   })
 );
 app.use(express.urlencoded({ limit: "25mb", extended: true }));
+
+// SECURITY: refuse requests that smuggle database operators ($ne, $regex...)
+// into the query string or body — see rejectMongoOperators.js.
+app.use(rejectMongoOperators);
 
 // SECURITY: loose baseline rate limit across the whole API — not meant to
 // stop targeted abuse (specific routes like login/upload have their own

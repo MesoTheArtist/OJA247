@@ -136,6 +136,27 @@ export async function markOrderPaid(reference, { notifyVendors = true } = {}) {
 // Same idempotency shape as markOrderPaid — never overwrites an order that's
 // already "paid" (a late charge.failed webhook arriving after a successful
 // verify shouldn't undo it), and only emails the customer once per order.
+// The old Paystack card path (verify + webhook) can only settle orders that were
+// created for card payment, and only when the amount covers the order total.
+// Without this, any successful Paystack payment made with a bank-transfer
+// order's reference (say N100 against a N100,000 order) marked that order
+// "paid" and told the vendor to ship, with no transfer ever made.
+function paystackMaySettle(order, paystackData) {
+  if (!order) return { ok: false, reason: "no such order" };
+  if (order.paymentMethod === "bank_transfer") {
+    return { ok: false, reason: "this order is paid by bank transfer, not card" };
+  }
+  const expectedKobo = Math.round((order.total || 0) * 100);
+  const paidKobo = Number(paystackData?.amount);
+  if (!Number.isFinite(paidKobo) || paidKobo < expectedKobo) {
+    return { ok: false, reason: `amount paid (${paystackData?.amount}) is less than the order total (${expectedKobo})` };
+  }
+  if (paystackData?.currency && paystackData.currency !== "NGN") {
+    return { ok: false, reason: `unexpected currency ${paystackData.currency}` };
+  }
+  return { ok: true };
+}
+
 async function markOrderFailed(reference) {
   const existing = await Order.findOne({ reference });
   if (!existing) return null;
@@ -422,6 +443,10 @@ export const verifyOrderPayment = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
+    // Never let a card payment settle (or fail) a bank-transfer order.
+    if (order.paymentMethod === "bank_transfer") {
+      return res.status(400).json({ message: "This order is paid by bank transfer, so it can't be verified here." });
+    }
 
     if (!verificationResponse.ok || !verificationData.status || verificationData.data?.status !== "success") {
       const failedOrder = await markOrderFailed(reference);
@@ -431,6 +456,12 @@ export const verifyOrderPayment = async (req, res) => {
         order: failedOrder,
         verification: verificationData,
       });
+    }
+
+    const settle = paystackMaySettle(order, verificationData.data);
+    if (!settle.ok) {
+      console.error(`Order verify: not settling ${reference} — ${settle.reason}`);
+      return res.status(400).json({ message: "This payment doesn't match the order, so it was not applied." });
     }
 
     const paidOrder = await markOrderPaid(reference);
@@ -481,12 +512,23 @@ export const handlePaystackWebhook = async (req, res) => {
 
     // findOneAndUpdate is idempotent — safe if Paystack retries, or if
     // /verify already marked this order paid via the redirect callback.
+    // Always answer 200 so Paystack stops retrying, but only act on orders the
+    // card path is allowed to touch (see paystackMaySettle).
     if (event.event === "charge.success" && event.data?.reference) {
-      await markOrderPaid(event.data.reference);
+      const order = await Order.findOne({ reference: String(event.data.reference) });
+      const settle = paystackMaySettle(order, event.data);
+      if (settle.ok) {
+        await markOrderPaid(event.data.reference);
+      } else if (order) {
+        console.error(`Paystack webhook: ignored charge.success for ${order.reference} — ${settle.reason}`);
+      }
     }
 
     if (event.event === "charge.failed" && event.data?.reference) {
-      await markOrderFailed(event.data.reference);
+      const order = await Order.findOne({ reference: String(event.data.reference) });
+      if (order && order.paymentMethod !== "bank_transfer") {
+        await markOrderFailed(event.data.reference);
+      }
     }
 
     return res.sendStatus(200);
@@ -533,6 +575,11 @@ export const updateOrderStatus = async (req, res) => {
 // up someone else's order.
 export const lookupOrderForDispute = async (req, res) => {
   try {
+    // Query values must be plain text. `?reference[$ne]=x` would otherwise reach
+    // the database as an operator and match a random order.
+    if (typeof req.query.reference !== "string" || typeof req.query.email !== "string") {
+      return res.status(400).json({ message: "reference and email are required" });
+    }
     const { reference, email } = req.query;
 
     if (!reference || !email) {
