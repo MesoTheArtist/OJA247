@@ -62,3 +62,13 @@
     font-size: 16px;
   }
 }
+
+/* Safety net: if any element is ever wider than the screen, clip it instead of
+   letting the page grow sideways. On iPhones a page that is wider than the
+   screen makes the browser zoom the whole site out to fit (everything shrinks
+   to about half size). "clip" (unlike "hidden") keeps position: sticky working.
+   This hides the symptom only; widths should still be fixed at the source. */
+html,
+body {
+  overflow-x: clip;
+}

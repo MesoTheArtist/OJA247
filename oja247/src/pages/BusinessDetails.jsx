@@ -604,9 +604,12 @@ function BusinessDetails() {
             </span>
           </h2>
 
-          <div className="flex items-center gap-3">
+          {/* min-w-0 / flex-1 let the chips scroll sideways inside this row. Without
+              them the row grew to the width of ALL the chips side by side, which
+              made the whole page wider than the phone (iPhones then zoom out). */}
+          <div className="flex items-center gap-3 w-full sm:w-auto min-w-0 max-w-full">
             {products.length > 0 && (
-              <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1 sm:pb-0">
+              <div className="flex items-center gap-2 overflow-x-auto flex-1 min-w-0 pb-1 sm:pb-0">
                 {categories.map((cat) => (
                   <button
                     key={cat}
@@ -625,7 +628,7 @@ function BusinessDetails() {
 
             <a
               href="/cart"
-              className="inline-flex items-center justify-center bg-gray-900 hover:bg-gray-800 text-white p-3 rounded-full shadow-sm relative"
+              className="inline-flex shrink-0 items-center justify-center bg-gray-900 hover:bg-gray-800 text-white p-3 rounded-full shadow-sm relative"
               aria-label="View cart"
             >
               <svg
