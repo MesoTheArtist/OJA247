@@ -297,10 +297,10 @@ const LandingPage = () => {
             hero (mirrors the green one on the left). Kept small, pushed
             toward the edge and low opacity so it never dims the text. */}
         <motion.div
-          className="absolute w-56 h-56 bg-orange-400/20 rounded-full blur-3xl"
+          className="absolute w-80 h-80 bg-orange-400/30 rounded-full blur-3xl"
           animate={{ x: -mousePosition.x / 50, y: mousePosition.y / 50 }}
           transition={{ type: "spring", damping: 30 }}
-          style={{ right: "-3%", top: "3%" }}
+          style={{ right: "-4%", top: "3%" }}
         />
         <motion.div
           className="absolute w-[30rem] h-[30rem] bg-yellow-400/25 rounded-full blur-3xl"
@@ -1120,4 +1120,4 @@ const LandingPage = () => {
   );
 };
 
-export default LandingPage;
+export default LandingPage; 
