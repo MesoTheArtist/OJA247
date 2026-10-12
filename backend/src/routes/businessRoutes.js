@@ -9,6 +9,7 @@ import {
 } from "../controllers/businessController.js";
 import { getPointsDashboard, withdrawPoints } from "../controllers/pointsController.js";
 import { protect, checkBusinessOwnership } from "../middleware/authMiddleware.js";
+import { withdrawalLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
 
@@ -20,6 +21,6 @@ router.patch("/:id/referral-code", protect, checkBusinessOwnership, updateBusine
 router.get("/:id/earnings-summary", protect, checkBusinessOwnership, getEarningsSummary);
 
 router.get("/:id/points", protect, checkBusinessOwnership, getPointsDashboard);
-router.post("/:id/points/withdraw", protect, checkBusinessOwnership, withdrawPoints);
+router.post("/:id/points/withdraw", protect, checkBusinessOwnership, withdrawalLimiter, withdrawPoints);
 
 export default router;

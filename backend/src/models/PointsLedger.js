@@ -9,7 +9,7 @@ const PointsLedgerSchema = new mongoose.Schema(
     type: {
       type: String,
       // "withdrawal_refunded" puts a rejected withdrawal's points back (positive points)
-      enum: ["earned", "redeemed_subscription", "withdrawn_cash", "withdrawal_refunded"],
+      enum: ["earned", "redeemed_subscription", "withdrawn_cash", "withdrawal_refunded", "redemption_refunded"],
       required: true,
     },
     points: { type: Number, required: true }, // positive for "earned", negative for redeem/withdraw
@@ -34,6 +34,9 @@ const PointsLedgerSchema = new mongoose.Schema(
     // "withdrawal_refunded" entry that points back at the withdrawal it undoes.
     rejectionReason: { type: String, default: "" },
     refundOfEntryId: { type: mongoose.Schema.Types.ObjectId, ref: "PointsLedger", default: null },
+    // Set on "redeemed_subscription" entries and the "redemption_refunded" entry
+    // that undoes one: which subscription payment the points were held for.
+    subscriptionPaymentId: { type: mongoose.Schema.Types.ObjectId, ref: "SubscriptionPayment", default: null },
   },
   { timestamps: true }
 );

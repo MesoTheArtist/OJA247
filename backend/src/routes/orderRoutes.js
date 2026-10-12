@@ -23,7 +23,7 @@ import {
   cancelTransferOrder,
 } from "../controllers/directOrderController.js";
 import { protect, requireCustomer } from "../middleware/authMiddleware.js";
-import { authLimiter, orderLookupLimiter, paymentDetailsLimiter, directOrderLimiter } from "../middleware/rateLimiters.js";
+import { authLimiter, orderLookupLimiter, paymentDetailsLimiter, directOrderLimiter, paymentLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
 
@@ -35,7 +35,7 @@ router.post("/:reference/receipt", directOrderLimiter, handleReceiptUpload, resu
 router.post("/:reference/cancel", directOrderLimiter, cancelTransferOrder);
 router.patch("/:reference/payment/confirm", protect, confirmTransferPayment);
 router.patch("/:reference/payment/reject", protect, rejectTransferPayment);
-router.post("/verify/:reference", verifyOrderPayment);
+router.post("/verify/:reference", paymentLimiter, verifyOrderPayment);
 // Public — Paystack calls this directly, verified via signature, not a user token
 router.post("/webhook", handlePaystackWebhook);
 router.get("/reference/:reference", orderLookupLimiter, getOrderByReference);

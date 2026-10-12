@@ -6,6 +6,7 @@ import ReferralAttribution from "../models/ReferralAttribution.js";
 import MarketerPayout from "../models/MarketerPayout.js";
 import PointsLedger from "../models/PointsLedger.js";
 import { sendMarketerConversionEmail, sendBusinessReferralConversionEmail } from "./emailService.js";
+import { runInTransaction } from "../utils/transactions.js";
 
 // Marketer payout rate is tiered by which plan the referral bought — the rate
 // drops as the plan (and payout) grows, so acquisition cost doesn't scale
@@ -175,92 +176,156 @@ export async function attributeReferral({ businessId, referralCodeUsed, ownerEma
 
 // --- Conversion (call this from the subscription payment success handler) --
 
+// A referral only pays out once the referred business has paid at least this
+// much REAL money (plan price minus any points used). It keeps the reward
+// below what actually came in: a business paying N1 in cash and the rest in
+// points would otherwise trigger a full reward. Below this the referral just
+// stays "pending" and converts on a later payment with real cash.
+const MIN_CASH_FOR_REFERRAL_CONVERSION = 1000;
+
 /**
  * Fires when a SubscriptionPayment transitions to "success" and real cash
  * was actually collected (see subscriptionController.js: the points-only
  * path never calls this at all).
  *
- * Gated purely on the ReferralAttribution still being "pending" — NOT on
+ * Gated purely on the ReferralAttribution still being "pending" - NOT on
  * payment.isFirstPayment / business.hasPaidFirstSubscription. Those flip to
  * true on ANY successful payment, including one fully covered by points,
  * which set the business's "first payment" as done well before any real
- * cash was ever collected on a referred business. Gating on that flag meant
- * a referral whose first payment happened to be points-only would never
- * convert on a later cash payment either — the marketer/business referrer
- * silently never got paid. The "pending" status is already the correct,
- * self-idempotent guard: it flips to "converted" the first time this
- * actually runs, so a second call for the same business is a no-op below
- * regardless of which payment number it is.
+ * cash was ever collected on a referred business.
+ *
+ * Safe against double payment and against losing a reward:
+ *  - the referral is CLAIMED with one atomic update (pending -> converted), so
+ *    two overlapping calls can't both pay it;
+ *  - the reward (marketer payout row, or business points + ledger line) is
+ *    written next. The payout row has a unique index per referral, and the
+ *    points credit is a single transaction, so it can't be half-recorded;
+ *  - if recording the reward fails, the referral is put back to "pending" so
+ *    it isn't silently lost, and the error is thrown for the caller to log.
  */
 export async function handleSubscriptionConversion({ businessId, amountPaid, planType, paymentId, paymentReference }) {
-  const attribution = await ReferralAttribution.findOne({
-    referredBusinessId: businessId,
-    status: "pending",
-  });
+  if (!(Number(amountPaid) >= MIN_CASH_FOR_REFERRAL_CONVERSION)) return null;
+
+  const attribution = await ReferralAttribution.findOneAndUpdate(
+    { referredBusinessId: businessId, status: "pending" },
+    {
+      $set: {
+        status: "converted",
+        convertedAt: new Date(),
+        conversionBaseAmount: amountPaid,
+        conversionPlanType: planType,
+        conversionPaymentId: paymentId || null,
+        conversionPaymentReference: paymentReference || "",
+      },
+    },
+    { new: true }
+  );
   if (!attribution) return null; // this business wasn't referred, or already converted
 
-  attribution.status = "converted";
-  attribution.convertedAt = new Date();
-  attribution.conversionBaseAmount = amountPaid;
-  attribution.conversionPlanType = planType;
-  attribution.conversionPaymentId = paymentId || null;
-  attribution.conversionPaymentReference = paymentReference || "";
-  await attribution.save();
+  let marketerPayoutAmount = null;
+  let newPointsBalance = null;
 
-  if (attribution.referrerType === "marketer") {
-    const rate = MARKETER_PAYOUT_RATE_BY_PLAN[planType];
-    if (rate === undefined) {
-      throw new Error(`Unknown planType "${planType}" — cannot determine marketer payout rate`);
-    }
+  try {
+    if (attribution.referrerType === "marketer") {
+      const rate = MARKETER_PAYOUT_RATE_BY_PLAN[planType];
+      if (rate === undefined) {
+        throw new Error(`Unknown planType "${planType}" - cannot determine marketer payout rate`);
+      }
 
-    const payoutAmount = Math.round(amountPaid * rate);
-    await MarketerPayout.create({
-      marketerId: attribution.referrerId,
-      referralAttributionId: attribution._id,
-      amount: payoutAmount,
-      planType,
-      conversionAmount: amountPaid,
-      commissionRate: rate,
-      paymentReference: paymentReference || "",
-      subscriptionPaymentId: paymentId || null,
-    });
-
-    const marketer = await Marketer.findById(attribution.referrerId).select("email name");
-    const business = await Business.findById(businessId).select("name");
-    if (marketer) {
-      await sendMarketerConversionEmail({
-        to: marketer.email,
-        name: marketer.name,
-        businessName: business?.name || "a business",
-        payoutAmount,
+      marketerPayoutAmount = Math.round(amountPaid * rate);
+      try {
+        await MarketerPayout.create({
+          marketerId: attribution.referrerId,
+          referralAttributionId: attribution._id,
+          amount: marketerPayoutAmount,
+          planType,
+          conversionAmount: amountPaid,
+          commissionRate: rate,
+          paymentReference: paymentReference || "",
+          subscriptionPaymentId: paymentId || null,
+        });
+      } catch (err) {
+        // Unique index: a payout already exists for this referral, so it has
+        // been paid for already - nothing more to record.
+        if (err?.code !== 11000) throw err;
+        marketerPayoutAmount = null;
+      }
+    } else {
+      newPointsBalance = await runInTransaction(async (session) => {
+        const credited = await Business.findByIdAndUpdate(
+          attribution.referrerId,
+          { $inc: { pointsBalance: BUSINESS_REFERRAL_POINTS } },
+          { new: true, session }
+        );
+        if (!credited) throw new Error("Referring business no longer exists");
+        // Unique index on referralAttributionId: a second credit for the same
+        // referral fails here and the transaction (including the $inc above)
+        // is undone.
+        await PointsLedger.create(
+          [
+            {
+              businessId: attribution.referrerId,
+              type: "earned",
+              points: BUSINESS_REFERRAL_POINTS,
+              balanceAfter: credited.pointsBalance,
+              referralAttributionId: attribution._id,
+            },
+          ],
+          { session }
+        );
+        return credited.pointsBalance;
       });
     }
-  } else {
-    const referringBusiness = await Business.findById(attribution.referrerId);
-    const newBalance = (referringBusiness.pointsBalance || 0) + BUSINESS_REFERRAL_POINTS;
-
-    await PointsLedger.create({
-      businessId: attribution.referrerId,
-      type: "earned",
-      points: BUSINESS_REFERRAL_POINTS,
-      balanceAfter: newBalance,
-      referralAttributionId: attribution._id,
-    });
-    referringBusiness.pointsBalance = newBalance;
-    await referringBusiness.save();
-
-    const referringOwner = await User.findOne({ businessId: referringBusiness._id }).select("email");
-    const referredBusiness = await Business.findById(businessId).select("name");
-    if (referringOwner) {
-      await sendBusinessReferralConversionEmail({
-        to: referringOwner.email,
-        businessName: referringBusiness.name,
-        referredBusinessName: referredBusiness?.name || "a business",
-        points: BUSINESS_REFERRAL_POINTS,
-        newBalance,
-      });
+  } catch (err) {
+    if (attribution.referrerType === "business" && err?.code === 11000) {
+      // Points for this referral were already credited once.
+      return attribution;
     }
+    // The reward was NOT recorded: give the referral back so a later paid
+    // renewal (or a re-run) can still pay it, rather than losing it.
+    await ReferralAttribution.updateOne(
+      { _id: attribution._id, status: "converted" },
+      {
+        $set: { status: "pending", convertedAt: null, conversionBaseAmount: null, conversionPlanType: null, conversionPaymentId: null, conversionPaymentReference: "" },
+      }
+    ).catch((revertErr) =>
+      console.error(`MANUAL FIX NEEDED: referral ${attribution._id} is marked converted but its reward was not recorded:`, revertErr)
+    );
+    throw err;
+  }
+
+  // Notifications are best effort: the reward is already safely recorded.
+  try {
+    if (attribution.referrerType === "marketer") {
+      if (marketerPayoutAmount !== null) {
+        const marketer = await Marketer.findById(attribution.referrerId).select("email name");
+        const business = await Business.findById(businessId).select("name");
+        if (marketer) {
+          await sendMarketerConversionEmail({
+            to: marketer.email,
+            name: marketer.name,
+            businessName: business?.name || "a business",
+            payoutAmount: marketerPayoutAmount,
+          });
+        }
+      }
+    } else {
+      const referringBusiness = await Business.findById(attribution.referrerId).select("name");
+      const referringOwner = await User.findOne({ businessId: attribution.referrerId }).select("email");
+      const referredBusiness = await Business.findById(businessId).select("name");
+      if (referringOwner) {
+        await sendBusinessReferralConversionEmail({
+          to: referringOwner.email,
+          businessName: referringBusiness?.name || "your store",
+          referredBusinessName: referredBusiness?.name || "a business",
+          points: BUSINESS_REFERRAL_POINTS,
+          newBalance: newPointsBalance,
+        });
+      }
+    }
+  } catch (err) {
+    console.error(`Referral reward recorded for ${attribution._id}, but its email failed:`, err);
   }
 
   return attribution;
-}
+} 

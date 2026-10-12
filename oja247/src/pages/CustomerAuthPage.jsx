@@ -263,7 +263,7 @@ const CustomerAuthPage = () => {
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  minLength={6}
+                  minLength={8}
                   className="w-full pl-11 pr-11 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white/50"
                   placeholder="••••••••"
                 />

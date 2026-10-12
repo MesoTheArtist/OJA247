@@ -115,22 +115,34 @@ export const requestMarketerWithdrawal = async (req, res) => {
       });
     }
 
+    // Claim each payout with an atomic update and report only the ones this
+    // request really moved, so a double tap (or the weekly job running at the
+    // same moment) can't ask an admin to pay the same payout twice.
     const payoutWeekStart = new Date();
-    await MarketerPayout.updateMany(
-      { marketerId, status: "pending" },
-      { status: "batched", payoutWeekStart }
-    );
+    let amountRequested = 0;
+    for (const payout of pendingPayouts) {
+      const claimed = await MarketerPayout.findOneAndUpdate(
+        { _id: payout._id, status: "pending" },
+        { status: "batched", payoutWeekStart },
+        { new: true }
+      );
+      if (claimed) amountRequested += claimed.amount;
+    }
+
+    if (amountRequested <= 0) {
+      return res.status(409).json({ message: "Your payouts were just batched already. Please refresh." });
+    }
 
     await sendMarketerWithdrawalRequestEmail({
       marketerName: req.marketer.name,
       marketerEmail: req.marketer.email,
-      amount: pendingTotal,
+      amount: amountRequested,
     });
 
     res.json({
       success: true,
       message: "Withdrawal requested — an admin has been notified and will process it shortly.",
-      amountRequested: pendingTotal,
+      amountRequested,
     });
   } catch (error) {
     console.error("Request marketer withdrawal error:", error);
@@ -151,6 +163,37 @@ export const updateMarketerPayoutDetails = async (req, res) => {
       return res.status(400).json({
         message: "Bank, and account number are required.",
       });
+    }
+    if (
+      typeof bank_code !== "string" ||
+      typeof bank_name !== "string" ||
+      typeof account_number !== "string" ||
+      !/^\d{10}$/.test(account_number) ||
+      !/^[a-zA-Z0-9_-]{1,20}$/.test(bank_code) ||
+      bank_name.length > 100
+    ) {
+      return res.status(400).json({ message: "Enter a valid bank and a 10-digit account number." });
+    }
+
+    // This is where the marketer's earnings get sent, so changing it asks for
+    // the password again - a stolen or left-open login can't quietly redirect
+    // payouts. (An account created with Google has no password to ask for; the
+    // "payout details changed" email below still goes out for it.)
+    const withPassword = await Marketer.findById(req.marketer._id).select("+password");
+    if (withPassword?.password) {
+      const supplied = String(req.body.current_password || "");
+      if (!supplied) {
+        return res.status(403).json({
+          code: "PASSWORD_REQUIRED",
+          message: "For your security, enter your password to change your payout details.",
+        });
+      }
+      if (!(await withPassword.comparePassword(supplied))) {
+        return res.status(403).json({
+          code: "PASSWORD_INCORRECT",
+          message: "That password isn't right, so your payout details were not changed.",
+        });
+      }
     }
 
     let accountName;

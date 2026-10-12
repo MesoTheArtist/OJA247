@@ -34,6 +34,9 @@ const MarketerDashboard = () => {
   const [resolveError, setResolveError] = useState("");
   const [savingPayout, setSavingPayout] = useState(false);
   const [payoutMessage, setPayoutMessage] = useState("");
+  // Changing payout details asks for the password again (shown when the server asks).
+  const [needPassword, setNeedPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawMessage, setWithdrawMessage] = useState("");
   const [withdrawError, setWithdrawError] = useState("");
@@ -181,10 +184,15 @@ const MarketerDashboard = () => {
         bank_code: bankCode,
         bank_name: selectedBank?.name || "",
         account_number: accountNumber,
+        ...(currentPassword ? { current_password: currentPassword } : {}),
       });
       setEditingPayout(false);
+      setNeedPassword(false);
+      setCurrentPassword("");
       loadDashboard();
     } catch (err) {
+      const code = err.response?.data?.code;
+      if (code === "PASSWORD_REQUIRED" || code === "PASSWORD_INCORRECT") setNeedPassword(true);
       setPayoutMessage(err.response?.data?.message || "Could not save your payout details.");
     } finally {
       setSavingPayout(false);
@@ -424,6 +432,8 @@ const MarketerDashboard = () => {
                   setBankCode("");
                   setAccountNumber("");
                   setPayoutMessage("");
+                  setNeedPassword(false);
+                  setCurrentPassword("");
                   setEditingPayout(true);
                 }}
                 className="flex items-center gap-1 text-xs font-semibold text-green-600 hover:text-green-700"
@@ -485,6 +495,21 @@ const MarketerDashboard = () => {
                 )}
                 {resolveError && <p className="text-xs text-red-600 mt-1">{resolveError}</p>}
               </div>
+
+              {needPassword && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Your password</label>
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter your password to confirm"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
+                  />
+                </div>
+              )}
 
               {payoutMessage && <p className="text-xs text-red-600">{payoutMessage}</p>}
 

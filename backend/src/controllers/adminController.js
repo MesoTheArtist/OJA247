@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import User from "../models/User.js";
 import Business from "../models/Business.js";
 import Product from "../models/Product.js";
@@ -28,6 +29,7 @@ import {
   sendDisputeAdminDecisionEmail,
 } from "../services/emailService.js";
 import { linkGuestOrders } from "../services/orderLinking.js";
+import { runInTransaction, MoneyRuleError } from "../utils/transactions.js";
 
 // Get all users
 export const getAllUsers = async (req, res) => {
@@ -719,53 +721,56 @@ export const rejectPointsWithdrawal = async (req, res) => {
       return res.status(400).json({ message: "A reason is required — the vendor will see it." });
     }
 
-    // Claim the withdrawal first. Only one caller can move it out of "pending",
-    // so two clicks (or a reject racing a Mark paid) can never refund twice or
-    // refund money that was already sent.
-    const entry = await PointsLedger.findOneAndUpdate(
-      { _id: id, type: "withdrawn_cash", status: "pending" },
-      { status: "rejected", rejectionReason: reason },
-      { new: true }
-    );
-    if (!entry) {
+    if (!mongoose.isValidObjectId(id)) {
       return res.status(404).json({ message: "Pending points withdrawal not found (it may already be paid or rejected)." });
     }
 
-    const refundPoints = Math.abs(entry.points);
-    const undoClaim = () =>
-      PointsLedger.findByIdAndUpdate(entry._id, { status: "pending", rejectionReason: "" }).catch((err) =>
-        console.error(`MANUAL FIX NEEDED: withdrawal ${entry._id} is marked rejected but its ${refundPoints} points were NOT refunded:`, err)
-      );
-
+    // Claim the withdrawal, give the points back and write the refund line as
+    // ONE transaction. Only one caller can move the withdrawal out of
+    // "pending", so two clicks (or a reject racing a Mark paid) can never
+    // refund twice or refund money that was already sent - and if any step
+    // fails, none of them are kept (no more "marked rejected but not refunded").
+    let entry;
     let business;
+    let refundPoints;
     try {
-      business = await Business.findByIdAndUpdate(
-        entry.businessId,
-        { $inc: { pointsBalance: refundPoints } },
-        { new: true }
-      );
+      ({ entry, business, refundPoints } = await runInTransaction(async (session) => {
+        const claimed = await PointsLedger.findOneAndUpdate(
+          { _id: id, type: "withdrawn_cash", status: "pending" },
+          { status: "rejected", rejectionReason: reason },
+          { new: true, session }
+        );
+        if (!claimed) {
+          throw new MoneyRuleError("Pending points withdrawal not found (it may already be paid or rejected).", 404);
+        }
+        const points = Math.abs(claimed.points);
+        const refunded = await Business.findByIdAndUpdate(
+          claimed.businessId,
+          { $inc: { pointsBalance: points } },
+          { new: true, session }
+        );
+        if (!refunded) {
+          throw new MoneyRuleError("That business no longer exists, so there is nobody to refund.", 404);
+        }
+        await PointsLedger.create(
+          [
+            {
+              businessId: claimed.businessId,
+              type: "withdrawal_refunded",
+              points,
+              balanceAfter: refunded.pointsBalance,
+              status: "n/a",
+              rejectionReason: reason,
+              refundOfEntryId: claimed._id,
+            },
+          ],
+          { session }
+        );
+        return { entry: claimed, business: refunded, refundPoints: points };
+      }));
     } catch (err) {
-      await undoClaim();
+      if (err instanceof MoneyRuleError) return res.status(err.status).json({ message: err.message });
       throw err;
-    }
-    if (!business) {
-      await undoClaim();
-      return res.status(404).json({ message: "That business no longer exists, so there is nobody to refund." });
-    }
-
-    // The balance is already restored; the ledger line is the audit trail.
-    try {
-      await PointsLedger.create({
-        businessId: entry.businessId,
-        type: "withdrawal_refunded",
-        points: refundPoints,
-        balanceAfter: business.pointsBalance,
-        status: "n/a",
-        rejectionReason: reason,
-        refundOfEntryId: entry._id,
-      });
-    } catch (err) {
-      console.error(`Refund of withdrawal ${entry._id} succeeded but its ledger entry could not be written (needs a manual look):`, err);
     }
 
     const owner = await User.findOne({ businessId: entry.businessId }).select("email");

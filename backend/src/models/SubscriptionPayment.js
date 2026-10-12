@@ -25,6 +25,11 @@ const SubscriptionPaymentSchema = new mongoose.Schema(
     // than actually charged. Deducted from the business's balance only once
     // the payment (or the points-only path) actually succeeds.
     pointsApplied: { type: Number, default: 0 },
+    // True while those points are taken off the business's balance for this
+    // payment. They are taken the moment the payment is started (so the same
+    // points can't discount two plans at once) and given back if the payment
+    // fails or is abandoned. See subscriptionController.js.
+    pointsReserved: { type: Boolean, default: false },
     autoRenewRequested: { type: Boolean, default: false },
     autoRenewActivated: { type: Boolean, default: false },
 

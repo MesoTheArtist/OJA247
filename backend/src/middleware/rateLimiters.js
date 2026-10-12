@@ -103,3 +103,23 @@ export const accountResolveLimiter = rateLimit({
   legacyHeaders: false,
   message: { status: false, message: "Too many account checks. Please try again in a few minutes." },
 });
+
+// Starting, confirming or cancelling a payment, and asking to cash out. Real
+// use is a handful of calls; this stops scripted hammering (and repeated
+// calls to Paystack's verify API that each one of these can trigger).
+export const paymentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many payment requests. Please try again in a few minutes." },
+});
+
+// Cashing out points or marketer earnings is rare; keep it tight.
+export const withdrawalLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many withdrawal requests. Please try again later." },
+});

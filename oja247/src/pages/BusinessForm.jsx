@@ -139,7 +139,7 @@ const BusinessForm = () => {
   const validateStep = (n) => {
     if (n === 1) {
       if (!EMAIL_RE.test(formData.email.trim())) return "Please enter a valid email address.";
-      if (formData.password.length < 6) return "Password must be at least 6 characters!";
+      if (formData.password.length < 8) return "Password must be at least 8 characters!";
       if (formData.password !== formData.confirmPassword) return "Passwords do not match!";
     }
     if (n === 2) {
@@ -327,7 +327,7 @@ const BusinessForm = () => {
                         onChange={handleChange}
                         className={`${inputClass} pr-11`}
                         required
-                        minLength={6}
+                        minLength={8}
                       />
                       <button
                         type="button"

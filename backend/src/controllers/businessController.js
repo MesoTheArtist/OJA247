@@ -7,6 +7,7 @@ import Follow from "../models/Follow.js";
 import { isValidCustomReferralCode, isBusinessReferralCodeTaken } from "../services/referralService.js";
 import { sendBusinessReferralCodeChangedEmail } from "../services/emailService.js";
 import { sanitizeSocialLinks, sanitizeHighlights } from "../services/businessProfile.js";
+import { normalizeProfileImage } from "../services/imageStorage.js";
 
 const PUBLIC_BUSINESS_FIELDS = [
   "_id",
@@ -199,6 +200,14 @@ export const updateBusiness = async (req, res) => {
       const highlights = sanitizeHighlights(sanitizedUpdates.highlights);
       if (highlights.error) return res.status(400).json({ message: highlights.error });
       sanitizedUpdates.highlights = highlights.value;
+    }
+
+    // Logo/banner: only real image data or web addresses are kept (see imageStorage.js).
+    for (const field of ["logo", "banner"]) {
+      if (sanitizedUpdates[field] === undefined) continue;
+      const image = await normalizeProfileImage(sanitizedUpdates[field]);
+      if (image.error) return res.status(400).json({ message: image.error });
+      sanitizedUpdates[field] = image.value;
     }
 
     // If the vendor supplied a custom slug, normalize + guarantee it's unique

@@ -18,7 +18,8 @@ const UserSchema = new mongoose.Schema(
     // here. minlength still applies to whatever IS provided.
     password: {
       type: String,
-      minlength: 6
+      minlength: [8, "Password must be at least 8 characters."],
+      maxlength: [72, "Password must be 72 characters or fewer."]
     },
     businessId: {
       type: mongoose.Schema.Types.ObjectId,

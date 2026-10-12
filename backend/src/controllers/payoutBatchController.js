@@ -87,17 +87,29 @@ export const getPayoutBatches = async (req, res) => {
 export const markPayoutBatchPaid = async (req, res) => {
   try {
     const { marketerId } = req.params;
-    const { transferReference } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(marketerId)) {
+      return res.status(404).json({ message: "Marketer not found." });
+    }
+    const transferReference = String(req.body?.transferReference || "").trim().slice(0, 100);
 
-    // Grab the amount being paid out before the update, for the email —
-    // updateMany only returns a modified count, not the documents.
-    const payoutsBeingPaid = await MarketerPayout.find({ marketerId, status: "batched" }).select("amount");
-    const totalAmount = payoutsBeingPaid.reduce((sum, p) => sum + p.amount, 0);
-
-    const result = await MarketerPayout.updateMany(
-      { marketerId, status: "batched" },
-      { status: "paid", paidAt: new Date(), transferReference: transferReference || "" }
-    );
+    // Claim each payout one by one with an atomic update, and add up only the
+    // ones THIS call actually flipped. Two clicks (or a click racing a
+    // rejection) then can't count or email the same payout twice.
+    const waiting = await MarketerPayout.find({ marketerId, status: "batched" }).select("_id");
+    const paidAt = new Date();
+    let totalAmount = 0;
+    let paidCount = 0;
+    for (const { _id } of waiting) {
+      const done = await MarketerPayout.findOneAndUpdate(
+        { _id, status: "batched" },
+        { status: "paid", paidAt, transferReference },
+        { new: true }
+      );
+      if (done) {
+        totalAmount += done.amount;
+        paidCount += 1;
+      }
+    }
 
     if (totalAmount > 0) {
       const marketer = await Marketer.findById(marketerId).select("email name");
@@ -108,7 +120,7 @@ export const markPayoutBatchPaid = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Marked ${result.modifiedCount} payout(s) as paid`,
+      message: `Marked ${paidCount} payout(s) as paid`,
     });
   } catch (error) {
     console.error("Mark payout batch paid error:", error);

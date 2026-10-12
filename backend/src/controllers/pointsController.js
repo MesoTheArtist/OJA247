@@ -3,11 +3,19 @@ import Vendor from "../models/Vendor.js";
 import ReferralAttribution from "../models/ReferralAttribution.js";
 import PointsLedger from "../models/PointsLedger.js";
 import { sendBusinessPointsWithdrawalRequestEmail } from "../services/emailService.js";
+import { runInTransaction, MoneyRuleError } from "../utils/transactions.js";
+import { reconcilePendingPayments } from "./subscriptionController.js";
 
 // GET /api/businesses/:id/points
 export const getPointsDashboard = async (req, res) => {
   try {
     const businessId = req.params.id;
+
+    // Points held by a subscription payment that was never finished are given
+    // back here, so the balance shown is the real one.
+    await reconcilePendingPayments(businessId).catch((err) =>
+      console.error("Could not settle pending subscription payments:", err)
+    );
 
     const business = await Business.findById(businessId);
     if (!business) {
@@ -97,35 +105,53 @@ export const withdrawPoints = async (req, res) => {
       });
     }
 
-    // Atomic check-and-decrement: the pointsBalance >= requestedAmount filter
-    // is enforced by MongoDB as part of the same operation as the $inc, not
-    // as a separate read beforehand. Two simultaneous withdrawal requests
-    // can no longer both pass a balance check based on the same stale
-    // reading — only one can match the filter and succeed if the balance
-    // wouldn't cover both.
-    const business = await Business.findOneAndUpdate(
-      { _id: businessId, pointsBalance: { $gte: requestedAmount } },
-      { $inc: { pointsBalance: -requestedAmount } },
-      { new: true }
-    );
-
-    if (!business) {
-      // Either the business doesn't exist, or the balance check failed —
-      // distinguish the two for a clearer error message.
-      const exists = await Business.exists({ _id: businessId });
-      if (!exists) {
-        return res.status(404).json({ message: "Business not found" });
-      }
-      return res.status(400).json({ message: "Withdrawal amount exceeds your points balance" });
+    // A bank change that failed its name check holds payouts until an admin has
+    // reviewed it - points can't be cashed out to that account in the meantime.
+    if (vendor.payoutHold) {
+      return res.status(403).json({
+        message: "Your payout account is being reviewed, so withdrawals are paused until that is done.",
+      });
     }
 
-    const entry = await PointsLedger.create({
-      businessId,
-      type: "withdrawn_cash",
-      points: -requestedAmount,
-      balanceAfter: business.pointsBalance,
-      status: "pending",
-    });
+    // The balance check, the subtraction and the ledger line happen as ONE
+    // transaction. The balance check is part of the same database operation as
+    // the subtraction, so two simultaneous requests can't both pass it; and the
+    // ledger line can't fail separately and leave points gone with no
+    // withdrawal request on record.
+    let business;
+    let entry;
+    try {
+      ({ business, entry } = await runInTransaction(async (session) => {
+        const updated = await Business.findOneAndUpdate(
+          { _id: businessId, pointsBalance: { $gte: requestedAmount } },
+          { $inc: { pointsBalance: -requestedAmount } },
+          { new: true, session }
+        );
+        if (!updated) {
+          const exists = await Business.exists({ _id: businessId }).session(session);
+          throw new MoneyRuleError(
+            exists ? "Withdrawal amount exceeds your points balance" : "Business not found",
+            exists ? 400 : 404
+          );
+        }
+        const [created] = await PointsLedger.create(
+          [
+            {
+              businessId,
+              type: "withdrawn_cash",
+              points: -requestedAmount,
+              balanceAfter: updated.pointsBalance,
+              status: "pending",
+            },
+          ],
+          { session }
+        );
+        return { business: updated, entry: created };
+      }));
+    } catch (err) {
+      if (err instanceof MoneyRuleError) return res.status(err.status).json({ message: err.message });
+      throw err;
+    }
 
     await sendBusinessPointsWithdrawalRequestEmail({
       businessName: business.name,

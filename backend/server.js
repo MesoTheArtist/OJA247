@@ -105,13 +105,13 @@ app.use(addCsrfResponseHeader);
 // not the parsed/re-stringified JSON.
 app.use(
   express.json({
-    limit: "25mb",
+    limit: "6mb",
     verify: (req, res, buf) => {
       req.rawBody = buf;
     },
   })
 );
-app.use(express.urlencoded({ limit: "25mb", extended: true }));
+app.use(express.urlencoded({ limit: "6mb", extended: true }));
 
 // SECURITY: refuse requests that smuggle database operators ($ne, $regex...)
 // into the query string or body — see rejectMongoOperators.js.
@@ -148,7 +148,6 @@ app.use("/api/unsubscribe", unsubscribeRoutes);
 app.use("/api/disputes", disputeRoutes);
 app.use("/api/customer-auth", customerAuthRoutes);
 app.use("/api/follows", followRoutes);
-app.use("/api/reviews", reviewRoutes);
 app.use("/api/reviews", reviewRoutes);
 
 // Awaited at module load — on a cold start this holds the response until

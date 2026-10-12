@@ -58,6 +58,35 @@ export const getBanks = async (req, res) => {
   }
 };
 
+// The bank's real name for a code, from the same cached Paystack list the
+// dropdown uses, so the name customers are shown always matches the code the
+// payout is tied to. Returns "" if the list can't be loaded right now.
+async function lookupBankName(bankCode) {
+  try {
+    if (!(cachedBanks && Date.now() - cachedAt < CACHE_TTL_MS)) {
+      const response = await axios.get("https://api.paystack.co/bank", {
+        params: { country: "nigeria", currency: "NGN" },
+        headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
+      });
+      cachedBanks = response.data.data.map((bank) => ({ name: bank.name, code: bank.code, slug: bank.slug }));
+      cachedAt = Date.now();
+    }
+    return cachedBanks.find((bank) => bank.code === bankCode)?.name || "";
+  } catch {
+    return "";
+  }
+}
+
+// The account holder's name according to the bank (via Paystack). Used instead
+// of any name the browser sends, because the browser's value can say anything.
+async function resolveAccountNameFromPaystack(accountNumber, bankCode) {
+  const response = await axios.get("https://api.paystack.co/bank/resolve", {
+    params: { account_number: accountNumber, bank_code: bankCode },
+    headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
+  });
+  return String(response.data?.data?.account_name || "").trim();
+}
+
 // GET /api/vendors/resolve-account?account_number=...&bank_code=...
 // Used by the frontend to auto-fill the account name once the vendor
 // enters their account number, so they can confirm it's correct before
@@ -216,7 +245,6 @@ export const onboardVendor = async (req, res) => {
     if (!contact_phone) missing.push("contact_phone");
     if (!bank_code) missing.push("bank_code");
     if (!account_number) missing.push("account_number");
-    if (!account_name) missing.push("account_name");
     if (!nin) missing.push("nin");
 
     if (missing.length > 0) {
@@ -248,15 +276,48 @@ export const onboardVendor = async (req, res) => {
       return res.status(404).json({ status: false, message: "Business not found." });
     }
 
-    // bank-name-match check: does the account_name resolved from Paystack
-    // reasonably match the business/contact name they entered?
-    // (Simple normalized-substring check — tune to taste.)
+    const existingVendor = await Vendor.findOne({ businessId: business_id });
+
+    // Customers pay the account saved here, and the "name matches" check is a
+    // trust signal shown to them - so the account holder's name must come from
+    // the bank itself, never from the browser. (Before this, the name was
+    // whatever the form sent, so anyone could register someone else's account
+    // with a made-up matching name and pass the check.)
+    if (
+      typeof bank_code !== "string" ||
+      !/^[a-zA-Z0-9_-]{1,20}$/.test(bank_code) ||
+      typeof account_number !== "string" ||
+      !/^\d{10}$/.test(account_number)
+    ) {
+      return res.status(400).json({ status: false, message: "Enter a valid bank and a 10-digit account number." });
+    }
+    const sameAccountAsBefore =
+      Boolean(existingVendor?.accountName) &&
+      existingVendor.bankCode === bank_code &&
+      existingVendor.accountNumber === account_number;
+    let verifiedAccountName = sameAccountAsBefore ? existingVendor.accountName : "";
+    if (!verifiedAccountName) {
+      try {
+        verifiedAccountName = await resolveAccountNameFromPaystack(account_number, bank_code);
+      } catch (resolveError) {
+        console.error("Vendor account resolve failed:", resolveError.response?.data || resolveError.message);
+      }
+      if (!verifiedAccountName) {
+        return res.status(400).json({
+          status: false,
+          message: "We couldn't verify this account number with the bank. Double-check the bank and number and try again.",
+        });
+      }
+    }
+    // Show the bank's real name for this code, not whatever text was submitted.
+    const verifiedBankName = (await lookupBankName(bank_code)) || String(bank_name || "").slice(0, 100);
+
+    // bank-name-match check: does the account name from the bank reasonably
+    // match the business name they entered? (Simple normalized-substring check.)
     const normalize = (s) => s.toLowerCase().replace(/[^a-z\s]/g, "").trim();
     const bankNameMatch =
-      normalize(account_name).includes(normalize(business_name).split(" ")[0]) ||
-      normalize(business_name).includes(normalize(account_name).split(" ")[0]);
-
-    const existingVendor = await Vendor.findOne({ businessId: business_id });
+      normalize(verifiedAccountName).includes(normalize(business_name).split(" ")[0]) ||
+      normalize(business_name).includes(normalize(verifiedAccountName).split(" ")[0]);
 
     // Customers pay the account saved here, so changing it is the most
     // sensitive thing a vendor can do. Ask for the password again, so a stolen
@@ -306,7 +367,7 @@ export const onboardVendor = async (req, res) => {
       if (ninResult.status === "verified") {
         ninVerified = true;
         ninHolderName = [ninResult.firstName, ninResult.middleName, ninResult.lastName].filter(Boolean).join(" ");
-        ninNameMatch = ninNameMatchesAccount(ninResult, account_name);
+        ninNameMatch = ninNameMatchesAccount(ninResult, verifiedAccountName);
       }
       // "skipped" / "unavailable": carry on as before; ninVerified stays
       // false so it's retried next time and the admin sees "not checked".
@@ -383,9 +444,9 @@ export const onboardVendor = async (req, res) => {
         contactPhone: contact_phone,
         contactWhatsapp: contact_whatsapp || contact_phone,
         bankCode: bank_code,
-        bankName: bank_name,
+        bankName: verifiedBankName,
         accountNumber: account_number,
-        accountName: account_name,
+        accountName: verifiedAccountName,
         bankNameMatch,
         nin,
         ninVerified,

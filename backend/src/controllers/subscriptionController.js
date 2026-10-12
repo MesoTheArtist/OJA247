@@ -5,6 +5,7 @@ import SubscriptionPayment, { PLAN_PRICES } from "../models/SubscriptionPayment.
 import PointsLedger from "../models/PointsLedger.js";
 import { handleSubscriptionConversion } from "../services/referralService.js";
 import { sendSubscriptionReceiptEmail } from "../services/emailService.js";
+import { runInTransaction, MoneyRuleError } from "../utils/transactions.js";
 
 // Looks up the business owner's login email for the receipt — Business
 // itself only stores a public contact phone, not an email.
@@ -62,53 +63,143 @@ function computePeriod(planType, from = new Date()) {
   return { periodStart, periodEnd };
 }
 
-// Deducts a payment's applied points from the business's balance and logs
-// it, exactly once. Called only once a payment has actually succeeded
-// (either fully via points, or after Paystack verification) — never at
-// initiate time, so an abandoned/failed payment never costs the vendor points.
-async function deductAppliedPoints(payment) {
-  if (!payment.pointsApplied || payment.pointsApplied <= 0) return;
+// --- Points held for a subscription payment ---------------------------------
+//
+// Points are taken off the business's balance THE MOMENT a payment is started
+// (inside initiateSubscription), in the same transaction that creates the
+// payment and its ledger line. Before, they were only deducted after the
+// payment succeeded, so several payments started in a row could each be
+// discounted by the same points, and when the deduction finally ran the
+// balance was just floored to zero while every plan stayed active.
+//
+// If the payment then fails or is abandoned the points go back (failPayment).
+// If it succeeds there is nothing left to do: they are already spent.
 
-  // Safe to call once per payment: the points-only path in initiateSubscription
-  // creates the payment already "success" (never re-entering this function),
-  // and markSubscriptionPaid only reaches this line on the pending -> success
-  // transition, which happens at most once per payment (idempotency guarded above).
-  //
-  // Atomic decrement (not read-then-write) — closes the same race window as
-  // withdrawPoints in pointsController.js: two balance-affecting operations
-  // firing near-simultaneously for the same business can no longer both act
-  // on the same stale balance reading.
-  let business = await Business.findOneAndUpdate(
-    { _id: payment.businessId, pointsBalance: { $gte: payment.pointsApplied } },
-    { $inc: { pointsBalance: -payment.pointsApplied } },
-    { new: true }
-  );
-
-  if (!business) {
-    // The balance check at initiate time is now stale (something else moved
-    // the balance in between) and there isn't enough left to fully cover
-    // this payment. The subscription is already active at this point — that
-    // can't be undone — so floor at 0 and log loudly rather than silently
-    // pretending the deduction happened as planned.
-    console.error(
-      `Points balance insufficient at deduction time for business ${payment.businessId} ` +
-        `(payment ${payment._id}, expected to deduct ${payment.pointsApplied}). Flooring balance to 0.`
+// Marks a payment failed and, if it was holding points, gives them back and
+// writes the matching ledger line - all in one transaction. Safe to call twice:
+// only the call that actually moves the payment out of `from` does anything.
+async function failPayment(paymentId, { from = ["pending"] } = {}) {
+  return runInTransaction(async (session) => {
+    const claimed = await SubscriptionPayment.findOneAndUpdate(
+      { _id: paymentId, status: { $in: from } },
+      { $set: { status: "failed" } },
+      { new: false, session } // returns the payment as it was, so we can see if it held points
     );
-    business = await Business.findByIdAndUpdate(
-      payment.businessId,
-      { pointsBalance: 0 },
-      { new: true }
-    );
-    if (!business) return;
-  }
+    if (!claimed) return false;
 
-  await PointsLedger.create({
-    businessId: payment.businessId,
-    type: "redeemed_subscription",
-    points: -payment.pointsApplied,
-    balanceAfter: business.pointsBalance,
-    status: "n/a",
+    if (claimed.pointsReserved && claimed.pointsApplied > 0) {
+      await SubscriptionPayment.updateOne({ _id: paymentId }, { $set: { pointsReserved: false } }, { session });
+      const business = await Business.findByIdAndUpdate(
+        claimed.businessId,
+        { $inc: { pointsBalance: claimed.pointsApplied } },
+        { new: true, session }
+      );
+      if (business) {
+        await PointsLedger.create(
+          [
+            {
+              businessId: claimed.businessId,
+              type: "redemption_refunded",
+              points: claimed.pointsApplied,
+              balanceAfter: business.pointsBalance,
+              status: "n/a",
+              subscriptionPaymentId: claimed._id,
+            },
+          ],
+          { session }
+        );
+      }
+    }
+    return true;
   });
+}
+
+// A payment that was marked failed (so its points were given back) can still be
+// completed later by Paystack, e.g. a slow bank. The cash is really in, so the
+// plan is activated; this tries to take the points again. If the vendor has
+// already spent them elsewhere the shortfall is logged for a manual look
+// rather than undoing a plan they paid cash for.
+async function retakeReleasedPoints(payment) {
+  await runInTransaction(async (session) => {
+    const business = await Business.findOneAndUpdate(
+      { _id: payment.businessId, pointsBalance: { $gte: payment.pointsApplied } },
+      { $inc: { pointsBalance: -payment.pointsApplied } },
+      { new: true, session }
+    );
+    if (!business) {
+      throw new MoneyRuleError("Not enough points left to take again for a late payment.");
+    }
+    await SubscriptionPayment.updateOne({ _id: payment._id }, { $set: { pointsReserved: true } }, { session });
+    await PointsLedger.create(
+      [
+        {
+          businessId: payment.businessId,
+          type: "redeemed_subscription",
+          points: -payment.pointsApplied,
+          balanceAfter: business.pointsBalance,
+          status: "n/a",
+          subscriptionPaymentId: payment._id,
+        },
+      ],
+      { session }
+    );
+  });
+}
+
+// Asks Paystack what really happened to one reference. Paystack, not our own
+// record, is the source of truth for whether money arrived.
+async function fetchPaystackTransaction(reference) {
+  const secret = process.env.PAYSTACK_SECRET_KEY;
+  if (!secret) return null;
+  const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+  });
+  const body = await response.json().catch(() => ({}));
+  return { httpStatus: response.status, ok: response.ok, body };
+}
+
+const paystackSaysPaid = (result) => Boolean(result?.ok && result.body?.status && result.body.data?.status === "success");
+// "Never going to succeed" - safe to release held points for. Anything else
+// (still processing, Paystack down) is left alone and looked at again later.
+const paystackSaysDead = (result) =>
+  Boolean(result) &&
+  (result.httpStatus === 404 || ["failed", "reversed", "abandoned"].includes(result.body?.data?.status));
+
+// Before a business starts a new payment, settle its older unfinished ones with
+// Paystack: really paid -> activate it; dead -> give its points back. This is
+// what frees points held by a payment whose popup was simply closed.
+export async function reconcilePendingPayments(businessId) {
+  const settledBefore = new Date(Date.now() - 60 * 1000); // leave a payment being paid right now alone
+  const pending = await SubscriptionPayment.find({
+    businessId,
+    status: "pending",
+    createdAt: { $lt: settledBefore },
+  })
+    .sort({ createdAt: -1 })
+    .limit(5);
+
+  for (const payment of pending) {
+    try {
+      const result = await fetchPaystackTransaction(payment.paystackReference);
+      if (!result) continue;
+      if (paystackSaysPaid(result)) {
+        if (paidEnough(payment, result.body.data)) {
+          await markSubscriptionPaid(payment.paystackReference, result.body.data);
+        } else {
+          console.error(
+            `UNDERPAID subscription payment ${payment.paystackReference}: Paystack took ${result.body.data?.amount} kobo, ` +
+              `${Math.round((payment.amount - (payment.pointsApplied || 0)) * 100)} needed. Not activated, points released - refund the customer manually.`
+          );
+          await failPayment(payment._id);
+        }
+      } else if (paystackSaysDead(result)) {
+        await failPayment(payment._id);
+      }
+    } catch (err) {
+      console.error(`Could not settle pending subscription payment ${payment.paystackReference}:`, err);
+    }
+  }
 }
 
 // Wraps handleSubscriptionConversion so a referral/payout bug can never
@@ -136,8 +227,12 @@ async function safeHandleSubscriptionConversion(details) {
 // Creates the pending SubscriptionPayment record the frontend then charges
 // against via the Paystack popup, mirroring orderController's createOrder.
 // If the vendor applies enough points to cover the full plan price, no
-// Paystack charge is needed at all — the subscription is activated here
+// Paystack charge is needed at all - the subscription is activated here
 // and the frontend skips the payment popup entirely.
+//
+// Any points being applied are taken off the balance right here, in the same
+// transaction that creates the payment and its ledger line (see "Points held
+// for a subscription payment" above), so they cannot be used twice.
 export const initiateSubscription = async (req, res) => {
   try {
     const { businessId, planType, pointsToApply, autoRenew } = req.body;
@@ -145,7 +240,7 @@ export const initiateSubscription = async (req, res) => {
     if (!businessId || !planType) {
       return res.status(400).json({ message: "businessId and planType are required" });
     }
-    if (typeof planType !== "string" || !Object.hasOwn(PLAN_PRICES, planType)) {
+    if (typeof businessId !== "string" || typeof planType !== "string" || !Object.hasOwn(PLAN_PRICES, planType)) {
       return res.status(400).json({ message: "Invalid planType" });
     }
 
@@ -160,8 +255,17 @@ export const initiateSubscription = async (req, res) => {
       return res.status(404).json({ message: "Business not found" });
     }
 
+    // Free up points held by this business's earlier payments that were never
+    // finished, and activate any that actually were paid, before working out
+    // how many points are available now.
+    await reconcilePendingPayments(businessId);
+    const fresh = await Business.findById(businessId).select("pointsBalance subscriptionExpiresAt hasPaidFirstSubscription name");
+    if (!fresh) {
+      return res.status(404).json({ message: "Business not found" });
+    }
+
     const planPrice = PLAN_PRICES[planType];
-    const pointsBalance = business.pointsBalance || 0;
+    const pointsBalance = fresh.pointsBalance || 0;
     const appliedPoints = Math.min(
       Math.max(0, Math.floor(Number(pointsToApply) || 0)),
       pointsBalance,
@@ -172,23 +276,70 @@ export const initiateSubscription = async (req, res) => {
       return res.status(400).json({ message: "A card payment is required to enable automatic renewal." });
     }
 
-    const isFirstPayment = !business.hasPaidFirstSubscription;
-    const reference = `oja247-sub-${Date.now()}`;
+    const isFirstPayment = !fresh.hasPaidFirstSubscription;
+    // Unpredictable, so nobody can guess another business's payment reference.
+    const reference = `oja247-sub-${crypto.randomBytes(9).toString("hex")}`;
 
-    const payment = await SubscriptionPayment.create({
-      businessId,
-      planType,
-      amount: planPrice, // always the full plan value, for accounting/marketer-payout accuracy
-      pointsApplied: appliedPoints,
-      isFirstPayment,
-      autoRenewRequested: autoRenew === true,
-      paystackReference: reference,
-      status: chargeAmount <= 0 ? "success" : "pending",
-    });
+    let payment;
+    try {
+      payment = await runInTransaction(async (session) => {
+        let balanceAfter = 0;
+        if (appliedPoints > 0) {
+          // The balance check is part of the same database operation as the
+          // subtraction, so two requests can never both spend the same points.
+          const charged = await Business.findOneAndUpdate(
+            { _id: businessId, pointsBalance: { $gte: appliedPoints } },
+            { $inc: { pointsBalance: -appliedPoints } },
+            { new: true, session }
+          );
+          if (!charged) {
+            throw new MoneyRuleError("Your points balance changed. Please check it and try again.", 409);
+          }
+          balanceAfter = charged.pointsBalance;
+        }
 
-    // Fully covered by points — activate immediately, no Paystack step.
+        const [created] = await SubscriptionPayment.create(
+          [
+            {
+              businessId,
+              planType,
+              amount: planPrice, // always the full plan value, for accounting/marketer-payout accuracy
+              pointsApplied: appliedPoints,
+              pointsReserved: appliedPoints > 0,
+              isFirstPayment,
+              autoRenewRequested: autoRenew === true,
+              paystackReference: reference,
+              status: chargeAmount <= 0 ? "success" : "pending",
+            },
+          ],
+          { session }
+        );
+
+        if (appliedPoints > 0) {
+          await PointsLedger.create(
+            [
+              {
+                businessId,
+                type: "redeemed_subscription",
+                points: -appliedPoints,
+                balanceAfter,
+                status: "n/a",
+                subscriptionPaymentId: created._id,
+              },
+            ],
+            { session }
+          );
+        }
+        return created;
+      });
+    } catch (err) {
+      if (err instanceof MoneyRuleError) return res.status(err.status).json({ message: err.message });
+      throw err;
+    }
+
+    // Fully covered by points - activate immediately, no Paystack step.
     if (chargeAmount <= 0) {
-      const { periodStart, periodEnd } = computePeriod(planType, periodStartFor(business.subscriptionExpiresAt));
+      const { periodStart, periodEnd } = computePeriod(planType, periodStartFor(fresh.subscriptionExpiresAt));
       try {
         payment.periodStart = periodStart;
         payment.periodEnd = periodEnd;
@@ -202,18 +353,18 @@ export const initiateSubscription = async (req, res) => {
           subscriptionExpiredEmailSentAt: null,
         });
       } catch (err) {
-        // Nothing was charged and nothing was activated: don't leave a "success" record behind.
+        // Nothing was activated: give the points back and don't leave a "success" record behind.
         console.error(`Points-only activation failed for payment ${payment._id}:`, err);
-        await SubscriptionPayment.findByIdAndUpdate(payment._id, { status: "failed" }).catch(() => {});
+        await failPayment(payment._id, { from: ["success"] }).catch((refundErr) =>
+          console.error(`MANUAL FIX NEEDED: points for failed payment ${payment._id} were not returned:`, refundErr)
+        );
         throw err;
       }
-
-      await bestEffort(`Points deduction for payment ${payment._id}`, () => deductAppliedPoints(payment));
 
       await bestEffort(`Receipt email for payment ${payment._id}`, async () =>
         sendSubscriptionReceiptEmail({
           to: await getOwnerEmail(businessId),
-          businessName: business.name,
+          businessName: fresh.name,
           planType,
           amountPaid: 0,
           planPrice: payment.amount,
@@ -224,16 +375,12 @@ export const initiateSubscription = async (req, res) => {
         })
       );
 
-      // No Paystack cash was collected on this payment — it's covered
+      // No Paystack cash was collected on this payment - it's covered
       // entirely by points, which are themselves money the platform already
       // paid out once (to whoever earned them). Awarding a marketer payout
       // or business referral points again here, off the nominal plan price,
       // would pay out twice against a single real inflow. So: activate the
-      // subscription, but skip the referral conversion entirely — the
-      // referring marketer/business simply doesn't get paid on this
-      // particular payment. (Their ReferralAttribution stays "pending"
-      // rather than flipping to "converted" — it will still convert on a
-      // later payment for this business that does involve real cash.)
+      // subscription, but skip the referral conversion entirely.
 
       return res.status(201).json({
         message: "Subscription paid in full with points",
@@ -339,8 +486,12 @@ async function markSubscriptionPaid(reference, paystackData = null) {
   }
 
   // The vendor is active from here on. The rest is bookkeeping and must not
-  // undo or fail it.
-  await bestEffort(`Points deduction for payment ${payment._id}`, () => deductAppliedPoints(payment));
+  // undo or fail it. Points were already taken when the payment was started;
+  // the only case left is a payment that was marked failed (points given back)
+  // and then completed late by Paystack.
+  if (payment.pointsApplied > 0 && !payment.pointsReserved) {
+    await bestEffort(`Taking points again for late payment ${payment._id}`, () => retakeReleasedPoints(payment));
+  }
 
   const cashCollected = payment.amount - (payment.pointsApplied || 0);
 
@@ -424,11 +575,13 @@ export const verifySubscriptionPayment = async (req, res) => {
     const verificationData = await verificationResponse.json();
 
     if (!verificationResponse.ok || !verificationData.status || verificationData.data?.status !== "success") {
-      await SubscriptionPayment.findOneAndUpdate(
-        { _id: payment._id, status: "pending" },
-        { $set: { status: "failed" } }
-      );
-      return res.status(400).json({ message: "Payment verification failed", verification: verificationData });
+      // Only a payment Paystack says has definitely failed is closed (and its
+      // points returned). One that is merely still processing, or that Paystack
+      // couldn't answer about, stays pending and is settled later.
+      if (["failed", "reversed"].includes(verificationData?.data?.status)) {
+        await failPayment(payment._id);
+      }
+      return res.status(400).json({ message: "Payment verification failed" });
     }
 
     if (payment.status !== "success" && !paidEnough(payment, verificationData.data)) {
@@ -676,4 +829,4 @@ export const runSubscriptionAutoRenewal = async (req, res) => {
     console.error("Subscription auto-renew cron error:", error);
     return res.status(500).json({ message: "Subscription renewal processing failed" });
   }
-};
+};  

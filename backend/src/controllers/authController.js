@@ -13,6 +13,7 @@ import {
 import { sendVendorWelcomeEmail, sendPasswordResetEmail, sendPasswordChangedEmail } from "../services/emailService.js";
 import { sanitizeSocialLinks, sanitizeHighlights } from "../services/businessProfile.js";
 import { clearSessionCookies, setUserSessionCookie } from "../middleware/sessionCookies.js";
+import { normalizeProfileImage } from "../services/imageStorage.js";
 
 // Generate JWT Token
 const generateToken = (id, authVersion = 1) => {
@@ -72,14 +73,19 @@ export const register = async (req, res) => {
       Array.isArray(businessData.highlights) ? businessData.highlights : []
     );
 
+    const logoResult = await normalizeProfileImage(businessData.logo);
+    if (logoResult.error) return res.status(400).json({ message: `Registration failed: ${logoResult.error}` });
+    const bannerResult = await normalizeProfileImage(businessData.banner);
+    if (bannerResult.error) return res.status(400).json({ message: `Registration failed: ${bannerResult.error}` });
+
     const normalizedBusinessData = {
       name: String(businessData.name).trim(),
       description: businessData.description ? String(businessData.description).trim() : "",
       category: String(businessData.category).trim(),
       location: String(businessData.location).trim(),
       contact: String(businessData.contact).trim(),
-      logo: typeof businessData.logo === "string" ? businessData.logo : "",
-      banner: typeof businessData.banner === "string" ? businessData.banner : "",
+      logo: logoResult.value,
+      banner: bannerResult.value,
       socialLinks: cleanLinks.value,
       highlights: cleanHighlights.value
     };

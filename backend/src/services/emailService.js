@@ -99,7 +99,7 @@ export async function verifyEmailTransporter() {
 function layout(bodyHtml, { preheader = "" } = {}) {
   return `
   <div style="background:#f3f4f6; padding:32px 16px; font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-    ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;">${preheader}</div>` : ""}
+    ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;">${esc(preheader)}</div>` : ""}
     <div style="max-width:560px; margin:0 auto;">
       <div style="text-align:center; padding-bottom:20px;">
         <img src="${LOGO_URL}" alt="OJA247" width="52" height="52" style="border-radius:12px; display:inline-block;" />
@@ -127,7 +127,7 @@ function button(label, url) {
   return `
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 20px 0;">
       <tr><td style="border-radius:10px; background:#16a34a;">
-        <a href="${url}" style="display:inline-block; padding:12px 24px; color:#ffffff; font-weight:600; font-size:14px; text-decoration:none; border-radius:10px;">${label}</a>
+        <a href="${esc(url)}" style="display:inline-block; padding:12px 24px; color:#ffffff; font-weight:600; font-size:14px; text-decoration:none; border-radius:10px;">${label}</a>
       </td></tr>
     </table>`;
 }
@@ -146,7 +146,7 @@ export async function sendMarketerWithdrawalRequestEmail({ marketerName, markete
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Marketer withdrawal request</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;"><strong>${marketerName}</strong> (${marketerEmail}) just requested a withdrawal of their pending balance.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;"><strong>${esc(marketerName)}</strong> (${esc(marketerEmail)}) just requested a withdrawal of their pending balance.</p>
       <div style="background:#f0fdf4; border-radius:10px; padding:18px; text-align:center; margin:20px 0;">
         <p style="margin:0; font-size:28px; font-weight:800; color:#16a34a;">₦${amount.toLocaleString()}</p>
       </div>
@@ -165,7 +165,7 @@ export async function sendBusinessPointsWithdrawalRequestEmail({ businessName, b
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Business points withdrawal request</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;"><strong>${businessName}</strong> (${businessEmail}) just requested a cash withdrawal of their referral points balance.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;"><strong>${esc(businessName)}</strong> (${esc(businessEmail)}) just requested a cash withdrawal of their referral points balance.</p>
       <div style="background:#f0fdf4; border-radius:10px; padding:18px; text-align:center; margin:20px 0;">
         <p style="margin:0; font-size:28px; font-weight:800; color:#16a34a;">₦${amount.toLocaleString()}</p>
       </div>
@@ -184,7 +184,7 @@ export async function sendPasswordResetEmail({ to, name, resetUrl }) {
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Reset your password</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${name || "there"}, we got a request to reset your OJA247 password. Click below to choose a new one — this link works for the next hour.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(name || "there")}, we got a request to reset your OJA247 password. Click below to choose a new one — this link works for the next hour.</p>
       ${button("Reset my password", resetUrl)}
       <p style="color:#9ca3af; font-size:13px; line-height:1.6;">Didn't request this? You can safely ignore this email — your password won't change unless you click the link above.</p>
       `,
@@ -200,7 +200,7 @@ export async function sendCustomerVerificationEmail({ to, name, verifyUrl }) {
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Confirm your email</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${name || "there"}, confirm this is your email address to finish setting up your OJA247 account. Once it's confirmed, orders you placed as a guest with this email show up in your order history. This link works for 48 hours.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(name || "there")}, confirm this is your email address to finish setting up your OJA247 account. Once it's confirmed, orders you placed as a guest with this email show up in your order history. This link works for 48 hours.</p>
       ${button("Confirm my email", verifyUrl)}
       <p style="color:#9ca3af; font-size:13px; line-height:1.6;">Didn't create an OJA247 account? You can ignore this email.</p>
       `,
@@ -217,7 +217,7 @@ export async function sendVendorWelcomeEmail({ to, businessName }) {
     subject: `Welcome to OJA247, ${businessName}!`,
     html: layout(
       `
-      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Welcome to OJA247, ${businessName} 🎉</h1>
+      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Welcome to OJA247, ${esc(businessName)} 🎉</h1>
       <p style="color:#4b5563; font-size:14px; line-height:1.6;">Your store is live on OJA247 — Nigeria's marketplace built for local businesses to sell to the customers they already have.</p>
       <p style="color:#4b5563; font-size:14px; line-height:1.6; margin-bottom:4px;">Here's what to do next:</p>
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%; margin: 12px 0 4px;">
@@ -240,7 +240,7 @@ export async function sendVendorWelcomeEmail({ to, businessName }) {
 
 export async function sendVerificationReviewedEmail({ to, businessName, businessCategory, decision, reviewNotes }) {
   const approved = decision === "approved";
-  const badgeLabel = `Verified${businessCategory ? ` ${businessCategory}` : ""} Vendor`;
+  const badgeLabel = `Verified${businessCategory ? ` ${esc(businessCategory)}` : ""} Vendor`;
   return sendEmail({
     to,
     subject: approved ? "Your vendor verification was approved" : "Your vendor verification needs attention",
@@ -248,13 +248,13 @@ export async function sendVerificationReviewedEmail({ to, businessName, business
       approved
         ? `
           <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">You're verified ✅</h1>
-          <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, your vendor verification documents have been approved. Your <strong>${badgeLabel}</strong> badge is now active on your storefront.</p>
+          <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, your vendor verification documents have been approved. Your <strong>${badgeLabel}</strong> badge is now active on your storefront.</p>
           ${button("View my dashboard", `${SITE_URL}/dashboard`)}
           `
         : `
           <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Action needed on your verification</h1>
-          <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, we weren't able to approve your verification submission.</p>
-          ${reviewNotes ? `<div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 14px; color:#991b1b; font-size:14px; margin:14px 0;">${reviewNotes}</div>` : ""}
+          <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, we weren't able to approve your verification submission.</p>
+          ${reviewNotes ? `<div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px 14px; color:#991b1b; font-size:14px; margin:14px 0;">${esc(reviewNotes)}</div>` : ""}
           <p style="color:#4b5563; font-size:14px; line-height:1.6;">Please update your details and resubmit from your dashboard.</p>
           ${button("Update my details", `${SITE_URL}/dashboard`)}
           `
@@ -269,8 +269,8 @@ export async function sendPayoutHoldEmail({ to, businessName, reason }) {
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Your store is temporarily paused</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, we've paused new orders to your store.</p>
-      ${reason ? `<div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px 14px; color:#9a3412; font-size:14px; margin:14px 0;">${reason}</div>` : ""}
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, we've paused new orders to your store.</p>
+      ${reason ? `<div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px 14px; color:#9a3412; font-size:14px; margin:14px 0;">${esc(reason)}</div>` : ""}
       <p style="color:#4b5563; font-size:14px; line-height:1.6;">This is usually because a bank account change couldn't be automatically verified. An admin will review it shortly — you don't need to do anything else right now, but customers can't place new orders at your store until it's cleared.</p>
       ${button("View my dashboard", `${SITE_URL}/dashboard`)}
       `,
@@ -286,9 +286,9 @@ export async function sendBankDetailsUpdatedEmail({ to, businessName, bankName, 
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Bank account updated</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, this confirms the bank account customers pay on OJA247 was just changed to:</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, this confirms the bank account customers pay on OJA247 was just changed to:</p>
       <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px 14px; color:#166534; font-size:14px; margin:14px 0;">
-        ${bankName} &middot; account ending in ${accountNumberLast4}
+        ${esc(bankName)} &middot; account ending in ${esc(accountNumberLast4)}
       </div>
       <p style="color:#4b5563; font-size:14px; line-height:1.6;">The account name matched your business name, so this took effect immediately — no admin review needed. Customers placing new orders will now be asked to pay this account. If you didn't make this change, change your password and contact us right away, because someone else may have access to your account.</p>
       ${button("View my dashboard", `${SITE_URL}/dashboard`)}
@@ -305,7 +305,7 @@ function orderItemsTable(items) {
     .map(
       (i) => `
       <tr>
-        <td style="padding:10px 0; font-size:14px; color:#374151; border-bottom:1px solid #f1f2f4;">${i.name}</td>
+        <td style="padding:10px 0; font-size:14px; color:#374151; border-bottom:1px solid #f1f2f4;">${esc(i.name)}</td>
         <td style="padding:10px 0; font-size:14px; color:#6b7280; text-align:center; border-bottom:1px solid #f1f2f4;">&times;${i.quantity}</td>
         <td style="padding:10px 0; font-size:14px; color:#111827; text-align:right; border-bottom:1px solid #f1f2f4; white-space:nowrap;">${NAIRA(i.price * i.quantity)}</td>
       </tr>`
@@ -364,12 +364,12 @@ export async function sendOrderConfirmationEmail({
     subject: `Your OJA247 order is confirmed — ${reference}`,
     html: layout(
       `
-      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Thanks for your order${customerName ? `, ${customerName}` : ""}! 🛍️</h1>
+      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Thanks for your order${customerName ? `, ${esc(customerName)}` : ""}! 🛍️</h1>
       <p style="color:#4b5563; font-size:14px; line-height:1.6;">Your payment was successful and your order is being prepared for ${deliveryMethod === "pickup" ? "pickup" : "delivery"}.</p>
 
       <div style="background:#f9fafb; border-radius:10px; padding:16px 18px; margin:20px 0;">
         <p style="margin:0 0 2px; font-size:12px; color:#9ca3af; text-transform:uppercase; letter-spacing:0.05em;">Order reference</p>
-        <p style="margin:0; font-size:15px; font-weight:700; color:#111827; font-family:monospace;">${reference}</p>
+        <p style="margin:0; font-size:15px; font-weight:700; color:#111827; font-family:monospace;">${esc(reference)}</p>
       </div>
 
       ${orderItemsTable(items)}
@@ -379,7 +379,7 @@ export async function sendOrderConfirmationEmail({
         address
           ? `<div style="margin-top:22px; padding-top:18px; border-top:1px solid #f1f2f4;">
               <p style="margin:0 0 4px; font-size:12px; color:#9ca3af; text-transform:uppercase; letter-spacing:0.05em;">Delivering to</p>
-              <p style="margin:0; font-size:14px; color:#374151; line-height:1.5;">${address}</p>
+              <p style="margin:0; font-size:14px; color:#374151; line-height:1.5;">${esc(address)}</p>
             </div>`
           : ""
       }
@@ -408,11 +408,11 @@ export async function sendVendorNewOrderEmail({
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">You've got a new order! 📦</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, ${customerName || "a customer"} just placed an order on OJA247.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, ${esc(customerName || "a customer")} just placed an order on OJA247.</p>
 
       <div style="background:#f9fafb; border-radius:10px; padding:16px 18px; margin:20px 0;">
         <p style="margin:0 0 2px; font-size:12px; color:#9ca3af; text-transform:uppercase; letter-spacing:0.05em;">Order reference</p>
-        <p style="margin:0; font-size:15px; font-weight:700; color:#111827; font-family:monospace;">${reference}</p>
+        <p style="margin:0; font-size:15px; font-weight:700; color:#111827; font-family:monospace;">${esc(reference)}</p>
       </div>
 
       ${orderItemsTable(items)}
@@ -424,11 +424,11 @@ export async function sendVendorNewOrderEmail({
       <div style="margin-top:22px; padding-top:18px; border-top:1px solid #f1f2f4;">
         <p style="margin:0 0 8px; font-size:12px; color:#9ca3af; text-transform:uppercase; letter-spacing:0.05em;">Customer &amp; delivery details</p>
         <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%; font-size:14px; color:#374151;">
-          <tr><td style="padding:4px 0; color:#9ca3af; width:110px;">Name</td><td style="padding:4px 0;">${customerName || "—"}</td></tr>
-          ${customerPhone ? `<tr><td style="padding:4px 0; color:#9ca3af;">Phone</td><td style="padding:4px 0;">${customerPhone}</td></tr>` : ""}
+          <tr><td style="padding:4px 0; color:#9ca3af; width:110px;">Name</td><td style="padding:4px 0;">${esc(customerName || "—")}</td></tr>
+          ${customerPhone ? `<tr><td style="padding:4px 0; color:#9ca3af;">Phone</td><td style="padding:4px 0;">${esc(customerPhone)}</td></tr>` : ""}
           <tr><td style="padding:4px 0; color:#9ca3af;">Method</td><td style="padding:4px 0; text-transform:capitalize;">${deliveryMethod || "delivery"}</td></tr>
-          ${address ? `<tr><td style="padding:4px 0; color:#9ca3af; vertical-align:top;">Address</td><td style="padding:4px 0;">${address}</td></tr>` : ""}
-          ${note ? `<tr><td style="padding:4px 0; color:#9ca3af; vertical-align:top;">Note</td><td style="padding:4px 0;">${note}</td></tr>` : ""}
+          ${address ? `<tr><td style="padding:4px 0; color:#9ca3af; vertical-align:top;">Address</td><td style="padding:4px 0;">${esc(address)}</td></tr>` : ""}
+          ${note ? `<tr><td style="padding:4px 0; color:#9ca3af; vertical-align:top;">Note</td><td style="padding:4px 0;">${esc(note)}</td></tr>` : ""}
         </table>
       </div>
 
@@ -446,10 +446,10 @@ export async function sendOrderPaymentFailedEmail({ to, customerName, reference 
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Your payment didn't go through</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${customerName || "there"}, we weren't able to confirm your payment for this order, so it hasn't been placed and nothing was charged.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(customerName || "there")}, we weren't able to confirm your payment for this order, so it hasn't been placed and nothing was charged.</p>
       <div style="background:#f9fafb; border-radius:10px; padding:16px 18px; margin:20px 0;">
         <p style="margin:0 0 2px; font-size:12px; color:#9ca3af; text-transform:uppercase; letter-spacing:0.05em;">Order reference</p>
-        <p style="margin:0; font-size:15px; font-weight:700; color:#111827; font-family:monospace;">${reference}</p>
+        <p style="margin:0; font-size:15px; font-weight:700; color:#111827; font-family:monospace;">${esc(reference)}</p>
       </div>
       <p style="color:#4b5563; font-size:14px; line-height:1.6;">This can happen from a declined card, an expired session, or a network hiccup mid-payment. You can just try checking out again — your cart items weren't lost.</p>
       ${button("Try again", `${SITE_URL}`)}
@@ -487,7 +487,7 @@ export async function sendSubscriptionReceiptEmail({
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Payment received ✅</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, here's your receipt.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, here's your receipt.</p>
 
       <div style="border:1px solid #eef0f3; border-radius:12px; padding:20px 22px; margin:20px 0;">
         <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%; margin-bottom:14px;">
@@ -496,7 +496,7 @@ export async function sendSubscriptionReceiptEmail({
             <td style="font-size:12px; color:#9ca3af; text-transform:uppercase; letter-spacing:0.05em; text-align:right;">Date</td>
           </tr>
           <tr>
-            <td style="font-size:14px; font-weight:600; color:#111827;">${businessName}</td>
+            <td style="font-size:14px; font-weight:600; color:#111827;">${esc(businessName)}</td>
             <td style="font-size:14px; color:#111827; text-align:right;">${formatDate(paidAt || new Date())}</td>
           </tr>
         </table>
@@ -508,7 +508,7 @@ export async function sendSubscriptionReceiptEmail({
           ${summaryRow("Amount charged", NAIRA(amountPaid), { bold: true })}
         </table>
 
-        ${reference ? `<p style="margin:14px 0 0; font-size:12px; color:#9ca3af; font-family:monospace;">Ref: ${reference}</p>` : ""}
+        ${reference ? `<p style="margin:14px 0 0; font-size:12px; color:#9ca3af; font-family:monospace;">Ref: ${esc(reference)}</p>` : ""}
       </div>
 
       <p style="color:#4b5563; font-size:14px; line-height:1.6;">Your store will remain visible to customers until <strong>${formatDate(expiresAt)}</strong>.</p>
@@ -525,8 +525,8 @@ export async function sendBusinessReferralConversionEmail({ to, businessName, re
     subject: "You just earned referral points!",
     html: layout(
       `
-      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Nice work, ${businessName} 🎉</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;"><strong>${referredBusinessName}</strong> just subscribed using your referral link.</p>
+      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Nice work, ${esc(businessName)} 🎉</h1>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;"><strong>${esc(referredBusinessName)}</strong> just subscribed using your referral link.</p>
       <div style="background:#f0fdf4; border-radius:10px; padding:18px; text-align:center; margin:20px 0;">
         <p style="margin:0; font-size:28px; font-weight:800; color:#16a34a;">+${points} points</p>
         <p style="margin:6px 0 0; font-size:13px; color:#166534;">New balance: ${newBalance} points</p>
@@ -546,7 +546,7 @@ export async function sendSubscriptionExpiringEmail({ to, businessName, daysLeft
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Your subscription is expiring soon ⏳</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, your subscription expires on <strong>${formatDate(expiresAt)}</strong> — that's ${daysLeft} day${daysLeft === 1 ? "" : "s"} away.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, your subscription expires on <strong>${formatDate(expiresAt)}</strong> — that's ${daysLeft} day${daysLeft === 1 ? "" : "s"} away.</p>
       <p style="color:#4b5563; font-size:14px; line-height:1.6;">Renew before then so your store stays visible to customers without any interruption.</p>
       ${button("Renew my subscription", `${SITE_URL}/dashboard`)}
       `,
@@ -562,7 +562,7 @@ export async function sendSubscriptionExpiredEmail({ to, businessName }) {
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Your subscription has expired</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, your subscription period has ended, so your store is currently hidden from customer search.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, your subscription period has ended, so your store is currently hidden from customer search.</p>
       <p style="color:#4b5563; font-size:14px; line-height:1.6;">Renew now to bring it back — your store goes live again immediately after payment.</p>
       ${button("Renew now", `${SITE_URL}/dashboard`)}
       `,
@@ -578,7 +578,7 @@ export async function sendNeverSubscribedReminderEmail({ to, businessName }) {
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Your store isn't visible to customers yet</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, your store on OJA247 is set up but it won't show up in customer search or the Explore page until you subscribe.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, your store on OJA247 is set up but it won't show up in customer search or the Explore page until you subscribe.</p>
       <p style="color:#4b5563; font-size:14px; line-height:1.6;">Subscribe any time — your store goes live right after payment.</p>
       ${button("Subscribe now", `${SITE_URL}/dashboard`)}
       `,
@@ -595,12 +595,12 @@ export async function sendMarketerWelcomeEmail({ to, name, referralCode }) {
     subject: "Welcome to the OJA247 Marketer Program",
     html: layout(
       `
-      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Welcome, ${name} 🚀</h1>
+      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Welcome, ${esc(name)} 🚀</h1>
       <p style="color:#4b5563; font-size:14px; line-height:1.6;">Your marketer account is ready. Share your referral code with businesses — you'll earn a payout whenever one of them subscribes.</p>
 
       <div style="background:#f0fdf4; border:1px dashed #16a34a; border-radius:10px; padding:18px; text-align:center; margin:20px 0;">
         <p style="margin:0 0 4px; font-size:11px; color:#166534; text-transform:uppercase; letter-spacing:0.1em;">Your referral code</p>
-        <p style="margin:0; font-size:24px; font-weight:800; letter-spacing:0.1em; color:#16a34a; font-family:monospace;">${referralCode}</p>
+        <p style="margin:0; font-size:24px; font-weight:800; letter-spacing:0.1em; color:#16a34a; font-family:monospace;">${esc(referralCode)}</p>
       </div>
 
       ${button("Go to my marketer dashboard", `${SITE_URL}/marketer-dashboard`)}
@@ -616,8 +616,8 @@ export async function sendMarketerConversionEmail({ to, name, businessName, payo
     subject: "You just earned a referral payout!",
     html: layout(
       `
-      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Nice work, ${name} 💰</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;"><strong>${businessName}</strong> just subscribed using your referral link.</p>
+      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Nice work, ${esc(name)} 💰</h1>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;"><strong>${esc(businessName)}</strong> just subscribed using your referral link.</p>
       <div style="background:#f0fdf4; border-radius:10px; padding:18px; text-align:center; margin:20px 0;">
         <p style="margin:0; font-size:28px; font-weight:800; color:#16a34a;">+${NAIRA(payoutAmount)}</p>
       </div>
@@ -636,7 +636,7 @@ export async function sendMarketerPayoutPaidEmail({ to, name, amount }) {
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Payout sent 💸</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${name}, <strong>${NAIRA(amount)}</strong> has been paid out to your registered bank account.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(name)}, <strong>${NAIRA(amount)}</strong> has been paid out to your registered bank account.</p>
       ${button("View payout history", `${SITE_URL}/marketer-dashboard`)}
       `,
       { preheader: `${NAIRA(amount)} has been sent to your bank account` }
@@ -651,13 +651,13 @@ export async function sendMarketerReferralCodeChangedEmail({ to, name, oldCode, 
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Your referral code changed</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${name}, this confirms your OJA247 marketer referral code was just updated. If you didn't make this change, contact support right away — anyone with access to your account can redirect who gets credit for new referrals.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(name)}, this confirms your OJA247 marketer referral code was just updated. If you didn't make this change, contact support right away — anyone with access to your account can redirect who gets credit for new referrals.</p>
 
       <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:16px; margin:20px 0;">
         <p style="margin:0 0 6px; font-size:12px; color:#9ca3af;">Old code</p>
-        <p style="margin:0 0 14px; font-size:16px; font-weight:700; color:#9ca3af; text-decoration:line-through; font-family:monospace;">${oldCode}</p>
+        <p style="margin:0 0 14px; font-size:16px; font-weight:700; color:#9ca3af; text-decoration:line-through; font-family:monospace;">${esc(oldCode)}</p>
         <p style="margin:0 0 6px; font-size:12px; color:#166534;">New code</p>
-        <p style="margin:0; font-size:22px; font-weight:800; letter-spacing:0.08em; color:#16a34a; font-family:monospace;">${newCode}</p>
+        <p style="margin:0; font-size:22px; font-weight:800; letter-spacing:0.08em; color:#16a34a; font-family:monospace;">${esc(newCode)}</p>
       </div>
 
       <p style="color:#6b7280; font-size:13px; line-height:1.6;">Links or codes shared before this change will no longer credit you — update anything you've already shared.</p>
@@ -676,13 +676,13 @@ export async function sendBusinessReferralCodeChangedEmail({ to, businessName, o
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Your referral code changed</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, this confirms your OJA247 referral code was just updated. If you didn't make this change, contact support right away.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, this confirms your OJA247 referral code was just updated. If you didn't make this change, contact support right away.</p>
 
       <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:16px; margin:20px 0;">
         <p style="margin:0 0 6px; font-size:12px; color:#9ca3af;">Old code</p>
-        <p style="margin:0 0 14px; font-size:16px; font-weight:700; color:#9ca3af; text-decoration:line-through; font-family:monospace;">${oldCode}</p>
+        <p style="margin:0 0 14px; font-size:16px; font-weight:700; color:#9ca3af; text-decoration:line-through; font-family:monospace;">${esc(oldCode)}</p>
         <p style="margin:0 0 6px; font-size:12px; color:#166534;">New code</p>
-        <p style="margin:0; font-size:22px; font-weight:800; letter-spacing:0.08em; color:#16a34a; font-family:monospace;">${newCode}</p>
+        <p style="margin:0; font-size:22px; font-weight:800; letter-spacing:0.08em; color:#16a34a; font-family:monospace;">${esc(newCode)}</p>
       </div>
 
       <p style="color:#6b7280; font-size:13px; line-height:1.6;">Links or codes shared before this change will no longer credit you — update anything you've already shared.</p>
@@ -702,12 +702,12 @@ export async function sendMarketerPayoutDetailsChangedEmail({ to, name, bankName
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Payout account updated</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${name}, this confirms your OJA247 marketer payout details were just changed. If this wasn't you, contact support immediately — future payouts will be sent to this account.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(name)}, this confirms your OJA247 marketer payout details were just changed. If this wasn't you, contact support immediately — future payouts will be sent to this account.</p>
 
       <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:16px; margin:20px 0;">
-        <p style="margin:0 0 4px; font-size:13px; color:#111827;"><strong>${bankName}</strong></p>
-        <p style="margin:0 0 4px; font-size:13px; color:#4b5563;">${accountName}</p>
-        <p style="margin:0; font-size:13px; color:#6b7280; font-family:monospace;">${maskedAccount}</p>
+        <p style="margin:0 0 4px; font-size:13px; color:#111827;"><strong>${esc(bankName)}</strong></p>
+        <p style="margin:0 0 4px; font-size:13px; color:#4b5563;">${esc(accountName)}</p>
+        <p style="margin:0; font-size:13px; color:#6b7280; font-family:monospace;">${esc(maskedAccount)}</p>
       </div>
 
       ${button("Go to my marketer dashboard", `${SITE_URL}/marketer-dashboard`)}
@@ -731,13 +731,13 @@ export async function sendAccountBanStatusEmail({ to, name, banned, dashboardUrl
       banned
         ? `
         <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Account suspended</h1>
-        <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${name}, your OJA247 account has been suspended by an administrator. You won't be able to log in while this is in effect.</p>
+        <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(name)}, your OJA247 account has been suspended by an administrator. You won't be able to log in while this is in effect.</p>
         ${reasonBlock}
         <p style="color:#6b7280; font-size:13px; line-height:1.6;">If you believe this is a mistake, reply to this email or contact support to ask about the reason and next steps.</p>
         `
         : `
         <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Account reinstated</h1>
-        <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${name}, your OJA247 account has been reinstated — you can log in and use OJA247 normally again.</p>
+        <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(name)}, your OJA247 account has been reinstated — you can log in and use OJA247 normally again.</p>
         ${button("Go to my dashboard", dashboardUrl || SITE_URL)}
         `,
       { preheader: banned ? "Your account has been suspended" : "Your account has been reinstated" }
@@ -821,10 +821,10 @@ export async function sendDisputeFiledVendorEmail({
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">A customer has a problem with an order</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, a customer has raised a dispute on order <strong>${orderReference}</strong>.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, a customer has raised a dispute on order <strong>${esc(orderReference)}</strong>.</p>
       <div style="background:#fff7ed; border-radius:10px; padding:16px 18px; margin:20px 0;">
-        <p style="margin:0 0 6px; font-size:13px; color:#9a3412; font-weight:700;">${DISPUTE_REASON_LABELS[reason] || reason}</p>
-        <p style="margin:0; font-size:14px; color:#4b5563; line-height:1.6;">${description}</p>
+        <p style="margin:0 0 6px; font-size:13px; color:#9a3412; font-weight:700;">${esc(DISPUTE_REASON_LABELS[reason] || reason)}</p>
+        <p style="margin:0; font-size:14px; color:#4b5563; line-height:1.6;">${esc(description)}</p>
       </div>
       <p style="color:#4b5563; font-size:14px; line-height:1.6;">Please reach out to the customer directly to sort this out. You have until <strong>${formatDate(selfResolveDeadline)}</strong> to resolve it — after that it moves to platform review.</p>
       ${button("View in dashboard", `${SITE_URL}/business-dashboard`)}
@@ -840,8 +840,8 @@ export async function sendDisputeFiledCustomerEmail({ to, customerName, business
     subject: `We've received your report on order ${orderReference}`,
     html: layout(
       `
-      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">We've let ${businessName} know</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${customerName}, thanks for letting us know about an issue with order <strong>${orderReference}</strong>. We've notified ${businessName} and asked them to reach out to you directly to sort it out.</p>
+      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">We've let ${esc(businessName)} know</h1>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(customerName)}, thanks for letting us know about an issue with order <strong>${esc(orderReference)}</strong>. We've notified ${esc(businessName)} and asked them to reach out to you directly to sort it out.</p>
       <p style="color:#6b7280; font-size:13px; line-height:1.6;">If you don't hear back within a week, this will automatically move to OJA247 for review.</p>
       `,
       { preheader: `We've notified ${businessName} about your order` }
@@ -862,7 +862,7 @@ export async function sendDisputeResolvedCustomerEmail({
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Your dispute has been marked resolved</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${customerName}, ${businessName} has marked the issue with order <strong>${orderReference}</strong> as resolved${refunded ? ", and noted that you've been refunded" : ""}.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(customerName)}, ${esc(businessName)} has marked the issue with order <strong>${esc(orderReference)}</strong> as resolved${refunded ? ", and noted that you've been refunded" : ""}.</p>
       <p style="color:#6b7280; font-size:13px; line-height:1.6;">If that doesn't match what actually happened, reply to this email and we'll take another look.</p>
       `,
       { preheader: `${businessName} marked order ${orderReference} resolved` }
@@ -877,7 +877,7 @@ export async function sendDisputeEscalatedVendorEmail({ to, businessName, orderR
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">This dispute is now under platform review</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, the dispute on order <strong>${orderReference}</strong> (${DISPUTE_REASON_LABELS[reason] || reason}) wasn't marked resolved within the response window, so OJA247 is stepping in to review it.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, the dispute on order <strong>${esc(orderReference)}</strong> (${esc(DISPUTE_REASON_LABELS[reason] || reason)}) wasn't marked resolved within the response window, so OJA247 is stepping in to review it.</p>
       <p style="color:#6b7280; font-size:13px; line-height:1.6;">You can still resolve this directly with the customer — let us know if you do.</p>
       `,
       { preheader: `Dispute on order ${orderReference} escalated to platform review` }
@@ -892,7 +892,7 @@ export async function sendDisputeEscalatedCustomerEmail({ to, customerName, busi
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">We're taking a closer look</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${customerName}, ${businessName} didn't resolve your report on order <strong>${orderReference}</strong> within the response window, so OJA247 is now reviewing it directly.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(customerName)}, ${esc(businessName)} didn't resolve your report on order <strong>${esc(orderReference)}</strong> within the response window, so OJA247 is now reviewing it directly.</p>
       `,
       { preheader: `OJA247 is reviewing your report on order ${orderReference}` }
     ),
@@ -906,7 +906,7 @@ export async function sendDisputeEscalatedAdminEmail({ businessName, orderRefere
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">A dispute needs review</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;"><strong>${businessName}</strong> didn't resolve a dispute on order <strong>${orderReference}</strong> (${DISPUTE_REASON_LABELS[reason] || reason}) within the self-resolve window, so it's moved to platform review.</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;"><strong>${esc(businessName)}</strong> didn't resolve a dispute on order <strong>${esc(orderReference)}</strong> (${esc(DISPUTE_REASON_LABELS[reason] || reason)}) within the self-resolve window, so it's moved to platform review.</p>
       ${button("Review in admin panel", `${SITE_URL}/admin`)}
       `,
       { preheader: `Dispute on order ${orderReference} needs admin review` }
@@ -924,7 +924,7 @@ export async function sendVerificationReminderEmail({ to, businessName, verifica
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">A quick reminder</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${businessName}, your storefront is live${
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(businessName)}, your storefront is live${
         verificationTier === "basic" ? " on the Basic tier" : ""
       } — no action needed to keep selling. But finishing verification${
         verificationTier === "basic" ? " (CAC document, address proof, and a selfie)" : ""
@@ -951,13 +951,13 @@ export async function sendNewProductFollowerEmail({
     html: layout(
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">New from a store you follow</h1>
-      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${customerName}, <strong>${businessName}</strong> just listed a new product:</p>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">Hi ${esc(customerName)}, <strong>${esc(businessName)}</strong> just listed a new product:</p>
       ${
         productImage
-          ? `<img src="${productImage}" alt="${productName}" style="width:100%; max-width:280px; border-radius:12px; margin:16px 0; display:block;" />`
+          ? `<img src="${esc(productImage)}" alt="${esc(productName)}" style="width:100%; max-width:280px; border-radius:12px; margin:16px 0; display:block;" />`
           : ""
       }
-      <p style="font-size:16px; font-weight:700; color:#111827; margin:0 0 16px;">${productName}</p>
+      <p style="font-size:16px; font-weight:700; color:#111827; margin:0 0 16px;">${esc(productName)}</p>
       ${button("View in store", storefrontUrl)}
       `,
       { preheader: `${businessName} just listed ${productName}` }
@@ -1141,7 +1141,7 @@ export async function sendExemptionGrantedEmail({ to, businessName, exemptUntil,
     to,
     subject: extended
       ? `Good news: your OJA247 visibility is extended to ${until}`
-      : `Congratulations! ${businessName} stays visible on OJA247 until ${until}`,
+      : `Congratulations! ${esc(businessName)} stays visible on OJA247 until ${until}`,
     html: layout(
       `${h1(extended ? "Your free visibility has been extended 🎉" : "Congratulations, you've got free visibility 🎉")}
        ${p(`Hi ${esc(businessName)}, great news from the OJA247 team. ${
@@ -1339,8 +1339,8 @@ export async function sendVendorTransferOrderEmail({
   return sendEmail({
     to,
     subject: resubmitted
-      ? `New receipt uploaded: check your bank, order ${reference}`
-      : `New order: check your bank and confirm, ${reference}`,
+      ? `New receipt uploaded: check your bank, order ${esc(reference)}`
+      : `New order: check your bank and confirm, ${esc(reference)}`,
     html: layout(
       `
       ${h1(resubmitted ? "A new receipt was uploaded" : "New order: check your bank")}
