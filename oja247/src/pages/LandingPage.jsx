@@ -293,6 +293,15 @@ const LandingPage = () => {
           transition={{ type: "spring", damping: 30 }}
           style={{ left: "6%", top: "4%" }}
         />
+        {/* Small, soft orange glow tucked into the top-right corner of the
+            hero (mirrors the green one on the left). Kept small, pushed
+            toward the edge and low opacity so it never dims the text. */}
+        <motion.div
+          className="absolute w-56 h-56 bg-orange-400/20 rounded-full blur-3xl"
+          animate={{ x: -mousePosition.x / 50, y: mousePosition.y / 50 }}
+          transition={{ type: "spring", damping: 30 }}
+          style={{ right: "-3%", top: "3%" }}
+        />
         <motion.div
           className="absolute w-[30rem] h-[30rem] bg-yellow-400/25 rounded-full blur-3xl"
           animate={{ x: -mousePosition.x / 30, y: -mousePosition.y / 30 }}
@@ -1010,7 +1019,7 @@ const LandingPage = () => {
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1, type: "spring", stiffness: 200, damping: 20 }}
                 whileHover={{ y: -12, scale: 1.03 }}
-                className={`group relative p-8 rounded-3xl border-2 backdrop-blur-xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden ${
+                className={`group relative p-8 rounded-3xl border-2 backdrop-blur-xl shadow-lg hover:shadow-2xl transition-all duration-300 ${
                   plan.recommended
                     ? "border-green-500 bg-white/90 sm:scale-105 shadow-green-100"
                     : "border-gray-200/50 bg-white/70"
@@ -1019,7 +1028,7 @@ const LandingPage = () => {
                 {/* Recommended plans get a subtle animated glow sweep */}
                 {plan.recommended && (
                   <motion.div
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-br from-green-400/10 via-transparent to-yellow-300/10"
+                    className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-green-400/10 via-transparent to-yellow-300/10"
                     animate={{ opacity: [0.4, 0.8, 0.4] }}
                     transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                   />
