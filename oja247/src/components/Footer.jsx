@@ -243,7 +243,7 @@ const Footer = () => {
           </div>
 
           <a
-            href="https://chat.whatsapp.com/I0QOjcdgOlEDME91pdN2Kl"
+            href="https://chat.whatsapp.com/HHZ3GWuJaSXLQO5rIyMEXY?mode=gi_t"
             target="_blank"
             rel="noopener noreferrer"
             className="px-6 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 font-bold hover:scale-105 transition whitespace-nowrap"
