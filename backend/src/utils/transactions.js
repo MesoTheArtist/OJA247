@@ -1,4 +1,4 @@
-    import mongoose from "mongoose";
+import mongoose from "mongoose";
 
 // Runs `work(session)` as ONE all-or-nothing MongoDB transaction.
 //
