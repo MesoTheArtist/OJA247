@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { getAllBusinesses } from "../services/api";
 import Loader from "../components/Loader";
+import VerifiedBadge from "../components/VerifiedBadge";
 
 const PLACEHOLDER_LOGO = "/assets/placeholder-logo.png"; // local fallback instead of via.placeholder.com
 
@@ -258,9 +259,10 @@ const ExplorePage = () => {
                   />
 
                   {/* Business Name */}
-                  <h3 className="font-bold text-lg mb-2 truncate">
-                    {business.name}
-                  </h3>
+                  <div className="flex items-center gap-2 mb-2 min-w-0">
+                    <h3 className="font-bold text-lg truncate">{business.name}</h3>
+                    {business.verified && <VerifiedBadge />}
+                  </div>
 
                   {/* Description */}
                   <p className="text-sm text-gray-600 mb-3 line-clamp-2 h-10">

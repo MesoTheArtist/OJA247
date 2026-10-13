@@ -223,6 +223,45 @@ async function safeHandleSubscriptionConversion(details) {
   }
 }
 
+// Starts the card payment on Paystack's side from the SERVER, restricted to
+// card (a subscription must be a card payment so it can be renewed
+// automatically), at exactly the amount still owed after points. Returns the
+// access_code the browser's payment popup resumes - without it the popup has
+// nothing to open.
+async function initializeSubscriptionTransaction({ email, chargeAmount, reference, planType, businessId, paymentId }) {
+  const secret = process.env.PAYSTACK_SECRET_KEY;
+  if (!secret) {
+    throw new Error("Paystack secret key is not configured on the backend");
+  }
+
+  const response = await fetch("https://api.paystack.co/transaction/initialize", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email,
+      amount: Math.round(Number(chargeAmount) * 100), // kobo
+      currency: "NGN",
+      reference,
+      channels: ["card"],
+      metadata: {
+        kind: "subscription",
+        businessId: String(businessId),
+        paymentId: String(paymentId),
+        planType,
+      },
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || !data?.status || !data?.data?.access_code) {
+    console.error("Paystack subscription initialize failed:", response.status, JSON.stringify(data));
+    const err = new Error(data?.message || "Paystack could not start this payment");
+    err.paystack = true;
+    throw err;
+  }
+  return data.data.access_code;
+}
+
 // POST /api/subscriptions/initiate
 // Creates the pending SubscriptionPayment record the frontend then charges
 // against via the Paystack popup, mirroring orderController's createOrder.
@@ -390,9 +429,35 @@ export const initiateSubscription = async (req, res) => {
       });
     }
 
+    // Card payment: have Paystack start it now and hand the browser the code to
+    // open the popup with. If Paystack can't, the payment is closed again and
+    // any points held for it go straight back.
+    let accessCode;
+    try {
+      const email = await getOwnerEmail(businessId);
+      if (!email) throw new Error("No login email on file for this business");
+      accessCode = await initializeSubscriptionTransaction({
+        email,
+        chargeAmount,
+        reference,
+        planType,
+        businessId,
+        paymentId: payment._id,
+      });
+    } catch (initError) {
+      console.error(`Could not start card payment ${reference}:`, initError.message);
+      await failPayment(payment._id).catch((releaseError) =>
+        console.error(`MANUAL FIX NEEDED: points for unstarted payment ${payment._id} were not returned:`, releaseError)
+      );
+      return res.status(initError.paystack ? 502 : 500).json({
+        message: "We couldn't start the card payment. Please try again in a moment.",
+      });
+    }
+
     res.status(201).json({
       message: "Subscription payment initiated",
       reference,
+      accessCode,
       amount: chargeAmount, // what Paystack should actually charge
       pointsApplied: appliedPoints,
       fullyPaidWithPoints: false,
@@ -829,4 +894,4 @@ export const runSubscriptionAutoRenewal = async (req, res) => {
     console.error("Subscription auto-renew cron error:", error);
     return res.status(500).json({ message: "Subscription renewal processing failed" });
   }
-};  
+};

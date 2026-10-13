@@ -25,7 +25,19 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
-  const { isAuthenticated, isCustomer, business, user, logout } = useAuth();
+  const { isAuthenticated, isCustomer, business, user, loading, logout } = useAuth();
+
+  // The signed-in flag turns on straight from the saved session, but the
+  // business details arrive a moment later from the server (and admin accounts
+  // have no business at all). The button used to do nothing in that gap, which
+  // looked like it was randomly unresponsive. Now it waits for the details,
+  // and sends admins to the admin page.
+  const goToDashboard = () => {
+    setMobileMenuOpen(false);
+    if (loading) return;
+    if (business?._id) navigate(`/dashboard/${business._id}`);
+    else if (user?.role === "admin") navigate("/admin");
+  };
 
   const { scrollY } = useScroll();
 
@@ -96,8 +108,9 @@ const Navbar = () => {
               {isAuthenticated && !isCustomer ? (
                 <motion.button
                   whileHover={{ scale: 1.1 }}
-                  onClick={() => business?._id && navigate(`/dashboard/${business._id}`)}
-                  className="px-6 py-2 bg-green-500 text-white rounded-xl font-semibold shadow-lg hover:bg-green-600 transition"
+                  onClick={goToDashboard}
+                  disabled={loading}
+                  className="px-6 py-2 bg-green-500 text-white rounded-xl font-semibold shadow-lg hover:bg-green-600 transition disabled:opacity-60"
                 >
                   My Dashboard
                 </motion.button>
@@ -179,8 +192,9 @@ const Navbar = () => {
             <div className="p-4 border-t border-gray-200 bg-white/80 space-y-2">
               {isAuthenticated && !isCustomer ? (
                 <button
-                  onClick={() => business?._id && navigate(`/dashboard/${business._id}`)}
-                  className="w-full px-6 py-3 bg-green-500 text-white rounded-xl font-semibold shadow-lg hover:bg-green-600 transition"
+                  onClick={goToDashboard}
+                  disabled={loading}
+                  className="w-full px-6 py-3 bg-green-500 text-white rounded-xl font-semibold shadow-lg hover:bg-green-600 transition disabled:opacity-60"
                 >
                   My Dashboard
                 </button>

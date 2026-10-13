@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import VerifiedBadge from "./VerifiedBadge";
 
 function BusinessCard({ business }) {
   return (
@@ -10,7 +11,10 @@ function BusinessCard({ business }) {
           className="w-full h-40 object-cover rounded"
         />
 
-        <h2 className="text-xl font-bold mt-3">{business.name}</h2>
+        <div className="flex items-center gap-2 mt-3 min-w-0">
+          <h2 className="text-xl font-bold truncate">{business.name}</h2>
+          {business.verified && <VerifiedBadge />}
+        </div>
         <p className="text-gray-600">{business.category}</p>
       </div>
     </Link>

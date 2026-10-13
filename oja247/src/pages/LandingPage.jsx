@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { getAllBusinesses, getAllProducts } from "../services/api";
 import axiosInstance from "../services/api";
+import VerifiedBadge from "../components/VerifiedBadge";
 
 // Reusable "premium" card wrapper — mouse-tracking 3D tilt with a shine
 // that follows the cursor, plus a blur-to-focus staggered entrance. Its
@@ -863,9 +864,10 @@ const LandingPage = () => {
                         alt={business.name}
                         className="w-20 h-20 rounded-full border-4 border-white shadow-lg mb-3 object-cover"
                       />
-                      <h3 className="font-bold text-lg mb-1 truncate">
-                        {business.name}
-                      </h3>
+                      <div className="flex items-center gap-2 mb-1 min-w-0">
+                        <h3 className="font-bold text-lg truncate">{business.name}</h3>
+                        {business.verified && <VerifiedBadge />}
+                      </div>
                       <p className="text-sm text-gray-600 mb-2 line-clamp-2 h-10">
                         {business.description}
                       </p>
@@ -1120,4 +1122,4 @@ const LandingPage = () => {
   );
 };
 
-export default LandingPage; 
+export default LandingPage;
