@@ -112,14 +112,12 @@ export const loginMarketer = async (req, res) => {
 };
 
 // POST /api/marketers/google
-// Unlike authController.js's vendor googleLogin (login-only, no
-// auto-create), this follows customerAuthController.js's pattern —
-// auto-creates a marketer account on first click, since forcing "register
-// with a password first, then separately sign in with Google" defeats the
-// point of offering Google as the low-friction option here too.
-// Google only hands us name + email, never a phone number, so a
-// Google-created marketer starts with phone: "" (see Marketer.js) and is
-// prompted to add it from their dashboard before requesting a payout.
+// Login only, same as the vendor googleLogin in authController.js: the Google
+// account is verified with Google, then matched to a marketer who ALREADY
+// registered through the normal sign-up form (with a password). No account is
+// created here. Keeping it this way means every marketer - the people who get
+// paid out - has a password on record, which is what the payout-details
+// change check asks for.
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const marketerGoogleAuth = async (req, res) => {
@@ -144,30 +142,16 @@ export const marketerGoogleAuth = async (req, res) => {
       return res.status(401).json({ message: "Google account email is not verified" });
     }
 
-    const normalizedEmail = payload.email.toLowerCase();
-    let marketer = await Marketer.findOne({ email: normalizedEmail });
+    const marketer = await Marketer.findOne({ email: payload.email.toLowerCase() });
 
-    let isNewMarketer = false;
     if (!marketer) {
-      const referralCode = await generateUniqueMarketerCode();
-      marketer = await Marketer.create({
-        name: payload.name || normalizedEmail.split("@")[0],
-        email: normalizedEmail,
-        referralCode,
+      return res.status(404).json({
+        message: "No OJA247 marketer account found for this Google email. Sign up first.",
       });
-      isNewMarketer = true;
     }
 
     if (marketer.banned || marketer.status === "suspended") {
       return res.status(403).json({ message: "This marketer account is not active." });
-    }
-
-    if (isNewMarketer) {
-      await sendMarketerWelcomeEmail({
-        to: marketer.email,
-        name: marketer.name,
-        referralCode: marketer.referralCode,
-      });
     }
 
     const token = generateToken(marketer._id, marketer.authVersion);

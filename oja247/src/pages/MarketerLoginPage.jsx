@@ -35,8 +35,8 @@ const MarketerLoginPage = () => {
   };
 
   // Called by Google's SDK with { credential: <ID token JWT> } once the
-  // person picks an account in the Google popup/One Tap prompt. Auto-creates
-  // a marketer account on first click (see backend marketerGoogleAuth).
+  // person picks an account in the Google popup/One Tap prompt. Login only:
+  // the marketer must already have registered (see backend marketerGoogleAuth).
   const handleGoogleCredential = async (googleResponse) => {
     setError("");
     setLoading(true);

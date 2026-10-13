@@ -2,6 +2,7 @@ import express from "express";
 import {
   registerMarketer,
   loginMarketer,
+  marketerGoogleAuth,
   getMarketerMe,
   forgotMarketerPassword,
   resetMarketerPassword,
@@ -19,6 +20,7 @@ const router = express.Router();
 
 router.post("/register", authLimiter, registerMarketer);
 router.post("/login", authLimiter, loginMarketer);
+router.post("/google", authLimiter, marketerGoogleAuth);
 router.post("/forgot-password", authLimiter, forgotMarketerPassword);
 router.post("/reset-password", authLimiter, resetMarketerPassword);
 router.get("/me", protectMarketer, getMarketerMe);
