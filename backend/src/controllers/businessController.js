@@ -288,7 +288,7 @@ export const getEarningsSummary = async (req, res) => {
     });
   } catch (error) {
     console.error("Get earnings summary error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 

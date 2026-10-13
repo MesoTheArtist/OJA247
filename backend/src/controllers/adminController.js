@@ -41,7 +41,8 @@ export const getAllUsers = async (req, res) => {
     
     res.json(users);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -81,7 +82,8 @@ export const getStats = async (req, res) => {
       businessesByCategory,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -90,7 +92,8 @@ export const getAllOrders = async (req, res) => {
     const orders = await Order.find().sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -123,7 +126,8 @@ export const toggleFeatured = async (req, res) => {
 
     res.json(business);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -153,7 +157,8 @@ export const deleteBusiness = async (req, res) => {
 
     res.json({ message: "Business and related data deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -248,7 +253,8 @@ export const toggleUserBan = async (req, res) => {
 
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -261,7 +267,8 @@ export const getAllVendors = async (req, res) => {
 
     res.json(vendors);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -321,7 +328,8 @@ export const reviewVendor = async (req, res) => {
 
     res.json(vendor);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -331,7 +339,8 @@ export const getPlatformSettings = async (req, res) => {
     const settings = await PlatformSettings.getSettings();
     res.json({ enforceSubscriptionVisibility: settings.enforceSubscriptionVisibility });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -353,7 +362,8 @@ export const setSubscriptionVisibilityEnforcement = async (req, res) => {
 
     res.json({ enforceSubscriptionVisibility: settings.enforceSubscriptionVisibility });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -366,7 +376,8 @@ export const getAllBusinessesAdmin = async (req, res) => {
     const businesses = await Business.find().sort({ createdAt: -1 }).lean();
     res.json(businesses);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -392,7 +403,8 @@ export const setBusinessVisibilityExempt = async (req, res) => {
 
     res.json(business);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -444,7 +456,8 @@ export const setBusinessGrandfatherExemption = async (req, res) => {
 
     res.json(business);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -496,7 +509,8 @@ export const getAllMarketersAdmin = async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -543,7 +557,8 @@ export const getMarketerDetailAdmin = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -565,7 +580,8 @@ export const toggleMarketerBan = async (req, res) => {
 
     res.json(marketer);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -589,7 +605,8 @@ export const deleteMarketer = async (req, res) => {
 
     res.json({ message: "Marketer and their payout records deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -666,7 +683,8 @@ export const getTransactions = async (req, res) => {
 
     res.json({ transactions: transactions.slice(0, cap) });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -705,7 +723,8 @@ export const markPointsWithdrawalPaid = async (req, res) => {
 
     res.json({ success: true, entry });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -787,7 +806,7 @@ export const rejectPointsWithdrawal = async (req, res) => {
     res.json({ success: true, entry, pointsBalance: business.pointsBalance });
   } catch (error) {
     console.error("Reject points withdrawal error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -816,7 +835,8 @@ export const getTaxLedger = async (req, res) => {
 
     res.json({ entries, totals: totalsByStatus });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -838,7 +858,8 @@ export const markTaxRemitted = async (req, res) => {
 
     res.json({ success: true, entry });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 // Disputes admin section — only escalated disputes land here (Phase 2's
@@ -857,7 +878,8 @@ export const adminListDisputes = async (req, res) => {
     const disputes = await Dispute.find(query).sort({ createdAt: -1 }).limit(200);
     res.json({ disputes });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -919,7 +941,7 @@ export const adminResolveDispute = async (req, res) => {
 
     res.json({ dispute });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -984,7 +1006,7 @@ export const getAllCustomersAdmin = async (req, res) => {
     res.json({ customers: result });
   } catch (error) {
     console.error("Get all customers error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -1028,7 +1050,7 @@ export const getCustomerDetailAdmin = async (req, res) => {
     });
   } catch (error) {
     console.error("Get customer detail error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -1065,7 +1087,7 @@ export const updateCustomerAdmin = async (req, res) => {
     res.json({ success: true, customer: publicAdminCustomer(customer) });
   } catch (error) {
     console.error("Update customer error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -1090,7 +1112,7 @@ export const adminVerifyCustomerEmail = async (req, res) => {
     res.json({ success: true, linkedOrders, customer: publicAdminCustomer(customer) });
   } catch (error) {
     console.error("Admin verify customer email error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -1132,7 +1154,7 @@ export const deleteCustomerAdmin = async (req, res) => {
     res.json({ success: true, message: "Customer account deleted" });
   } catch (error) {
     console.error("Delete customer error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -1197,7 +1219,8 @@ export const getFlaggedVendors = async (req, res) => {
       flagged,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 

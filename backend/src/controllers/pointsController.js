@@ -78,7 +78,7 @@ export const getPointsDashboard = async (req, res) => {
     });
   } catch (error) {
     console.error("Get points dashboard error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -167,6 +167,6 @@ export const withdrawPoints = async (req, res) => {
     });
   } catch (error) {
     console.error("Withdraw points error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };

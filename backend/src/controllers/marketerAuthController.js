@@ -93,6 +93,15 @@ export const loginMarketer = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    // Passwords made before the 8-character minimum are not accepted any more
+    // (shown only once the password is verified, so it leaks nothing).
+    if (String(password).length < 8) {
+      return res.status(403).json({
+        code: "PASSWORD_TOO_SHORT",
+        message: "Your password is shorter than our new 8-character minimum. Use \"Forgot password\" to set a new one, then log in.",
+      });
+    }
+
     const token = generateToken(marketer._id, marketer.authVersion);
     setMarketerSessionCookie(res, token);
 
@@ -107,7 +116,7 @@ export const loginMarketer = async (req, res) => {
     });
   } catch (error) {
     console.error("Marketer login error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -180,7 +189,7 @@ export const getMarketerMe = async (req, res) => {
     res.json({ success: true, marketer });
   } catch (error) {
     console.error("Get marketer me error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -209,7 +218,7 @@ export const forgotMarketerPassword = async (req, res) => {
     res.json(genericResponse);
   } catch (error) {
     console.error("Marketer forgot password error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -245,6 +254,6 @@ export const resetMarketerPassword = async (req, res) => {
     res.json({ success: true, message: "Password reset successfully" });
   } catch (error) {
     console.error("Marketer reset password error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };

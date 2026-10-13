@@ -146,15 +146,10 @@ export const register = async (req, res) => {
       message = `Registration failed: ${Object.values(error.errors)
         .map((item) => item.message)
         .join("; ")}`;
-    } else if (error?.message) {
-      message = `Registration failed: ${error.message}`;
     }
 
-    res.status(400).json({
-      message,
-      details: error?.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    // Details and stack traces stay in the server log (above), never in the response.
+    res.status(400).json({ message });
   }
 };
 
@@ -186,6 +181,17 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    // Passwords made before the 8-character minimum are not accepted any more.
+    // Shown only after the password was verified, so it reveals nothing to a
+    // guesser. Admins are exempt: they are protected by an authenticator code
+    // and a lockout here would also lock out whoever recovers the platform.
+    if (user.role !== "admin" && password.length < 8) {
+      return res.status(403).json({
+        code: "PASSWORD_TOO_SHORT",
+        message: "Your password is shorter than our new 8-character minimum. Use \"Forgot password\" to set a new one, then log in.",
+      });
+    }
+
     // TOTP is mandatory for admin accounts only — owners skip straight to
     // a normal token below. An admin who hasn't set up TOTP yet is routed
     // to setup instead of being let in; one who has must supply a code.
@@ -213,7 +219,7 @@ export const login = async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -281,7 +287,7 @@ export const googleLogin = async (req, res) => {
     });
   } catch (error) {
     console.error("Google login error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -307,7 +313,8 @@ export const totpSetupInit = async (req, res) => {
 
     res.json({ success: true, qrCodeDataUrl, manualEntryKey: user.totpSecret });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -342,7 +349,8 @@ export const totpSetupVerify = async (req, res) => {
       business: null
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -370,7 +378,8 @@ export const totpVerifyLogin = async (req, res) => {
       business: null
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -393,7 +402,7 @@ export const getMe = async (req, res) => {
     });
   } catch (error) {
     console.error("Get me error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -420,7 +429,7 @@ export const updatePassword = async (req, res) => {
     res.json({ success: true, message: "Password updated successfully" });
   } catch (error) {
     console.error("Update password error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -461,7 +470,7 @@ export const forgotPassword = async (req, res) => {
     res.json(genericResponse);
   } catch (error) {
     console.error("Forgot password error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -497,7 +506,7 @@ export const resetPassword = async (req, res) => {
     res.json({ success: true, message: "Password reset successfully" });
   } catch (error) {
     console.error("Reset password error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 

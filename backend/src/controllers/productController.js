@@ -18,7 +18,7 @@ export const getAllProducts = async (req, res) => {
     res.json(products);
   } catch (error) {
     console.error("Get all products error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -36,7 +36,7 @@ export const getProductsByBusiness = async (req, res) => {
     res.json(products);
   } catch (error) {
     console.error("Get products by business error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -59,7 +59,7 @@ export const getProduct = async (req, res) => {
     res.json(product);
   } catch (error) {
     console.error("Get product error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -217,7 +217,7 @@ export const deleteProduct = async (req, res) => {
     res.json({ message: "Product deleted successfully" });
   } catch (error) {
     console.error("Delete product error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -246,7 +246,7 @@ export const searchProducts = async (req, res) => {
     res.json(products);
   } catch (error) {
     console.error("Search products error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -261,6 +261,6 @@ export const getFeaturedProducts = async (req, res) => {
     res.json(products);
   } catch (error) {
     console.error("Get featured products error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };

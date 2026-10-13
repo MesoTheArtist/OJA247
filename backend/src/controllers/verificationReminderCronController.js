@@ -2,6 +2,7 @@ import Vendor, { VERIFICATION_REMINDER_INTERVAL_DAYS } from "../models/Vendor.js
 import User from "../models/User.js";
 import { sendVerificationReminderEmail } from "../services/emailService.js";
 
+import { isValidCronRequest } from "../utils/cronAuth.js";
 async function getOwnerEmail(businessId) {
   const owner = await User.findOne({ businessId }).select("email");
   return owner?.email || null;
@@ -21,7 +22,7 @@ export const runVerificationReminderCheck = async (req, res) => {
   // in disputeCronController.js for why the previous `process.env.CRON_SECRET && ...`
   // pattern was wrong (it fails open instead).
   const authHeader = req.headers.authorization;
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isValidCronRequest(authHeader)) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 

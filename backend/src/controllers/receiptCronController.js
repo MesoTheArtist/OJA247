@@ -7,6 +7,7 @@ import {
 } from "../services/emailService.js";
 import { transitionVendorFulfillment, receiptUrlFor } from "./fulfillmentController.js";
 
+import { isValidCronRequest } from "../utils/cronAuth.js";
 // How long after "sent out" before we nudge the customer, and before we
 // mark it received on their behalf. Both adjustable from the environment.
 const REMINDER_DAYS = Number(process.env.RECEIPT_REMINDER_DAYS) || 3;
@@ -20,7 +21,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const runAutoReceiveCheck = async (req, res) => {
   // Fails closed if CRON_SECRET is missing, same as the other cron jobs.
   const authHeader = req.headers.authorization;
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isValidCronRequest(authHeader)) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
@@ -100,6 +101,6 @@ export const runAutoReceiveCheck = async (req, res) => {
     res.json({ success: true, reminded, autoReceived });
   } catch (error) {
     console.error("Auto-receive cron error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };

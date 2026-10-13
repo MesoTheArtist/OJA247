@@ -2,6 +2,7 @@ import Order from "../models/Order.js";
 import { UNCONFIRMED_PAYMENT_DAYS } from "../models/Dispute.js";
 import { purgeExpiredReceipts } from "../services/receiptRetention.js";
 import User from "../models/User.js";
+import { isValidCronRequest } from "../utils/cronAuth.js";
 import {
   sendVendorTransferReminderEmail,
   sendAdminUnconfirmedTransferEmail,
@@ -27,7 +28,7 @@ const SITE_URL = process.env.SITE_URL || "https://oja247.store";
 export const runTransferFollowUpCheck = async (req, res) => {
   // Fails CLOSED if CRON_SECRET is missing, like the other cron jobs.
   const authHeader = req.headers.authorization;
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isValidCronRequest(authHeader)) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 

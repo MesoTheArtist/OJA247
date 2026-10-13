@@ -7,6 +7,7 @@ import Business from "../models/Business.js";
 import ReferralAttribution from "../models/ReferralAttribution.js";
 import { sendMarketerPayoutPaidEmail, sendMarketerPayoutRejectedEmail } from "../services/emailService.js";
 
+import { isValidCronRequest } from "../utils/cronAuth.js";
 // GET /api/cron/payout-batch  (called weekly by Vercel Cron — see vercel.json)
 // Groups every "pending" MarketerPayout row into this week's batch.
 // Deliberately does NOT move money: payouts are paid by hand for now. This
@@ -19,7 +20,7 @@ import { sendMarketerPayoutPaidEmail, sendMarketerPayoutRejectedEmail } from "..
 export const runWeeklyPayoutBatch = async (req, res) => {
   try {
     const cronSecret = req.headers["authorization"];
-    if (!process.env.CRON_SECRET || cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!isValidCronRequest(cronSecret)) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
@@ -36,7 +37,7 @@ export const runWeeklyPayoutBatch = async (req, res) => {
     });
   } catch (error) {
     console.error("Weekly payout batch error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -78,7 +79,7 @@ export const getPayoutBatches = async (req, res) => {
     res.json({ success: true, batches: Object.values(byMarketer) });
   } catch (error) {
     console.error("Get payout batches error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -124,7 +125,7 @@ export const markPayoutBatchPaid = async (req, res) => {
     });
   } catch (error) {
     console.error("Mark payout batch paid error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -279,7 +280,7 @@ export const getPayouts = async (req, res) => {
     res.json({ success: true, rows: rows.slice(0, status === "to_pay" ? rows.length : HISTORY_CAP), toPay });
   } catch (error) {
     console.error("Get payouts error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -326,7 +327,7 @@ export const rejectSingleMarketerPayout = async (req, res) => {
     res.json({ success: true, amount: payout.amount, message: `Rejected a ₦${payout.amount.toLocaleString()} payout` });
   } catch (error) {
     console.error("Reject single marketer payout error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -372,6 +373,6 @@ export const rejectMarketerPayouts = async (req, res) => {
     res.json({ success: true, message: `Rejected ${claimed.length} payout(s) totalling ₦${total.toLocaleString()}`, total });
   } catch (error) {
     console.error("Reject marketer payouts error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };

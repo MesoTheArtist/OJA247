@@ -50,7 +50,7 @@ export const getGrowthAnalytics = async (req, res) => {
     res.json({ days, userGrowth, businessGrowth, revenueGrowth, conversionGrowth });
   } catch (error) {
     console.error("Get growth analytics error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -69,7 +69,7 @@ export const getSubscriptionBreakdown = async (req, res) => {
     res.json({ active, expired, neverSubscribed });
   } catch (error) {
     console.error("Get subscription breakdown error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -136,7 +136,7 @@ export const getMarketerLeaderboard = async (req, res) => {
     res.json({ leaderboard });
   } catch (error) {
     console.error("Get marketer leaderboard error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -173,6 +173,6 @@ export const getRecentActivity = async (req, res) => {
     res.json({ events });
   } catch (error) {
     console.error("Get recent activity error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };

@@ -6,6 +6,7 @@ import {
 } from "../services/emailService.js";
 import { getOwnerEmail } from "./disputeController.js";
 
+import { isValidCronRequest } from "../utils/cronAuth.js";
 // GET /api/cron/dispute-escalation
 // Runs daily (see vercel.json). Vendor self-resolve is a hard timeout, not
 // a soft expectation — the platform has no way to compel a vendor to
@@ -20,7 +21,7 @@ export const runDisputeEscalationCheck = async (req, res) => {
   // safer pattern here — if the secret is missing, this now always
   // rejects instead of becoming a public, unauthenticated endpoint.
   const authHeader = req.headers.authorization;
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isValidCronRequest(authHeader)) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 

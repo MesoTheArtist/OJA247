@@ -85,7 +85,7 @@ export const getMarketerDashboard = async (req, res) => {
     });
   } catch (error) {
     console.error("Get marketer dashboard error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -146,7 +146,7 @@ export const requestMarketerWithdrawal = async (req, res) => {
     });
   } catch (error) {
     console.error("Request marketer withdrawal error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -180,7 +180,15 @@ export const updateMarketerPayoutDetails = async (req, res) => {
     // payouts. (An account created with Google has no password to ask for; the
     // "payout details changed" email below still goes out for it.)
     const withPassword = await Marketer.findById(req.marketer._id).select("+password");
-    if (withPassword?.password) {
+    if (!withPassword?.password) {
+      // A marketer who signed up with Google earlier has no password, so there
+      // is nothing to confirm with. They set one through "Forgot password" first.
+      return res.status(403).json({
+        code: "PASSWORD_NOT_SET",
+        message: "Your account has no password yet. Use \"Forgot password\" to set one, then you can change your payout details.",
+      });
+    }
+    {
       const supplied = String(req.body.current_password || "");
       if (!supplied) {
         return res.status(403).json({
@@ -246,7 +254,7 @@ export const updateMarketerPayoutDetails = async (req, res) => {
     });
   } catch (error) {
     console.error("Update marketer payout details error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 // PATCH /api/marketers/me/phone — fills in the phone number for a marketer

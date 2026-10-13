@@ -7,6 +7,7 @@ import { handleSubscriptionConversion } from "../services/referralService.js";
 import { sendSubscriptionReceiptEmail } from "../services/emailService.js";
 import { runInTransaction, MoneyRuleError } from "../utils/transactions.js";
 
+import { isValidCronRequest } from "../utils/cronAuth.js";
 // Looks up the business owner's login email for the receipt — Business
 // itself only stores a public contact phone, not an email.
 async function getOwnerEmail(businessId) {
@@ -757,7 +758,7 @@ export const cancelSubscriptionAutoRenew = async (req, res) => {
 export const runSubscriptionAutoRenewal = async (req, res) => {
   try {
     const cronSecret = req.headers["authorization"];
-    if (!process.env.CRON_SECRET || cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!isValidCronRequest(cronSecret)) {
       return res.status(401).json({ message: "Unauthorized" });
     }
     const secret = process.env.PAYSTACK_SECRET_KEY;

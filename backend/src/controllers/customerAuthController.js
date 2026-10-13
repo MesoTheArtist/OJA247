@@ -139,6 +139,15 @@ export const customerLogin = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    // Passwords made before the 8-character minimum are not accepted any more
+    // (shown only once the password is verified, so it leaks nothing).
+    if (String(password).length < 8) {
+      return res.status(403).json({
+        code: "PASSWORD_TOO_SHORT",
+        message: "Your password is shorter than our new 8-character minimum. Use \"Forgot password\" to set a new one, then log in.",
+      });
+    }
+
     if (user.banned) {
       return res.status(403).json({ message: "Account has been banned" });
     }
@@ -272,7 +281,7 @@ export const customerForgotPassword = async (req, res) => {
     res.json(genericResponse);
   } catch (error) {
     console.error("Customer forgot password error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
@@ -313,7 +322,7 @@ export const customerResetPassword = async (req, res) => {
     res.json({ success: true, message: "Password reset successfully" });
   } catch (error) {
     console.error("Customer reset password error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
 
