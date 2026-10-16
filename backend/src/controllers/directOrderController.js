@@ -182,7 +182,7 @@ export const createDirectOrder = async (req, res) => {
     // A vendor can't buy from their own store (it would unlock a "verified
     // purchase" review for themselves).
     const ownerAccount = await User.findOne({ businessId }).select("email");
-    if (isOwnStoreCustomer({ customer, vendor, ownerEmail: ownerAccount?.email })) {
+    if (isOwnStoreCustomer({ customer, vendor, ownerEmail: ownerAccount?.email, businessContact: business.contact })) {
       return res.status(403).json({ message: "You can't place an order on your own store." });
     }
 
