@@ -84,7 +84,7 @@ app.use(
       return callback(null, false);
     },
     credentials: true,
-    exposedHeaders: ["X-CSRF-Token"],
+    exposedHeaders: ["X-CSRF-Token", "X-Session-Token"],
   })
 );
 

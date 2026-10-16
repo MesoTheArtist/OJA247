@@ -17,6 +17,26 @@ function cookieOptions() {
   };
 }
 
+
+// The Android app can't use cookies the way a browser does, so when a request
+// comes from the app (it sends "X-Client-Platform: flutter") the freshly issued
+// session token is also returned in an X-Session-Token response header. The
+// app stores it and sends it back as "Authorization: Bearer ...", which
+// protect()/protectMarketer() already accept (and which skips CSRF, since
+// there is no cookie to forge). The website never sends that header, so
+// nothing changes for browsers. "capacitor" is accepted too, for the earlier
+// wrapper-style app.
+export const APP_CLIENT_HEADER = "x-client-platform";
+const APP_PLATFORMS = new Set(["flutter", "capacitor"]);
+
+export function isAppRequest(req) {
+  return APP_PLATFORMS.has(String(req?.headers?.[APP_CLIENT_HEADER] || "").toLowerCase());
+}
+
+function exposeTokenToApp(res, token) {
+  if (isAppRequest(res.req)) res.setHeader("X-Session-Token", token);
+}
+
 function appendSetCookie(res, value) {
   const current = res.getHeader("Set-Cookie");
   res.setHeader("Set-Cookie", current ? [...[].concat(current), value] : value);
@@ -49,6 +69,7 @@ export function setUserSessionCookie(res, token) {
   setCookie(res, USER_SESSION_COOKIE, token, { httpOnly: true });
   setCookie(res, CSRF_COOKIE, csrfToken, { httpOnly: false });
   res.setHeader("X-CSRF-Token", csrfToken);
+  exposeTokenToApp(res, token);
 }
 
 export function setMarketerSessionCookie(res, token) {
@@ -56,6 +77,7 @@ export function setMarketerSessionCookie(res, token) {
   setCookie(res, MARKETER_SESSION_COOKIE, token, { httpOnly: true });
   setCookie(res, CSRF_COOKIE, csrfToken, { httpOnly: false });
   res.setHeader("X-CSRF-Token", csrfToken);
+  exposeTokenToApp(res, token);
 }
 
 export function clearSessionCookies(res) {
