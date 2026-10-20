@@ -8,6 +8,7 @@ import { isValidCustomReferralCode, isBusinessReferralCodeTaken } from "../servi
 import { sendBusinessReferralCodeChangedEmail } from "../services/emailService.js";
 import { sanitizeSocialLinks, sanitizeHighlights } from "../services/businessProfile.js";
 import { normalizeProfileImage } from "../services/imageStorage.js";
+import { slugify } from "../services/storeSlug.js";
 
 const PUBLIC_BUSINESS_FIELDS = [
   "_id",
@@ -65,17 +66,6 @@ async function getOwnerEmail(businessId) {
   const owner = await User.findOne({ businessId }).select("email");
   return owner?.email || null;
 }
-
-// Turns "Chioma Fashion & Co." into "chioma-fashion-co"
-const slugify = (text) =>
-  text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "") // strip anything that isn't a letter, number, space, or hyphen
-    .replace(/[\s_]+/g, "-") // spaces/underscores -> hyphen
-    .replace(/-+/g, "-") // collapse multiple hyphens
-    .replace(/^-|-$/g, ""); // trim leading/trailing hyphen
 
 // GET all — excludes businesses an admin has hidden, and (only when the
 // enforceSubscriptionVisibility kill switch is ON — see PlatformSettings.js
@@ -215,7 +205,7 @@ export const updateBusiness = async (req, res) => {
     if (sanitizedUpdates.slug !== undefined) {
       const cleanSlug = slugify(sanitizedUpdates.slug);
       if (!cleanSlug) {
-        return res.status(400).json({ message: "Store link can't be empty." });
+        return res.status(400).json({ message: "Store link can't be empty. Use letters (A–Z), numbers or hyphens." });
       }
 
       const existing = await Business.findOne({ slug: cleanSlug, _id: { $ne: id } });

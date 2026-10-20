@@ -1,11 +1,23 @@
 import Business from "../models/Business.js";
 
-// Turns "Chioma Fashion & Co." into "chioma-fashion-co"
+// Letters that don't split into "base letter + accent mark" under Unicode
+// normalization, so they need an explicit plain-letter equivalent.
+const SPECIAL_LETTERS = {
+  "ø": "o", "æ": "ae", "œ": "oe", "ß": "ss", "đ": "d", "ð": "d",
+  "ł": "l", "þ": "th", "ı": "i", "ħ": "h", "ŧ": "t",
+};
+
+// Turns "Chioma Fashion & Co." into "chioma-fashion-co", and keeps accented
+// names readable instead of dropping letters: "JANOSÉ" -> "janose",
+// "Ọlá’s Ẹ̀wù" -> "olas-ewu", "Café Møller" -> "cafe-moller".
 export const slugify = (text) =>
   String(text || "")
+    .normalize("NFD") // é -> e + a separate accent mark
+    .replace(/[\u0300-\u036f]/g, "") // ...then drop the accent marks
     .toLowerCase()
+    .replace(/[øæœßđðłþıħŧ]/g, (ch) => SPECIAL_LETTERS[ch])
     .trim()
-    .replace(/[^\w\s-]/g, "")
+    .replace(/[^\w\s-]/g, "") // strip anything that isn't a letter, number, space, or hyphen
     .replace(/[\s_]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");

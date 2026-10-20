@@ -18,35 +18,7 @@ dotenv.config();
 
 import { connectDB } from "../src/db.js";
 import Business from "../src/models/Business.js";
-
-// Same logic as businessController.js — kept in sync manually since this
-// is a standalone script, not something imported into the running server.
-const slugify = (text) =>
-  text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-
-const generateUniqueSlug = async (name, excludeId = null) => {
-  const base = slugify(name) || "store";
-  let slug = base;
-  let suffix = 2;
-
-  while (true) {
-    const query = { slug };
-    if (excludeId) query._id = { $ne: excludeId };
-
-    const existing = await Business.findOne(query);
-    if (!existing) return slug;
-
-    slug = `${base}-${suffix}`;
-    suffix += 1;
-  }
-};
+import { generateUniqueSlug } from "../src/services/storeSlug.js";
 
 const run = async () => {
   await connectDB();

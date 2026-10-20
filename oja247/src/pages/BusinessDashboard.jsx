@@ -1205,7 +1205,7 @@ const BusinessDashboard = () => {
                     />
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
-                    Letters, numbers, and hyphens only. This is the link you'll share with customers.
+                    Letters, numbers, and hyphens only (accents are fine: é becomes e). This is the link you'll share with customers.
                   </p>
                 </div>
 
