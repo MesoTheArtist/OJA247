@@ -603,7 +603,7 @@ const AdminDashboard = () => {
     try {
       const [statsRes, bizRes, userRes, prodRes, ordersRes, vendorsRes, settingsRes] = await Promise.all([
         axiosInstance.get("/api/admin/stats"),
-        axiosInstance.get("/api/businesses"),
+        axiosInstance.get("/api/admin/businesses"),
         axiosInstance.get("/api/admin/users"),
         axiosInstance.get("/api/products/search"),
         axiosInstance.get("/api/admin/orders"),
