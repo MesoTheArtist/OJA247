@@ -1,3 +1,4 @@
+import { notifyAdmin } from "../services/adminNotificationService.js";
 import Dispute, { SELF_RESOLVE_WINDOW_DAYS } from "../models/Dispute.js";
 import {
   sendDisputeEscalatedVendorEmail,
@@ -35,6 +36,13 @@ export const runDisputeEscalationCheck = async (req, res) => {
       dispute.escalatedAt = new Date();
       await dispute.save();
       escalated += 1;
+      await notifyAdmin({
+        type: "dispute_escalated",
+        title: `Dispute needs you: ${dispute.businessName}`,
+        message: `Order ${dispute.orderReference} (${dispute.reason}) wasn't resolved by the vendor in time and is now in the admin queue.`,
+        tab: "overview",
+        meta: { disputeId: String(dispute._id), reference: dispute.orderReference, reason: dispute.reason },
+      });
 
       const vendorEmail = await getOwnerEmail(dispute.businessId);
       if (vendorEmail) {

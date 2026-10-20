@@ -1,3 +1,4 @@
+import { notifyAdmin } from "../services/adminNotificationService.js";
 import Order from "../models/Order.js";
 import Dispute, { DISPUTE_WINDOW_DAYS, SELF_RESOLVE_WINDOW_DAYS, UNCONFIRMED_PAYMENT_DAYS } from "../models/Dispute.js";
 import User from "../models/User.js";
@@ -154,6 +155,18 @@ export const fileDispute = async (req, res) => {
       order.status = "disputed";
       await order.save();
     }
+
+    await notifyAdmin({
+      type: unconfirmedTransfer ? "dispute_escalated" : "dispute_filed",
+      title: unconfirmedTransfer
+        ? `Dispute needs you: ${dispute.businessName}`
+        : `New dispute: ${dispute.businessName}`,
+      message: unconfirmedTransfer
+        ? `Order ${dispute.orderReference}: the vendor never confirmed payment (${dispute.reason}). It went straight to the admin queue.`
+        : `Order ${dispute.orderReference}: ${dispute.reason}. The vendor has 7 days to resolve it before it comes to you.`,
+      tab: unconfirmedTransfer ? "overview" : "orders",
+      meta: { disputeId: String(dispute._id), reference: dispute.orderReference, reason: dispute.reason },
+    });
 
     // Notifications — fire-and-forget, matches the rest of the codebase's
     // pattern (a broken mail server shouldn't fail the dispute filing).

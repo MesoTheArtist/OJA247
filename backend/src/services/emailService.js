@@ -139,6 +139,23 @@ const SITE_URL = process.env.SITE_URL || "https://oja247.store";
 // routed to a different inbox than support@oja247.store.
 const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || process.env.ZOHO_SMTP_USER;
 
+// Generic "something happened" email to the admin, used by the notification
+// center for events worth an email (new vendor, new marketer).
+export async function sendAdminActivityEmail({ title, message, tab = "overview" }) {
+  return sendEmail({
+    to: ADMIN_EMAIL,
+    subject: title,
+    html: layout(
+      `
+      <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">${esc(title)}</h1>
+      <p style="color:#4b5563; font-size:14px; line-height:1.6;">${esc(message)}</p>
+      ${button("Open admin panel", `${SITE_URL}/admin`)}
+      `,
+      { preheader: title }
+    ),
+  });
+}
+
 export async function sendMarketerWithdrawalRequestEmail({ marketerName, marketerEmail, amount }) {
   return sendEmail({
     to: ADMIN_EMAIL,

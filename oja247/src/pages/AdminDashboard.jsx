@@ -7,6 +7,7 @@ import Loader from "../components/Loader";
 import CustomerAdminTab from "../components/CustomerAdminTab.jsx";
 import CampaignAdminTab from "../components/CampaignAdminTab.jsx";
 import WaitingOrdersTab from "../components/WaitingOrdersTab.jsx";
+import NotificationBell from "../components/NotificationBell.jsx";
 import { useDialog } from "../components/DialogProvider";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
 import {
@@ -53,6 +54,30 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+
+// Small status tag for each row of the Businesses tab, worked out from the
+// raw business record (same rules the public listing uses to hide stores).
+const BUSINESS_TAG_STYLES = {
+  green: "bg-green-50 text-green-700 border-green-200",
+  amber: "bg-amber-50 text-amber-700 border-amber-200",
+  orange: "bg-orange-50 text-orange-700 border-orange-200",
+  red: "bg-red-50 text-red-700 border-red-200",
+  blue: "bg-blue-50 text-blue-700 border-blue-200",
+  purple: "bg-purple-50 text-purple-700 border-purple-200",
+  gray: "bg-gray-100 text-gray-600 border-gray-200",
+};
+
+const getBusinessStatusTag = (biz) => {
+  const now = Date.now();
+  const at = (date) => (date ? new Date(date).getTime() : 0);
+  if (biz.isHidden) return { label: "Banned / hidden", color: "red" };
+  if (at(biz.subscriptionExpiresAt) > now) return { label: "Subscribed", color: "green" };
+  if (at(biz.subscriptionGraceUntil) > now) return { label: "Renewal retrying", color: "amber" };
+  if (biz.visibilityExempt) return { label: "Exempt (always visible)", color: "blue" };
+  if (at(biz.grandfatherExemptUntil) > now) return { label: "Grandfathered", color: "purple" };
+  if (biz.subscriptionExpiresAt) return { label: "Subscription expired", color: "orange" };
+  return { label: "Not subscribed", color: "gray" };
+};
 
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: TrendingUp },
@@ -921,6 +946,9 @@ const AdminDashboard = () => {
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mt-0.5">{activeLabel}</h2>
             </div>
+            <div className="ml-auto">
+              <NotificationBell onOpenTab={setActiveTab} />
+            </div>
           </div>
         </motion.div>
 
@@ -1386,7 +1414,19 @@ const AdminDashboard = () => {
                                   className="w-9 h-9 rounded-full object-cover border border-gray-200"
                                 />
                               )}
-                              <span className="font-medium text-gray-900">{biz.name}</span>
+                              <div className="min-w-0">
+                                <span className="font-medium text-gray-900">{biz.name}</span>
+                                {(() => {
+                                  const tag = getBusinessStatusTag(biz);
+                                  return (
+                                    <span
+                                      className={`mt-1 block w-fit px-2 py-0.5 rounded-full text-[11px] font-semibold border ${BUSINESS_TAG_STYLES[tag.color]}`}
+                                    >
+                                      {tag.label}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
                             </div>
                           </td>
                           <td data-label="Category" className="p-4 text-gray-500">{biz.category}</td>

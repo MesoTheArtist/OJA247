@@ -1,3 +1,4 @@
+import { notifyAdmin } from "../services/adminNotificationService.js";
 import axios from "axios";
 import cloudinary from "../config/cloudinaryConfig.js";
 import Vendor from "../models/Vendor.js";
@@ -467,6 +468,14 @@ export const onboardVendor = async (req, res) => {
       },
       { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
     );
+
+    await notifyAdmin({
+      type: "verification_submitted",
+      title: `Verification to review: ${vendor.businessName}`,
+      message: `${vendor.businessName} submitted their payout and ID details (${vendor.verificationTier || "basic"} tier)${bankChanged ? ", including a bank account change" : ""}.`,
+      tab: "vendors",
+      meta: { businessId: String(vendor.businessId), tier: vendor.verificationTier, bankChanged: Boolean(bankChanged) },
+    });
 
     if (payoutHold) {
       await sendPayoutHoldEmail({

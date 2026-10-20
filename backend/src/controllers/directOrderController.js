@@ -1,3 +1,4 @@
+import { notifyAdmin } from "../services/adminNotificationService.js";
 import crypto from "crypto";
 import mongoose from "mongoose";
 import multer from "multer";
@@ -322,6 +323,14 @@ export const createDirectOrder = async (req, res) => {
 
     const dashboardUrl = `${SITE_URL}/dashboard/${businessId}`;
     const statusUrl = `${SITE_URL}/payment-status?status=awaiting&reference=${encodeURIComponent(reference)}&email=${encodeURIComponent(order.customer.email)}`;
+
+    await notifyAdmin({
+      type: "order_placed",
+      title: `New transfer order: ${business.name}`,
+      message: `${order.customer.fullName} placed order ${reference} for ₦${Number(total).toLocaleString()}. Waiting for the vendor to confirm payment.`,
+      tab: "waiting-orders",
+      meta: { orderId: String(order._id), reference, businessId: String(businessId), total },
+    });
 
     stage = "sending_notifications";
     // Notifications are best-effort. The order is already saved, so a mail

@@ -1,3 +1,4 @@
+import { notifyAdmin } from "../services/adminNotificationService.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
@@ -96,6 +97,13 @@ export const customerRegister = async (req, res) => {
     // works straight away (low friction); past guest orders attach once the
     // person confirms the email — see customerVerifyEmail.
     await sendVerificationLink(user);
+    await notifyAdmin({
+      type: "signup_customer",
+      title: `New customer: ${user.fullName || user.email}`,
+      message: `${user.email} signed up with email and password.`,
+      tab: "customers",
+      meta: { userId: String(user._id), email: user.email, method: "password" },
+    });
     setUserSessionCookie(res, generateToken(user._id, user.authVersion));
 
     res.status(201).json({
@@ -213,6 +221,13 @@ export const customerGoogleAuth = async (req, res) => {
         emailVerified: true, // Google already verified this email (checked above)
         // No password field at all — comparePassword and customerLogin
         // both handle that (see their comments).
+      });
+      await notifyAdmin({
+        type: "signup_customer",
+        title: `New customer: ${user.fullName || user.email}`,
+        message: `${user.email} signed up with Google.`,
+        tab: "customers",
+        meta: { userId: String(user._id), email: user.email, method: "google" },
       });
     } else if (user.emailVerified !== true) {
       // Google just proved this person owns the email. If the account was

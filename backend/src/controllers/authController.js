@@ -1,3 +1,4 @@
+import { notifyAdmin, describeReferralCode, referralLine } from "../services/adminNotificationService.js";
 import { SELLER_TERMS_VERSION } from "../config/sellerTerms.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
@@ -119,6 +120,24 @@ export const register = async (req, res) => {
 
     const savedUser = await user.save();
     console.log("User created:", savedUser._id);
+
+    // Admin notification center: new vendor, with the referral code they typed.
+    const referralInfo = await describeReferralCode(referralCodeUsed);
+    await notifyAdmin({
+      type: "signup_vendor",
+      title: `New vendor: ${savedBusiness.name}`,
+      message: `${savedUser.email} · ${savedBusiness.category} · ${savedBusiness.location}. ${referralLine(referralInfo)}`,
+      tab: "businesses",
+      meta: {
+        businessId: String(savedBusiness._id),
+        email: savedUser.email,
+        referralCodeUsed: referralInfo.code,
+        referralValid: referralInfo.valid,
+        referredBy: referralInfo.ownerName,
+        referrerType: referralInfo.ownerType,
+      },
+      emailAdmin: true,
+    });
 
     // Fire-and-forget — a mail server hiccup should never block registration.
     await sendVendorWelcomeEmail({ to: savedUser.email, businessName: savedBusiness.name });

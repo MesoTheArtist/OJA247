@@ -1,3 +1,4 @@
+import { notifyAdmin } from "../services/adminNotificationService.js";
 import crypto from "crypto";
 import Business from "../models/Business.js";
 import User from "../models/User.js";
@@ -573,6 +574,17 @@ async function markSubscriptionPaid(reference, paystackData = null) {
       paidAt: new Date(),
       reference: payment.paystackReference,
       expiresAt: periodEnd,
+    });
+  });
+
+  await bestEffort(`Admin notification for payment ${payment._id}`, async () => {
+    const business = await Business.findById(payment.businessId).select("name");
+    return notifyAdmin({
+      type: "subscription_paid",
+      title: `Subscription paid: ${business?.name || "a business"}`,
+      message: `${String(payment.planType).replace("_", " ")} plan · ₦${Number(cashCollected).toLocaleString()} cash${payment.pointsApplied ? ` + ${payment.pointsApplied} points` : ""}.`,
+      tab: "transactions",
+      meta: { paymentId: String(payment._id), businessId: String(payment.businessId), planType: payment.planType, cashCollected },
     });
   });
 

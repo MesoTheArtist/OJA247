@@ -34,6 +34,12 @@ import {
   deleteCustomerAdmin,
   adminVerifyCustomerEmail,
 } from "../controllers/adminController.js";
+import {
+  listNotifications,
+  getUnreadCount,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from "../controllers/adminNotificationController.js";
 import { getPayoutBatches, markPayoutBatchPaid, getPayouts, rejectMarketerPayouts, rejectSingleMarketerPayout } from "../controllers/payoutBatchController.js";
 import {
   getAudienceCounts,
@@ -56,6 +62,12 @@ const router = express.Router();
 // All routes require admin authentication
 router.use(protect);
 router.use(requireAdmin);
+
+// Notification center (bell in the admin top bar)
+router.get("/notifications", listNotifications);
+router.get("/notifications/unread-count", getUnreadCount);
+router.patch("/notifications/read-all", markAllNotificationsRead);
+router.patch("/notifications/:id/read", markNotificationRead);
 
 // Admin routes
 router.get("/users", getAllUsers);

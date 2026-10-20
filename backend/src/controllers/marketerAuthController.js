@@ -1,3 +1,4 @@
+import { notifyAdmin } from "../services/adminNotificationService.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
@@ -48,6 +49,14 @@ export const registerMarketer = async (req, res) => {
     setMarketerSessionCookie(res, token);
 
     await sendMarketerWelcomeEmail({ to: saved.email, name: saved.name, referralCode: saved.referralCode });
+    await notifyAdmin({
+      type: "signup_marketer",
+      title: `New marketer: ${saved.name}`,
+      message: `${saved.email} · ${saved.phone}. Their referral code is ${saved.referralCode}.`,
+      tab: "marketers",
+      meta: { marketerId: String(saved._id), email: saved.email, referralCode: saved.referralCode },
+      emailAdmin: true,
+    });
 
     res.status(201).json({
       success: true,
