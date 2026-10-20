@@ -15,6 +15,7 @@ import { sendVendorWelcomeEmail, sendPasswordResetEmail, sendPasswordChangedEmai
 import { sanitizeSocialLinks, sanitizeHighlights } from "../services/businessProfile.js";
 import { clearSessionCookies, setUserSessionCookie } from "../middleware/sessionCookies.js";
 import { normalizeProfileImage } from "../services/imageStorage.js";
+import { generateUniqueSlug } from "../services/storeSlug.js";
 
 // Generate JWT Token
 const generateToken = (id, authVersion = 1) => {
@@ -94,6 +95,9 @@ export const register = async (req, res) => {
     console.log("Creating business...");
     // Every business gets its own referral code (business-owner referral track)
     normalizedBusinessData.referralCode = await generateUniqueBusinessReferralCode();
+    // ...and a readable store link (/business/chioma-fashion) instead of a raw id.
+    // The vendor can still change it later in dashboard Settings.
+    normalizedBusinessData.slug = await generateUniqueSlug(normalizedBusinessData.name);
     const business = new Business(normalizedBusinessData);
     const savedBusiness = await business.save();
     console.log("Business created:", savedBusiness._id);

@@ -305,7 +305,7 @@ function ProductDetails() {
 
             {business && (
               <Link
-                to={`/business/${business._id}`}
+                to={`/business/${business.slug || business._id}`}
                 state={{ internalNav: true }}
                 className="inline-flex items-center gap-2.5 mb-5 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition"
               >
@@ -379,7 +379,7 @@ function ProductDetails() {
               </h2>
               {business && (
                 <Link
-                  to={`/business/${business._id}`}
+                  to={`/business/${business.slug || business._id}`}
                   state={{ internalNav: true }}
                   className="text-sm text-green-600 hover:text-green-700 font-medium"
                 >
