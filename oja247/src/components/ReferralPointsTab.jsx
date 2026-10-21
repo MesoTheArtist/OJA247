@@ -1,3 +1,4 @@
+import { planLabel, naira } from "../utils/referralFormat";
 import React, { useEffect, useState } from "react";
 import { Pencil, Percent, Gift } from "lucide-react";
 import axiosInstance from "../services/api";
@@ -237,11 +238,22 @@ function ReferralPointsTab({ businessId }) {
               <div key={entry.id} className="px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 capitalize">
-                    {entry.type.replace("_", " ")}
+                    {entry.type.replace(/_/g, " ")}
                   </p>
+                  {entry.type === "earned" && entry.detail && (
+                    <p className="text-xs text-gray-600 break-words">
+                      From {entry.detail.businessName}
+                      {entry.detail.planType && ` subscribing to the ${planLabel(entry.detail.planType).toLowerCase()}`}
+                      {entry.detail.amountPaid ? ` (they paid ${naira(entry.detail.amountPaid)})` : ""}
+                    </p>
+                  )}
+                  {entry.type === "redeemed_subscription" && entry.detail?.planType && (
+                    <p className="text-xs text-gray-600">Used toward your {planLabel(entry.detail.planType).toLowerCase()}</p>
+                  )}
                   <p className="text-xs text-gray-400">
                     {new Date(entry.createdAt).toLocaleDateString("en-NG")}
                     {entry.status !== "n/a" && ` · ${entry.status}`}
+                    {` · balance ${Number(entry.balanceAfter).toLocaleString()} pts`}
                   </p>
                 </div>
                 <p

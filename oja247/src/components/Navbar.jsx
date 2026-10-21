@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import { Menu, X, User as UserIcon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -7,6 +7,30 @@ import Logo from "../assets/OJA247 VX1.png";
 
 // Removed "Home" from the array
 const Items = ["Vendors", "Products", "About"];
+
+// Pages built around a form: the bar stays out of the way while typing and
+// needs a longer, deliberate scroll up before it comes back.
+const FORM_ROUTES =
+  /^\/(login|business-form|register-marketer|marketer-login|forgot-password|marketer-forgot-password|customer-forgot-password|reset-password|account|checkout|report-problem)(\/|$)/;
+
+// Dashboards have their own navigation, so the site bar only shows at the very
+// top of those pages and never pops back over their content.
+const OWN_NAV_ROUTES = /^\/(admin|dashboard\/)/;
+
+// Fields you type into (not buttons, checkboxes, etc).
+const isTypingTarget = (el) => {
+  if (!el) return false;
+  if (el.isContentEditable) return true;
+  if (el.tagName === "TEXTAREA" || el.tagName === "SELECT") return true;
+  if (el.tagName === "INPUT") {
+    return !["button", "submit", "reset", "checkbox", "radio", "range", "file", "color", "image"].includes(el.type);
+  }
+  return false;
+};
+
+// Any open popup/dialog/full-screen overlay (the site's modals lock page
+// scroll or use role="dialog" / a fixed full-screen layer).
+const MODAL_SELECTOR = '[role="dialog"], [aria-modal="true"], .fixed.inset-0:not(.pointer-events-none)';
 
 const routeFor = (item) => {
   switch (item) {
@@ -25,6 +49,11 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [typing, setTyping] = useState(false); // a form field has focus
+  const [modalOpen, setModalOpen] = useState(false); // a popup is covering the page
+  const upDistance = useRef(0); // how far the user has scrolled up since last going down
+  const mobileMenuOpenRef = useRef(false);
+  const { pathname } = useLocation();
   const { isAuthenticated, isCustomer, business, user, loading, logout } = useAuth();
 
   // The signed-in flag turns on straight from the saved session, but the
@@ -41,33 +70,111 @@ const Navbar = () => {
 
   const { scrollY } = useScroll();
 
+  useEffect(() => {
+    mobileMenuOpenRef.current = mobileMenuOpen;
+  }, [mobileMenuOpen]);
+
+  // New page: start fresh (bar visible, nothing focused, menu closed). Done
+  // while rendering, React's recommended way to reset state when a value
+  // (here the route) changes.
+  const [lastPath, setLastPath] = useState(pathname);
+  if (lastPath !== pathname) {
+    setLastPath(pathname);
+    setHidden(false);
+    setTyping(false);
+    setMobileMenuOpen(false);
+  }
+
   useMotionValueEvent(scrollY, "change", (latest) => {
     const previous = scrollY.getPrevious() ?? 0;
     const diff = latest - previous;
 
-    // Ignore tiny jitters (e.g. mobile bounce scroll) and keep the bar
-    // pinned near the very top regardless of direction.
+    // Keep the bar pinned near the very top regardless of direction.
     if (latest < 80) {
       setHidden(false);
+      upDistance.current = 0;
       return;
     }
 
+    // Dashboards have their own navigation: never pop back over them.
+    if (OWN_NAV_ROUTES.test(pathname)) {
+      setHidden(true);
+      setMobileMenuOpen(false);
+      return;
+    }
+
+    // Ignore tiny jitters (e.g. mobile bounce scroll, or the keyboard nudging
+    // the page).
     if (Math.abs(diff) < 4) return;
 
     if (diff > 0) {
       // scrolling down
+      upDistance.current = 0;
       setHidden(true);
       setMobileMenuOpen(false); // don't leave the mobile menu open while hiding
     } else {
-      // scrolling up
-      setHidden(false);
+      // scrolling up: only come back after a deliberate scroll, not a nudge
+      upDistance.current += -diff;
+      const needed = FORM_ROUTES.test(pathname) ? 60 : 24;
+      if (upDistance.current >= needed) setHidden(false);
     }
   });
+
+  // Get out of the way while the user is typing in a form field.
+  useEffect(() => {
+    let blurTimer;
+    const onFocusIn = (event) => {
+      clearTimeout(blurTimer);
+      if (!isTypingTarget(event.target)) return;
+      setTyping(true);
+      setHidden(true);
+      setMobileMenuOpen(false);
+      upDistance.current = 0;
+    };
+    const onFocusOut = () => {
+      clearTimeout(blurTimer);
+      // Wait a beat: focus often just moves to the next field.
+      blurTimer = setTimeout(() => {
+        if (isTypingTarget(document.activeElement)) return;
+        setTyping(false);
+        if (window.scrollY < 80) setHidden(false);
+      }, 150);
+    };
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    return () => {
+      clearTimeout(blurTimer);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+    };
+  }, []);
+
+  // Get out of the way while a popup/dialog is open.
+  useEffect(() => {
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      const locked = document.body.style.overflow === "hidden" && !mobileMenuOpenRef.current;
+      setModalOpen(locked || Boolean(document.querySelector(MODAL_SELECTOR)));
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(check);
+    };
+    check();
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class"] });
+    return () => {
+      observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [pathname]);
+
+  const shouldHide = hidden || typing || modalOpen;
 
   return (
     <motion.header
       initial={{ y: -100, opacity: 0 }}
-      animate={hidden ? { y: -140, opacity: 0 } : { y: 0, opacity: 1 }}
+      animate={shouldHide ? { y: -140, opacity: 0 } : { y: 0, opacity: 1 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
       className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-6xl pointer-events-none"
     >

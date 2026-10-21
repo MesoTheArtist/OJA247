@@ -1,3 +1,4 @@
+import { planLabel, naira, formatDate, percent } from "../utils/referralFormat";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -552,11 +553,22 @@ const MarketerDashboard = () => {
           ) : (
             <div className="divide-y">
               {data.payoutHistory.map((p) => (
-                <div key={p.id} className="px-6 py-4 flex items-center justify-between">
-                  <p className="text-sm text-gray-600">
-                    {new Date(p.paidAt).toLocaleDateString("en-NG")}
-                  </p>
-                  <p className="font-bold text-gray-900">₦{p.amount.toLocaleString()}</p>
+                <div key={p.id} className="px-6 py-4 flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 break-words">{p.businessName}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Paid {formatDate(p.paidAt)}
+                      {p.planType && ` · ${planLabel(p.planType)}`}
+                      {p.amountPaid ? ` · they paid ${naira(p.amountPaid)}` : ""}
+                      {p.rate !== null && p.rate !== undefined ? ` · ${percent(p.rate)} commission` : ""}
+                    </p>
+                    {p.convertedAt && (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Referred {formatDate(p.referredAt)}, subscribed {formatDate(p.convertedAt)}
+                      </p>
+                    )}
+                  </div>
+                  <p className="font-bold text-gray-900 shrink-0">₦{p.amount.toLocaleString()}</p>
                 </div>
               ))}
             </div>
@@ -573,7 +585,11 @@ const MarketerDashboard = () => {
               {data.rejectedPayouts.map((p) => (
                 <div key={p.id} className="px-6 py-4 flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-sm text-gray-600">{new Date(p.rejectedAt).toLocaleDateString("en-NG")}</p>
+                    <p className="text-sm font-semibold text-gray-900 break-words">{p.businessName}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Declined {formatDate(p.rejectedAt)}
+                      {p.planType && ` · ${planLabel(p.planType)}`}
+                    </p>
                     {p.reason && <p className="text-sm text-gray-700 mt-1 break-words">Reason: {p.reason}</p>}
                   </div>
                   <p className="font-bold text-gray-900 shrink-0">₦{p.amount.toLocaleString()}</p>

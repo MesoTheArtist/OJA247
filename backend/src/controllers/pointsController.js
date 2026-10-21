@@ -1,3 +1,5 @@
+import SubscriptionPayment from "../models/SubscriptionPayment.js";
+import { buildBusinessReferrals, describeLedgerEntry } from "../services/referralBreakdown.js";
 import Business from "../models/Business.js";
 import Vendor from "../models/Vendor.js";
 import ReferralAttribution from "../models/ReferralAttribution.js";
@@ -29,15 +31,21 @@ export const getPointsDashboard = async (req, res) => {
       .populate("referredBusinessId", "name createdAt")
       .sort({ createdAt: -1 });
 
-    const referrals = attributions.map((a) => ({
-      id: a._id,
-      businessName: a.referredBusinessId?.name || "(business deleted)",
-      status: a.status,
-      referredAt: a.createdAt,
-      convertedAt: a.convertedAt,
-    }));
+    // Every points entry earned from a referral (not just the latest 50), so
+    // each referral can show exactly what it earned.
+    const earnedEntries = await PointsLedger.find({
+      businessId,
+      type: "earned",
+      referralAttributionId: { $in: attributions.map((a) => a._id) },
+    });
+    const referrals = buildBusinessReferrals(attributions, earnedEntries);
 
     const ledger = await PointsLedger.find({ businessId }).sort({ createdAt: -1 }).limit(50);
+    const paymentIds = ledger.map((entry) => entry.subscriptionPaymentId).filter(Boolean);
+    const payments = paymentIds.length
+      ? await SubscriptionPayment.find({ _id: { $in: paymentIds } }).select("planType amount")
+      : [];
+    const paymentsById = new Map(payments.map((p) => [String(p._id), p]));
 
     const totalConverted = referrals.filter((r) => r.status === "converted").length;
 
@@ -67,14 +75,7 @@ export const getPointsDashboard = async (req, res) => {
       },
       nextRedemption,
       referrals,
-      ledger: ledger.map((entry) => ({
-        id: entry._id,
-        type: entry.type,
-        points: entry.points,
-        balanceAfter: entry.balanceAfter,
-        status: entry.status,
-        createdAt: entry.createdAt,
-      })),
+      ledger: ledger.map((entry) => describeLedgerEntry(entry, attributions, paymentsById)),
     });
   } catch (error) {
     console.error("Get points dashboard error:", error);

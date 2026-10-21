@@ -1,3 +1,4 @@
+import { planLabel, naira, formatDate, percent } from "../utils/referralFormat";
 import React, { useState, useEffect } from "react";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import axiosInstance from "../services/api";
@@ -8,6 +9,7 @@ import CustomerAdminTab from "../components/CustomerAdminTab.jsx";
 import CampaignAdminTab from "../components/CampaignAdminTab.jsx";
 import WaitingOrdersTab from "../components/WaitingOrdersTab.jsx";
 import NotificationBell from "../components/NotificationBell.jsx";
+import NotificationsTab from "../components/NotificationsTab.jsx";
 import { useDialog } from "../components/DialogProvider";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
 import {
@@ -42,6 +44,7 @@ import {
   Mail,
   Download,
   RefreshCw,
+  Bell,
 } from "lucide-react";
 import {
   LineChart,
@@ -81,6 +84,7 @@ const getBusinessStatusTag = (biz) => {
 
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: TrendingUp },
+  { id: "notifications", label: "Notifications", icon: Bell },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "businesses", label: "Businesses", icon: Store },
   { id: "products", label: "Products", icon: Package },
@@ -953,6 +957,8 @@ const AdminDashboard = () => {
         </motion.div>
 
         <div className="px-4 sm:px-8 py-8 max-w-7xl">
+          {activeTab === "notifications" && <NotificationsTab onOpenTab={setActiveTab} />}
+
           {activeTab === "overview" && (
             <div>
               {/* Platform Settings — subscription visibility kill switch */}
@@ -1790,7 +1796,17 @@ const AdminDashboard = () => {
                                 key={r.id}
                                 className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm"
                               >
-                                <span className="font-medium text-gray-900">{r.businessName}</span>
+                                <span className="min-w-0 pr-3">
+                                  <span className="block font-medium text-gray-900">{r.businessName}</span>
+                                  <span className="block text-xs text-gray-500 mt-0.5">
+                                    Referred {formatDate(r.referredAt)}
+                                    {r.status === "converted" && ` · subscribed ${formatDate(r.convertedAt)}`}
+                                    {r.planType && ` · ${planLabel(r.planType)}`}
+                                    {r.amountPaid ? ` · paid ${naira(r.amountPaid)}` : ""}
+                                    {r.earning?.kind === "cash" &&
+                                      ` · ${percent(r.earning.rate)} = ${naira(r.earning.amount)} (${r.earning.status})`}
+                                  </span>
+                                </span>
                                 <span
                                   className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${
                                     r.status === "converted"
@@ -1814,7 +1830,19 @@ const AdminDashboard = () => {
                                 key={p._id}
                                 className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm"
                               >
-                                <span className="text-gray-900 font-medium">₦{p.amount.toLocaleString()}</span>
+                                <span className="min-w-0 pr-3">
+                                  <span className="block text-gray-900 font-medium">₦{p.amount.toLocaleString()}</span>
+                                  {p.referral && (
+                                    <span className="block text-xs text-gray-500 mt-0.5 break-words">
+                                      {p.referral.businessName}
+                                      {p.referral.planType && ` · ${planLabel(p.referral.planType)}`}
+                                      {p.referral.amountPaid ? ` · they paid ${naira(p.referral.amountPaid)}` : ""}
+                                      {p.referral.rate !== null && p.referral.rate !== undefined ? ` · ${percent(p.referral.rate)}` : ""}
+                                      {p.paidAt ? ` · paid ${formatDate(p.paidAt)}` : ""}
+                                      {p.transferReference ? ` · ref ${p.transferReference}` : ""}
+                                    </span>
+                                  )}
+                                </span>
                                 <span className="text-gray-500 capitalize">{p.status}</span>
                               </div>
                             ))}

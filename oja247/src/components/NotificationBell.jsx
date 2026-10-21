@@ -1,35 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Bell, UserPlus, ShoppingCart, AlertTriangle, ShieldCheck, Wallet, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck } from "lucide-react";
 import axiosInstance from "../services/api";
+import { TYPE_STYLE, timeAgo } from "../utils/notificationDisplay";
 
 // Admin notification center: a bell with an unread badge in the top bar and a
 // dropdown list of recent activity (sign-ups, orders, disputes, ...).
 // Clicking an item marks it read and jumps to the dashboard tab it is about.
 
 const POLL_MS = 60 * 1000;
-
-const TYPE_STYLE = {
-  signup_vendor: { icon: UserPlus, cls: "bg-green-100 text-green-700" },
-  signup_customer: { icon: UserPlus, cls: "bg-blue-100 text-blue-700" },
-  signup_marketer: { icon: UserPlus, cls: "bg-purple-100 text-purple-700" },
-  order_placed: { icon: ShoppingCart, cls: "bg-amber-100 text-amber-700" },
-  dispute_filed: { icon: AlertTriangle, cls: "bg-red-100 text-red-700" },
-  dispute_escalated: { icon: AlertTriangle, cls: "bg-red-100 text-red-700" },
-  verification_submitted: { icon: ShieldCheck, cls: "bg-teal-100 text-teal-700" },
-  subscription_paid: { icon: Wallet, cls: "bg-emerald-100 text-emerald-700" },
-};
-
-function timeAgo(date) {
-  const seconds = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 1000));
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(date).toLocaleDateString();
-}
 
 const NotificationBell = ({ onOpenTab }) => {
   const [open, setOpen] = useState(false);
@@ -66,10 +44,6 @@ const NotificationBell = ({ onOpenTab }) => {
     return () => clearInterval(timer);
   }, [refreshCount]);
 
-  useEffect(() => {
-    if (open) loadList();
-  }, [open, loadList]);
-
   // Close when clicking outside.
   useEffect(() => {
     if (!open) return undefined;
@@ -100,7 +74,10 @@ const NotificationBell = ({ onOpenTab }) => {
     <div className="relative" ref={wrapRef}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) loadList();
+          setOpen(!open);
+        }}
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
         className="relative p-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 transition"
       >
@@ -160,6 +137,17 @@ const NotificationBell = ({ onOpenTab }) => {
               })
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenTab) onOpenTab("notifications");
+              setOpen(false);
+            }}
+            className="w-full px-4 py-3 border-t border-gray-100 text-sm font-semibold text-green-700 hover:bg-gray-50"
+          >
+            View full history (last 50 days)
+          </button>
         </div>
       )}
     </div>

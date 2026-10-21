@@ -1,3 +1,4 @@
+import { buildMarketerReferrals, describePayout } from "../services/referralBreakdown.js";
 import mongoose from "mongoose";
 import User from "../models/User.js";
 import Business from "../models/Business.js";
@@ -531,20 +532,14 @@ export const getMarketerDetailAdmin = async (req, res) => {
       .populate("referredBusinessId", "name createdAt")
       .sort({ createdAt: -1 });
 
-    const referrals = attributions.map((a) => ({
-      id: a._id,
-      businessName: a.referredBusinessId?.name || "(business deleted)",
-      status: a.status,
-      referredAt: a.createdAt,
-      convertedAt: a.convertedAt,
-    }));
-
     const payouts = await MarketerPayout.find({ marketerId: id }).sort({ createdAt: -1 });
+    const referrals = buildMarketerReferrals(attributions, payouts);
 
     res.json({
       marketer,
       referrals,
-      payouts,
+      // Same fields as before (_id, amount, status, ...) plus where each came from.
+      payouts: payouts.map((p) => ({ ...p.toObject(), referral: describePayout(p, attributions) })),
       stats: {
         totalReferred: referrals.length,
         totalConverted: referrals.filter((r) => r.status === "converted").length,

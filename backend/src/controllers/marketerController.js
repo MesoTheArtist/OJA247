@@ -1,3 +1,4 @@
+import { buildMarketerReferrals, describePayout } from "../services/referralBreakdown.js";
 import axios from "axios";
 import ReferralAttribution from "../models/ReferralAttribution.js";
 import MarketerPayout from "../models/MarketerPayout.js";
@@ -21,15 +22,10 @@ export const getMarketerDashboard = async (req, res) => {
       .populate("referredBusinessId", "name createdAt")
       .sort({ createdAt: -1 });
 
-    const referrals = attributions.map((a) => ({
-      id: a._id,
-      businessName: a.referredBusinessId?.name || "(business deleted)",
-      status: a.status, // "pending" | "converted"
-      referredAt: a.createdAt,
-      convertedAt: a.convertedAt,
-    }));
-
     const payouts = await MarketerPayout.find({ marketerId });
+
+    // Each referral now carries its plan, the amount paid and what it earned.
+    const referrals = buildMarketerReferrals(attributions, payouts);
 
     const pendingTotal = payouts
       .filter((p) => p.status === "pending" || p.status === "batched")
@@ -76,12 +72,12 @@ export const getMarketerDashboard = async (req, res) => {
       payoutHistory: payouts
         .filter((p) => p.status === "paid")
         .sort((a, b) => new Date(b.paidAt) - new Date(a.paidAt))
-        .map((p) => ({ id: p._id, amount: p.amount, paidAt: p.paidAt })),
+        .map((p) => describePayout(p, attributions)),
       // Payouts an admin declined, with the reason, so earnings never just vanish
       rejectedPayouts: payouts
         .filter((p) => p.status === "rejected")
         .sort((a, b) => new Date(b.rejectedAt) - new Date(a.rejectedAt))
-        .map((p) => ({ id: p._id, amount: p.amount, rejectedAt: p.rejectedAt, reason: p.rejectionReason })),
+        .map((p) => describePayout(p, attributions)),
     });
   } catch (error) {
     console.error("Get marketer dashboard error:", error);

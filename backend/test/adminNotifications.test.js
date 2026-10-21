@@ -27,3 +27,7 @@ test("notification model accepts every declared type and rejects others", () => 
   const bad = new AdminNotification({ type: "something_else", title: "x" });
   assert.ok(bad.validateSync());
 });
+test("notification history window is 50 days", async () => {
+  const { NOTIFICATION_HISTORY_DAYS } = await import("../src/models/AdminNotification.js");
+  assert.equal(NOTIFICATION_HISTORY_DAYS, 50);
+});
