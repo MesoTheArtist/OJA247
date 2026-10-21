@@ -416,6 +416,16 @@ export const initiateSubscription = async (req, res) => {
         })
       );
 
+      await bestEffort(`Admin notification for points-only payment ${payment._id}`, () =>
+        notifyAdmin({
+          type: "subscription_paid",
+          title: `Subscription paid: ${fresh.name}`,
+          message: `${String(planType).replace("_", " ")} plan · paid fully with ${payment.pointsApplied} points (no cash).`,
+          tab: "transactions",
+          meta: { paymentId: String(payment._id), businessId: String(businessId), planType, cashCollected: 0 },
+        })
+      );
+
       // No Paystack cash was collected on this payment - it's covered
       // entirely by points, which are themselves money the platform already
       // paid out once (to whoever earned them). Awarding a marketer payout

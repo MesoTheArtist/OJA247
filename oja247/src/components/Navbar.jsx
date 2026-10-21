@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { motion, useScroll, useMotionValueEvent } from "framer-motion";
-import { Menu, X, User as UserIcon } from "lucide-react";
+import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
+import { Menu, X, User as UserIcon, ChevronDown } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import Logo from "../assets/OJA247 VX1.png";
 
@@ -48,12 +48,15 @@ const routeFor = (item) => {
 const Navbar = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { pathname } = useLocation();
   const [hidden, setHidden] = useState(false);
   const [typing, setTyping] = useState(false); // a form field has focus
+  // Tucked away automatically on arrival at a form page or dashboard, so the
+  // user doesn't have to tap the page first. A small tab brings it back.
+  const [collapsed, setCollapsed] = useState(() => FORM_ROUTES.test(pathname) || OWN_NAV_ROUTES.test(pathname));
   const [modalOpen, setModalOpen] = useState(false); // a popup is covering the page
   const upDistance = useRef(0); // how far the user has scrolled up since last going down
   const mobileMenuOpenRef = useRef(false);
-  const { pathname } = useLocation();
   const { isAuthenticated, isCustomer, business, user, loading, logout } = useAuth();
 
   // The signed-in flag turns on straight from the saved session, but the
@@ -83,6 +86,8 @@ const Navbar = () => {
     setHidden(false);
     setTyping(false);
     setMobileMenuOpen(false);
+    // Collapse straight away on form pages and dashboards (no tap needed).
+    setCollapsed(FORM_ROUTES.test(pathname) || OWN_NAV_ROUTES.test(pathname));
   }
 
   useMotionValueEvent(scrollY, "change", (latest) => {
@@ -116,7 +121,10 @@ const Navbar = () => {
       // scrolling up: only come back after a deliberate scroll, not a nudge
       upDistance.current += -diff;
       const needed = FORM_ROUTES.test(pathname) ? 60 : 24;
-      if (upDistance.current >= needed) setHidden(false);
+      if (upDistance.current >= needed) {
+        setHidden(false);
+        setCollapsed(false);
+      }
     }
   });
 
@@ -169,9 +177,36 @@ const Navbar = () => {
     };
   }, [pathname]);
 
-  const shouldHide = hidden || typing || modalOpen;
+  const shouldHide = hidden || typing || modalOpen || collapsed;
+  // The "show menu" tab is for when the bar is tucked away, not while a popup is up.
+  const showHandle = shouldHide && !modalOpen && (collapsed || typing);
+
+  const revealBar = () => {
+    setCollapsed(false);
+    setHidden(false);
+    setTyping(false);
+    if (document.activeElement && isTypingTarget(document.activeElement)) document.activeElement.blur();
+  };
 
   return (
+    <>
+      <AnimatePresence>
+        {showHandle && (
+          <motion.button
+            key="show-menu"
+            type="button"
+            onClick={revealBar}
+            aria-label="Show menu"
+            initial={{ y: -40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -40, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed top-2 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 px-4 py-1.5 rounded-full bg-white/80 backdrop-blur-xl border border-gray-200/60 shadow-lg text-xs font-semibold text-gray-600 hover:text-gray-900"
+          >
+            Menu <ChevronDown size={14} />
+          </motion.button>
+        )}
+      </AnimatePresence>
     <motion.header
       initial={{ y: -100, opacity: 0 }}
       animate={shouldHide ? { y: -140, opacity: 0 } : { y: 0, opacity: 1 }}
@@ -338,6 +373,7 @@ const Navbar = () => {
         )}
       </div>
     </motion.header>
+    </>
   );
 };
 
