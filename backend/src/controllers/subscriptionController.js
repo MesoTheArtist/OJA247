@@ -9,6 +9,7 @@ import { sendSubscriptionReceiptEmail } from "../services/emailService.js";
 import { runInTransaction, MoneyRuleError } from "../utils/transactions.js";
 
 import { isValidCronRequest } from "../utils/cronAuth.js";
+import { isAppRequest } from "../middleware/sessionCookies.js";
 // Looks up the business owner's login email for the receipt — Business
 // itself only stores a public contact phone, not an email.
 async function getOwnerEmail(businessId) {
@@ -228,9 +229,12 @@ async function safeHandleSubscriptionConversion(details) {
 // Starts the card payment on Paystack's side from the SERVER, restricted to
 // card (a subscription must be a card payment so it can be renewed
 // automatically), at exactly the amount still owed after points. Returns the
-// access_code the browser's payment popup resumes - without it the popup has
-// nothing to open.
-async function initializeSubscriptionTransaction({ email, chargeAmount, reference, planType, businessId, paymentId }) {
+// access_code the website's payment popup resumes, and the authorization_url
+// of Paystack's hosted payment page, which the mobile app opens instead
+// (there is no popup in an app). For the app, Paystack sends the customer to
+// callback_url when they finish; the app watches for that address and then
+// calls /verify - the page itself never has to exist.
+async function initializeSubscriptionTransaction({ email, chargeAmount, reference, planType, businessId, paymentId, forApp = false }) {
   const secret = process.env.PAYSTACK_SECRET_KEY;
   if (!secret) {
     throw new Error("Paystack secret key is not configured on the backend");
@@ -245,6 +249,7 @@ async function initializeSubscriptionTransaction({ email, chargeAmount, referenc
       currency: "NGN",
       reference,
       channels: ["card"],
+      ...(forApp ? { callback_url: "https://oja247.store/app-payment-return" } : {}),
       metadata: {
         kind: "subscription",
         businessId: String(businessId),
@@ -261,7 +266,7 @@ async function initializeSubscriptionTransaction({ email, chargeAmount, referenc
     err.paystack = true;
     throw err;
   }
-  return data.data.access_code;
+  return { accessCode: data.data.access_code, authorizationUrl: data.data.authorization_url || null };
 }
 
 // POST /api/subscriptions/initiate
@@ -445,17 +450,19 @@ export const initiateSubscription = async (req, res) => {
     // open the popup with. If Paystack can't, the payment is closed again and
     // any points held for it go straight back.
     let accessCode;
+    let authorizationUrl = null;
     try {
       const email = await getOwnerEmail(businessId);
       if (!email) throw new Error("No login email on file for this business");
-      accessCode = await initializeSubscriptionTransaction({
+      ({ accessCode, authorizationUrl } = await initializeSubscriptionTransaction({
         email,
         chargeAmount,
         reference,
         planType,
         businessId,
         paymentId: payment._id,
-      });
+        forApp: isAppRequest(req),
+      }));
     } catch (initError) {
       console.error(`Could not start card payment ${reference}:`, initError.message);
       await failPayment(payment._id).catch((releaseError) =>
@@ -470,6 +477,7 @@ export const initiateSubscription = async (req, res) => {
       message: "Subscription payment initiated",
       reference,
       accessCode,
+      authorizationUrl, // the app opens this; the website uses accessCode
       amount: chargeAmount, // what Paystack should actually charge
       pointsApplied: appliedPoints,
       fullyPaidWithPoints: false,
