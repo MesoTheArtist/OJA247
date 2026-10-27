@@ -55,21 +55,31 @@ const GhostWord = ({ text }) => (
 
 // ---- Founder data -------------------------------------------------------
 
+// Hero card width: fits two side by side on phones, grows on desktop
+const CARD_W = "clamp(150px, 40vw, 270px)";
+
 const founders = [
   {
     img: EbenImage,
     name: "Ndudim Ebenezer Nmesoma",
     short: "Ebenezer",
-    role: "Frontend & Design Lead",
+    role: "Founder · Frontend & Backend Developer",
+    tag: "Founder",
     accent: "#0B8F4D",
-    skills: ["Frontend Development", "UI/UX Design", "Product Strategy"],
+    skills: [
+      "Frontend Development",
+      "Backend Development",
+      "UI/UX Design",
+      "Product Strategy",
+    ],
     rotate: -6,
   },
   {
     img: LanreImage,
     name: "Olanrewaju Williams Owolabi",
     short: "Williams",
-    role: "Backend Lead",
+    role: "Partner · Backend Developer",
+    tag: "Partner",
     accent: "#F59E0B",
     skills: ["Backend Engineering", "API Development", "System Security"],
     rotate: 5,
@@ -140,16 +150,20 @@ const About = () => {
         </div>
 
         {/* Floating founder cards */}
-        <div className="relative h-64 md:h-80 -mt-6 md:-mt-12 pointer-events-none">
+        <div
+          className="relative -mt-6 md:-mt-12 pointer-events-none"
+          style={{ height: `calc(${CARD_W} * 1.333 + 50px)` }}
+        >
           {founders.map((f, i) => (
             <motion.div
               key={f.short}
               className="pointer-events-auto absolute rounded-3xl overflow-hidden cursor-pointer"
               style={{
-                width: 170,
-                height: 220,
-                left: i === 0 ? "26%" : "58%",
-                top: i === 0 ? 30 : 0,
+                width: CARD_W,
+                aspectRatio: "3 / 4",
+                left: "50%",
+                marginLeft: i === 0 ? `calc(${CARD_W} * -1 - 10px)` : "10px",
+                top: i === 0 ? 36 : 0,
                 background: `linear-gradient(180deg, ${f.accent} 0%, #0B8F4D22 100%)`,
                 boxShadow: `0 30px 50px -18px ${f.accent}66, inset 0 2px 0 rgba(255,255,255,.35)`,
               }}
@@ -169,9 +183,11 @@ const About = () => {
                 alt={f.name}
                 className="w-full h-full object-cover object-top"
               />
-              <div className="absolute inset-x-0 bottom-0 bg-black/60 backdrop-blur-sm px-3 py-2">
-                <p className="text-white text-sm font-bold">{f.short}</p>
-                <p className="text-white/70 text-[11px]">{f.role}</p>
+              <div className="absolute inset-x-0 bottom-0 bg-black/60 backdrop-blur-sm px-4 py-3">
+                <p className="text-white text-base md:text-lg font-bold">
+                  {f.short}
+                </p>
+                <p className="text-white/70 text-xs md:text-sm">{f.tag}</p>
               </div>
             </motion.div>
           ))}
@@ -211,9 +227,10 @@ const About = () => {
             Our Mission
           </h2>
           <p className="text-gray-700 text-lg leading-8">
-            OJA247 was created by two Software Engineering students at
-            APTECH who saw the difficulties Nigerian entrepreneurs face when
-            trying to establish an online presence.
+            OJA247 was founded by Ebenezer, a Software Engineering student at
+            APTECH, together with his partner Lanre. They saw the difficulties
+            Nigerian entrepreneurs face when trying to establish an online
+            presence.
           </p>
           <p className="mt-5 text-gray-700 text-lg leading-8">
             Our goal is to make online selling simple, affordable, and
@@ -235,7 +252,7 @@ const About = () => {
             THE PEOPLE BEHIND IT
           </p>
           <h2 className="text-4xl font-black text-gray-900">
-            Meet The Founders
+            Meet The Team
           </h2>
         </motion.div>
 
@@ -249,26 +266,26 @@ const About = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.7, delay: i * 0.15 }}
               whileHover={{ y: -10, rotate: i === 0 ? -1.5 : 1.5 }}
-              className="relative bg-gray-900 rounded-[2rem] p-8 overflow-hidden shadow-2xl group"
+              className="relative bg-gray-900 rounded-[2rem] p-10 md:p-12 overflow-hidden shadow-2xl group"
             >
               <div
                 className="absolute -top-20 -right-20 w-64 h-64 rounded-full blur-3xl pointer-events-none transition-opacity duration-500 opacity-20 group-hover:opacity-40"
                 style={{ background: f.accent }}
               />
 
-              <div className="relative flex items-center gap-6">
+              <div className="relative flex flex-col sm:flex-row sm:items-center gap-6 md:gap-8">
                 <img
                   src={f.img}
                   alt={f.name}
-                  className="w-24 h-24 md:w-28 md:h-28 rounded-full object-cover border-4 shrink-0"
+                  className="w-36 h-36 md:w-44 md:h-44 rounded-full object-cover border-4 shrink-0"
                   style={{ borderColor: f.accent }}
                 />
                 <div>
-                  <p className="text-white font-black text-2xl leading-tight">
+                  <p className="text-white font-black text-2xl md:text-3xl leading-tight">
                     {f.name}
                   </p>
                   <p
-                    className="font-bold uppercase tracking-wide text-sm mt-1"
+                    className="font-bold uppercase tracking-wide text-sm md:text-base mt-2"
                     style={{ color: f.accent }}
                   >
                     {f.role}
@@ -280,7 +297,7 @@ const About = () => {
                 {f.skills.map((skill) => (
                   <span
                     key={skill}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                    className="px-4 py-2 rounded-full text-sm font-semibold"
                     style={{
                       background: `${f.accent}22`,
                       color: f.accent,
@@ -300,9 +317,9 @@ const About = () => {
           viewport={{ once: true }}
           className="text-center text-gray-600 mt-10 max-w-2xl mx-auto leading-7"
         >
-          Two Software Engineering students at APTECH, pairing frontend
-          craft with backend engineering to build one cohesive product from
-          the ground up.
+          Ebenezer founded OJA247 and builds across both frontend and backend,
+          while his partner Lanre focuses on backend engineering, together
+          building one cohesive product from the ground up.
         </motion.p>
 
         <motion.div
@@ -336,14 +353,14 @@ const About = () => {
 
           <div className="relative grid grid-cols-1 sm:grid-cols-3 gap-10 items-end">
             <h3 className="text-3xl md:text-4xl font-bold leading-tight sm:col-span-3 md:col-span-1">
-              Two founders.
+              Two developers.
               <br />
               <em className="italic font-black text-transparent bg-clip-text bg-gradient-to-r from-[#0B8F4D] to-[#F59E0B]">
                 Zero shortcuts.
               </em>
             </h3>
 
-            <Counter target={2} label="Co-Founders" />
+            <Counter target={2} label="Developers" />
             <Counter target={100} suffix="%" label="Built by Students" />
           </div>
         </motion.div>
