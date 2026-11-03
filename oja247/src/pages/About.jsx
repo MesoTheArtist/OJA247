@@ -63,14 +63,16 @@ const founders = [
     img: EbenImage,
     name: "Ndudim Ebenezer Nmesoma",
     short: "Ebenezer",
-    role: "Founder · Frontend & Backend Developer",
+    role: "Founder · Lead Full-Stack Engineer",
     tag: "Founder",
     accent: "#0B8F4D",
     skills: [
-      "Frontend Development",
-      "Backend Development",
-      "UI/UX Design",
-      "Product Strategy",
+      "Full-Stack Engineering",
+      "Systems Architecture",
+      "Payments Infrastructure",
+      "Platform Security",
+      "Product Design & UX",
+      "Technical Leadership",
     ],
     rotate: -6,
   },
@@ -78,10 +80,15 @@ const founders = [
     img: LanreImage,
     name: "Olanrewaju Williams Owolabi",
     short: "Williams",
-    role: "Partner · Backend Developer",
+    role: "Partner · Backend Engineer",
     tag: "Partner",
     accent: "#F59E0B",
-    skills: ["Backend Engineering", "API Development", "System Security"],
+    skills: [
+      "Backend Engineering",
+      "RESTful API Design",
+      "Database Architecture",
+      "Cloud Infrastructure",
+    ],
     rotate: 5,
   },
 ];
@@ -317,9 +324,9 @@ const About = () => {
           viewport={{ once: true }}
           className="text-center text-gray-600 mt-10 max-w-2xl mx-auto leading-7"
         >
-          Ebenezer founded OJA247 and builds across both frontend and backend,
-          while his partner Lanre focuses on backend engineering, together
-          building one cohesive product from the ground up.
+          Ebenezer founded OJA247 and leads its engineering and product end to
+          end, while his partner Lanre is a core part of the team behind its
+          backend, together building one cohesive product from the ground up.
         </motion.p>
 
         <motion.div
