@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /marketer-dashboard
+Disallow: /checkout
+Disallow: /cart
+
+Sitemap: https://oja247.store/sitemap.xml
