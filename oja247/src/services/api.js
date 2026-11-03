@@ -25,6 +25,7 @@ axiosInstance.interceptors.response.use(
 
 // Business API calls
 export const getAllBusinesses = () => axiosInstance.get('/api/businesses');
+export const getPublicSettings = () => axiosInstance.get('/api/settings/public');
 export const getBusinessById = (id) => axiosInstance.get(`/api/businesses/${id}`);
 export const getBusinessDashboard = (id) => axiosInstance.get(`/api/businesses/${id}/dashboard`);
 export const getFollowStatus = (businessId) => axiosInstance.get(`/api/follows/status/${businessId}`);

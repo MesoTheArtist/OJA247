@@ -1,6 +1,9 @@
 // Google AdSense helpers.
 //
-// Ads show for every visitor once VITE_ADSENSE_CLIENT is set
+import { getPublicSettings } from "../services/api";
+
+// Ads show for every visitor once VITE_ADSENSE_CLIENT is set and the admin
+// master switch (Admin > Overview) is on
 // (e.g. "ca-pub-1234567890123456"). The cookie notice only controls
 // personalization: "granted" = personalized ads, anything else (including no
 // choice yet) = non-personalized ads.
@@ -70,4 +73,17 @@ export const AD_SLOTS = {
   home: import.meta.env.VITE_ADSENSE_SLOT_HOME || "",
   feed: import.meta.env.VITE_ADSENSE_SLOT_FEED || "",
   product: import.meta.env.VITE_ADSENSE_SLOT_PRODUCT || "",
+};
+
+let adsSwitchPromise = null;
+
+// Reads the admin master switch once per page load. If the request fails the
+// answer is "on", so a brief API hiccup does not silently remove ad revenue.
+export const fetchAdsEnabled = () => {
+  if (!adsSwitchPromise) {
+    adsSwitchPromise = getPublicSettings()
+      .then((res) => res.data?.adsEnabled !== false)
+      .catch(() => true);
+  }
+  return adsSwitchPromise;
 };

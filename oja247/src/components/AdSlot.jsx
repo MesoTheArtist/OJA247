@@ -1,5 +1,11 @@
-import React, { useEffect, useRef } from "react";
-import { ADSENSE_CLIENT, adsConfigured, applyPersonalization, loadAdSense } from "../utils/ads";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ADSENSE_CLIENT,
+  adsConfigured,
+  applyPersonalization,
+  fetchAdsEnabled,
+  loadAdSense,
+} from "../utils/ads";
 
 // One Google ad unit.
 //
@@ -9,14 +15,28 @@ import { ADSENSE_CLIENT, adsConfigured, applyPersonalization, loadAdSense } from
 //   layoutKey - only for in-feed units (the data-ad-layout-key AdSense gives you)
 //   className - wrapper classes, e.g. "col-span-full" inside a grid
 //
-// Renders nothing unless AdSense is configured and a slot ID was passed, so it
-// is safe to drop in anywhere. Everyone sees ads; the cookie notice only decides
+// Renders nothing unless AdSense is configured, a slot ID was passed and the
+// admin master switch is on, so it is safe to drop in anywhere. Everyone sees ads; the cookie notice only decides
 // whether they are personalized.
 const AdSlot = ({ slot, format = "auto", layoutKey, className = "" }) => {
   const pushed = useRef(false);
   const insRef = useRef(null);
 
-  const enabled = adsConfigured() && Boolean(slot);
+  // null while the admin master switch is still being read, so nothing flashes.
+  const [switchOn, setSwitchOn] = useState(null);
+
+  useEffect(() => {
+    if (!adsConfigured() || !slot) return;
+    let cancelled = false;
+    fetchAdsEnabled().then((on) => {
+      if (!cancelled) setSwitchOn(on);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [slot]);
+
+  const enabled = adsConfigured() && Boolean(slot) && switchOn === true;
 
   useEffect(() => {
     if (!enabled || pushed.current) return;

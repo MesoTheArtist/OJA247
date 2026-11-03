@@ -221,7 +221,7 @@ const AdminDashboard = () => {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [vendors, setVendors] = useState([]);
-  const [settings, setSettings] = useState({ enforceSubscriptionVisibility: false });
+  const [settings, setSettings] = useState({ enforceSubscriptionVisibility: false, adsEnabled: true });
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -315,6 +315,25 @@ const AdminDashboard = () => {
         "success"
       );
       fetchAllData(); // businesses list changes shape immediately when this flips
+    } catch (error) {
+      showToast(error.response?.data?.message || "Could not update the setting.", "error");
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  const handleToggleAds = async () => {
+    const next = !settings.adsEnabled;
+    setSettingsSaving(true);
+    try {
+      const res = await axiosInstance.patch("/api/admin/settings/ads", { enabled: next });
+      setSettings(res.data);
+      showToast(
+        next
+          ? "Ads turned ON — Google ads will show on the public site."
+          : "Ads turned OFF — no ads will show. Visitors may take up to a minute to see the change.",
+        "success"
+      );
     } catch (error) {
       showToast(error.response?.data?.message || "Could not update the setting.", "error");
     } finally {
@@ -998,6 +1017,37 @@ const AdminDashboard = () => {
                     <span
                       className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
                         settings.enforceSubscriptionVisibility ? "translate-x-7" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Platform Settings — Google ads master switch */}
+              <div className="mb-8 relative rounded-2xl p-6 sm:p-8 border overflow-hidden bg-gray-50 border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-gray-900">Google Ads</h3>
+                    <p className="text-sm text-gray-500 mt-1 max-w-xl">
+                      Master switch for ads on the public site. Currently{" "}
+                      <span className={settings.adsEnabled ? "text-green-700 font-semibold" : "text-amber-600 font-semibold"}>
+                        {settings.adsEnabled ? "ON" : "OFF"}
+                      </span>
+                      . Turning it off hides every ad within about a minute; ads also stay hidden until
+                      the AdSense IDs are set on the site.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleToggleAds}
+                    disabled={settingsSaving}
+                    aria-label="Toggle Google ads"
+                    className={`shrink-0 relative inline-flex h-8 w-14 items-center rounded-full transition-colors disabled:opacity-50 ${
+                      settings.adsEnabled ? "bg-green-500" : "bg-gray-600"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                        settings.adsEnabled ? "translate-x-7" : "translate-x-1"
                       }`}
                     />
                   </button>

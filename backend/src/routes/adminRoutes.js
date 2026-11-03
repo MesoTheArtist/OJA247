@@ -13,6 +13,7 @@ import {
   reviewVendor,
   getPlatformSettings,
   setSubscriptionVisibilityEnforcement,
+  setAdsEnabled,
   getAllBusinessesAdmin,
   setBusinessVisibilityExempt,
   setBusinessGrandfatherExemption,
@@ -116,6 +117,7 @@ router.get("/payouts", getPayouts);
 // Platform settings (global kill switches)
 router.get("/settings", getPlatformSettings);
 router.patch("/settings/subscription-visibility", setSubscriptionVisibilityEnforcement);
+router.patch("/settings/ads", setAdsEnabled);
 
 // Unfiltered business list for admin management (see getAllBusinessesAdmin)
 router.get("/businesses", getAllBusinessesAdmin);

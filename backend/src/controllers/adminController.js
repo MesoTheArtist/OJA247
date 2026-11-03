@@ -334,11 +334,18 @@ export const reviewVendor = async (req, res) => {
   }
 };
 
+// Every settings endpoint returns the full set so the dashboard can replace
+// its settings state with any response without losing the other switches.
+const settingsPayload = (settings) => ({
+  enforceSubscriptionVisibility: settings.enforceSubscriptionVisibility,
+  adsEnabled: settings.adsEnabled !== false,
+});
+
 // GET /api/admin/settings
 export const getPlatformSettings = async (req, res) => {
   try {
     const settings = await PlatformSettings.getSettings();
-    res.json({ enforceSubscriptionVisibility: settings.enforceSubscriptionVisibility });
+    res.json(settingsPayload(settings));
   } catch (error) {
     console.error("Request failed:", error);
     res.status(500).json({ message: "Something went wrong. Please try again." });
@@ -361,7 +368,28 @@ export const setSubscriptionVisibilityEnforcement = async (req, res) => {
     settings.enforceSubscriptionVisibility = enabled;
     await settings.save();
 
-    res.json({ enforceSubscriptionVisibility: settings.enforceSubscriptionVisibility });
+    res.json(settingsPayload(settings));
+  } catch (error) {
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
+  }
+};
+
+// PATCH /api/admin/settings/ads
+// Master on/off switch for Google ads on the public site (see
+// PlatformSettings.adsEnabled and GET /api/settings/public).
+export const setAdsEnabled = async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ message: "'enabled' must be true or false" });
+    }
+
+    const settings = await PlatformSettings.getSettings();
+    settings.adsEnabled = enabled;
+    await settings.save();
+
+    res.json(settingsPayload(settings));
   } catch (error) {
     console.error("Request failed:", error);
     res.status(500).json({ message: "Something went wrong. Please try again." });

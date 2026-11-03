@@ -29,6 +29,7 @@ import disputeRoutes from "./src/routes/disputeRoutes.js";
 import customerAuthRoutes from "./src/routes/customerAuthRoutes.js";
 import followRoutes from "./src/routes/followRoutes.js";
 import reviewRoutes from "./src/routes/reviewRoutes.js";
+import publicSettingsRoutes from "./src/routes/publicSettingsRoutes.js";
 import { verifyEmailTransporter } from "./src/services/emailService.js";
 import { generalLimiter } from "./src/middleware/rateLimiters.js";
 import { addCsrfResponseHeader } from "./src/middleware/sessionCookies.js";
@@ -149,6 +150,7 @@ app.use("/api/disputes", disputeRoutes);
 app.use("/api/customer-auth", customerAuthRoutes);
 app.use("/api/follows", followRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/settings", publicSettingsRoutes);
 
 // Awaited at module load — on a cold start this holds the response until
 // Mongo is ready instead of letting requests race ahead of the connection.

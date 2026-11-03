@@ -11,6 +11,12 @@ const PlatformSettingsSchema = new mongoose.Schema(
     // the moment this collection is created; an admin turns it on
     // deliberately once vendors have had a fair chance to actually pay.
     enforceSubscriptionVisibility: { type: Boolean, default: false },
+
+    // Master switch for Google AdSense ads on the public site. Defaults to
+    // true so ads show as soon as AdSense is approved and configured; an admin
+    // can turn them off instantly without redeploying. The frontend reads it
+    // from GET /api/settings/public.
+    adsEnabled: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
