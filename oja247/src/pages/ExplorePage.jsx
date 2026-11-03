@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { getAllBusinesses } from "../services/api";
 import Loader from "../components/Loader";
 import VerifiedBadge from "../components/VerifiedBadge";
+import AdSlot from "../components/AdSlot";
+import { AD_SLOTS } from "../utils/ads";
 
 const PLACEHOLDER_LOGO = "/assets/placeholder-logo.png"; // local fallback instead of via.placeholder.com
 
@@ -224,9 +226,12 @@ const ExplorePage = () => {
         ) : (
           /* Business Grid */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredBusinesses.map((business) => (
+            {filteredBusinesses.map((business, index) => (
+              <React.Fragment key={business._id}>
+              {index > 0 && index % 8 === 0 && (
+                <AdSlot slot={AD_SLOTS.feed} className="col-span-full" />
+              )}
               <Link
-                key={business._id}
                 to={`/business/${business.slug || business._id}`}
                 state={{ internalNav: true }}
                 className="block bg-white/90 backdrop-blur-xl border border-gray-200 rounded-2xl shadow-lg overflow-hidden cursor-pointer hover:shadow-2xl transition-all hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-green-400"
@@ -323,6 +328,7 @@ const ExplorePage = () => {
                   </button>
                 </div>
               </Link>
+              </React.Fragment>
             ))}
           </div>
         )}

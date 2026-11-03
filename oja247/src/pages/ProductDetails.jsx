@@ -4,6 +4,8 @@ import { getProductById, getProductsByBusiness } from "../services/api";
 import { useCart } from "../context/CartContext";
 import Loader from "../components/Loader";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
+import AdSlot from "../components/AdSlot";
+import { AD_SLOTS } from "../utils/ads";
 
 const RECENTLY_VIEWED_KEY = "oja247_recently_viewed";
 const RECENTLY_VIEWED_LIMIT = 8;
@@ -346,6 +348,8 @@ function ProductDetails() {
                 <p className="text-gray-600 leading-relaxed whitespace-pre-line">{product.description}</p>
               </div>
             )}
+
+            <AdSlot slot={AD_SLOTS.product} />
 
             {business ? (
               <Link

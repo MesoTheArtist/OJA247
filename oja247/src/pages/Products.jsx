@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getAllProducts } from "../services/api";
 import { useCart } from "../context/CartContext";
 import Loader from "../components/Loader";
+import AdSlot from "../components/AdSlot";
+import { AD_SLOTS } from "../utils/ads";
 import useMinimumLoadingTime from "../hooks/useMinimumLoadingTime";
 import { SlidersHorizontal, X } from "lucide-react";
 
@@ -290,9 +292,13 @@ function Products() {
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {filteredProducts.map((product) => (
+          {filteredProducts.map((product, index) => (
+            <React.Fragment key={product._id}>
+            {/* In-feed ad after every 8th product, never before the first row */}
+            {index > 0 && index % 8 === 0 && (
+              <AdSlot slot={AD_SLOTS.feed} className="col-span-full" />
+            )}
             <div
-              key={product._id}
               className="group bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col"
             >
               {/* Image links through to the product detail page */}
@@ -385,6 +391,7 @@ function Products() {
                 </div>
               </div>
             </div>
+            </React.Fragment>
           ))}
 
           {filteredProducts.length === 0 && (

@@ -47,7 +47,7 @@ Only the receipt file is deleted. A record that the order happened, with its amo
 
 ## 6. Cookies and similar storage
 
-We use cookies and similar browser storage that the site needs in order to work: to keep you signed in, to remember what is in your cart, and to remember that you have seen our cookie notice. If you sign in with Google, Google may set its own cookies while you do. We do not use advertising or tracking cookies. You can clear this storage in your browser settings, but you may then be signed out and your cart will be emptied.
+We use cookies and similar browser storage that the site needs in order to work: to keep you signed in, to remember what is in your cart, and to remember that you have seen our cookie notice. If you sign in with Google, Google may set its own cookies while you do. We also show ads provided by Google AdSense, so every visitor sees ads. Google and its partners may set cookies and use identifiers on your device to show and measure ads and to limit how often you see the same one. If you choose "Accept" in our cookie notice, the ads can be personalized; if you choose "Limit personalization", or have not chosen yet, we ask Google to show non-personalized ads, which are not based on your browsing history but may still use some cookies. You can see the notice again by clearing this site's storage in your browser, and you can learn how Google uses information from sites that use its services at https://policies.google.com/technologies/partner-sites. You can clear this storage in your browser settings, but you may then be signed out and your cart will be emptied.
 
 ## 7. Keeping it safe
 

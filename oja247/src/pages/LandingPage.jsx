@@ -22,6 +22,8 @@ import {
 import { getAllBusinesses, getAllProducts } from "../services/api";
 import axiosInstance from "../services/api";
 import VerifiedBadge from "../components/VerifiedBadge";
+import AdSlot from "../components/AdSlot";
+import { AD_SLOTS } from "../utils/ads";
 
 // Reusable "premium" card wrapper — mouse-tracking 3D tilt with a shine
 // that follows the cursor, plus a blur-to-focus staggered entrance. Its
@@ -962,6 +964,11 @@ const LandingPage = () => {
           </div>
         </section>
       )}
+
+      {/* Ad: between Trending Products and Pricing */}
+      <div className="relative z-10 mx-auto max-w-5xl px-6">
+        <AdSlot slot={AD_SLOTS.home} />
+      </div>
 
       {/* Pricing / List Your Business */}
       <section className="relative z-10 py-20 px-6">
