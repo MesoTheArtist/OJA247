@@ -1,6 +1,6 @@
 ## Get in touch
 
-We read every message and reply by email. Pick the option that fits best so the right person sees it first.
+We aim to reply within a couple of hours. Pick the option that fits best so the right person sees it first.
 
 ## Questions and support
 
@@ -9,6 +9,10 @@ For help with an order, your account, payments or anything else on OJA247, email
 ## General enquiries
 
 For partnerships, press and everything else, email [hello@oja247.store](mailto:hello@oja247.store).
+
+## Phone and location
+
+Call us on [+234 706 795 3802](tel:+2347067953802). We are based in Lagos, Nigeria.
 
 ## Something went wrong
 
