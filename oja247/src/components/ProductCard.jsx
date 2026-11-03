@@ -2,7 +2,7 @@ function ProductCard({ product }) {
   return (
     <div className="border rounded-lg shadow hover:shadow-lg transition p-3">
       <img
-        src={product.image || "https://via.placeholder.com/200"}
+        src={product.image || "/placeholder.svg"}
         alt={product.name}
         className="w-full h-40 object-cover rounded"
       />

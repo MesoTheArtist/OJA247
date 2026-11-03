@@ -6,6 +6,7 @@ import privacyText from "../content/legal/privacy.md?raw";
 import deliveryText from "../content/legal/delivery.md?raw";
 import prohibitedText from "../content/legal/prohibited-items.md?raw";
 import helpText from "../content/legal/help.md?raw";
+import contactText from "../content/legal/contact.md?raw";
 
 // The wording lives in src/content/legal/*.md. Edit those files (or paste in
 // revised text from a lawyer) and update the date here when you do.
@@ -43,4 +44,8 @@ export const DeliveryPage = () => (
 
 export const HelpPage = () => (
   <LegalLayout title="Help Center" content={helpText} />
+);
+
+export const ContactPage = () => (
+  <LegalLayout title="Contact Us" subtitle="We are here to help." content={contactText} />
 );

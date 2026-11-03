@@ -6,7 +6,7 @@ function BusinessCard({ business }) {
     <Link to={`/business/${business.slug || business._id}`} state={{ internalNav: true }}>
       <div className="border rounded-lg p-4 shadow hover:shadow-lg transition cursor-pointer">
         <img
-          src={business.logo || "https://via.placeholder.com/150"}
+          src={business.logo || "/placeholder.svg"}
           alt={business.name}
           className="w-full h-40 object-cover rounded"
         />

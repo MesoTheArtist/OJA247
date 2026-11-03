@@ -26,7 +26,7 @@ const companyLinks = [
   { label: "About OJA247", path: "/about" },
   { label: "Our Story", path: "/about" },
   { label: "Careers", path: "/about" },
-  { label: "Contact", path: "mailto:support@oja247.store" },
+  { label: "Contact", path: "/contact" },
 ];
 
 const supportLinks = [

@@ -30,7 +30,7 @@ import JoinPage from "./pages/JoinPage";
 import ConfirmReceiptPage from "./pages/ConfirmReceiptPage";
 import UnsubscribePage from "./pages/UnsubscribePage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
-import { TermsPage, VendorTermsPage, PrivacyPage, DeliveryPage, HelpPage, ProhibitedItemsPage } from "./pages/PolicyPages";
+import { TermsPage, VendorTermsPage, PrivacyPage, DeliveryPage, HelpPage, ProhibitedItemsPage, ContactPage } from "./pages/PolicyPages";
 
 function App() {
   return (
@@ -50,6 +50,7 @@ function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/delivery-information" element={<DeliveryPage />} />
           <Route path="/help" element={<HelpPage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/business/:id" element={<BusinessDetails />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<Checkout />} />

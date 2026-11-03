@@ -862,7 +862,7 @@ const LandingPage = () => {
                       <motion.img
                         whileHover={{ rotate: 360, scale: 1.1 }}
                         transition={{ duration: 0.6 }}
-                        src={business.logo || "https://via.placeholder.com/80"}
+                        src={business.logo || "/placeholder.svg"}
                         alt={business.name}
                         className="w-20 h-20 rounded-full border-4 border-white shadow-lg mb-3 object-cover"
                       />

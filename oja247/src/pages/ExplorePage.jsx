@@ -6,7 +6,7 @@ import VerifiedBadge from "../components/VerifiedBadge";
 import AdSlot from "../components/AdSlot";
 import { AD_SLOTS } from "../utils/ads";
 
-const PLACEHOLDER_LOGO = "/assets/placeholder-logo.png"; // local fallback instead of via.placeholder.com
+const PLACEHOLDER_LOGO = "/placeholder.svg"; // local fallback (public/placeholder.svg)
 
 const ExplorePage = () => {
   const navigate = useNavigate();

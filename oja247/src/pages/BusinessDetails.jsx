@@ -287,7 +287,7 @@ function BusinessDetails() {
         {/* Avatar — sits above both the banner and the white card, overlapping the boundary */}
         <div className="absolute z-20 -top-12 sm:-top-16 left-1/2 sm:left-8 -translate-x-1/2 sm:translate-x-0">
           <img
-            src={business.logo || "https://via.placeholder.com/120"}
+            src={business.logo || "/placeholder.svg"}
             alt={business.name}
             className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white shadow-xl object-cover bg-white"
           />

@@ -47,7 +47,7 @@ function CartPage() {
                 className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex gap-4"
               >
                 <img
-                  src={item.images?.[0] || item.image || "https://via.placeholder.com/200"}
+                  src={item.images?.[0] || item.image || "/placeholder.svg"}
                   alt={item.name}
                   className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 object-cover rounded-xl"
                 />
