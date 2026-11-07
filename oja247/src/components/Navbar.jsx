@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import Logo from "../assets/OJA247 VX1.png";
 
 // Removed "Home" from the array
-const Items = ["Vendors", "Products", "About"];
+const Items = ["Vendors", "Products", "Custom Websites", "About"];
 
 // Pages built around a form: the bar stays out of the way while typing and
 // needs a longer, deliberate scroll up before it comes back.
@@ -38,6 +38,8 @@ const routeFor = (item) => {
       return "/explore";
     case "Products":
       return "/products";
+    case "Custom Websites":
+      return "/websites";
     case "About":
       return "/about";
     default:

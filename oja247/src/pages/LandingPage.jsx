@@ -18,6 +18,8 @@ import {
   Zap,
   Crown,
   Sparkles,
+  Globe,
+  MessageCircle,
 } from "lucide-react";
 import { getAllBusinesses, getAllProducts } from "../services/api";
 import axiosInstance from "../services/api";
@@ -675,6 +677,72 @@ const LandingPage = () => {
               );
             })}
           </div>
+        </div>
+      </section>
+
+      {/* Get your own website — the pitch for service providers and larger
+          brands who need their own site, not a storefront. Sits right after
+          the vendor story so visitors know what OJA247 is first. Links to
+          the full /websites page; the WhatsApp button opens a chat with
+          the message already typed. */}
+      <section className="relative z-10 py-16 px-6">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="relative overflow-hidden rounded-3xl border border-gray-800/40 bg-gradient-to-br from-gray-900 to-gray-800 shadow-xl p-8 sm:p-12"
+          >
+            <div className="absolute -top-10 -right-10 w-48 h-48 bg-green-500/20 rounded-full blur-2xl" />
+            <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-yellow-400/10 rounded-full blur-2xl" />
+
+            <div className="relative grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+              <div className="md:col-span-2">
+                <span className="inline-flex items-center gap-2 bg-white/10 text-white text-xs font-bold px-3 py-1 rounded-full mb-4">
+                  <Globe size={14} /> Custom websites
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-white mb-3">
+                  Get your own website
+                </h2>
+                <p className="text-gray-300 leading-relaxed mb-6">
+                  Not selling products, or ready for a site that is all yours? We
+                  design it, set it up and look after it, so you can focus on your
+                  business.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => navigate("/websites")}
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-green-500 text-white rounded-xl font-bold shadow-lg hover:bg-green-600 transition"
+                  >
+                    See packages <ArrowRight size={18} />
+                  </button>
+                  <a
+                    href={`https://wa.me/2347067953802?text=${encodeURIComponent(
+                      "Hi OJA247, I'd like to get a website for my business."
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-white/30 text-white rounded-xl font-bold hover:bg-white/10 transition"
+                  >
+                    <MessageCircle size={18} /> Chat on WhatsApp
+                  </a>
+                </div>
+              </div>
+
+              <ul className="space-y-3 text-white/90">
+                {[
+                  "Service providers and professionals",
+                  "Brands, boutiques and online stores",
+                  "Domain, hosting and care included",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <CheckCircle2 size={18} className="text-green-400 mt-0.5 shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </motion.div>
         </div>
       </section>
 

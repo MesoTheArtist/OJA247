@@ -27,6 +27,7 @@ import CustomerAuthPage from "./pages/CustomerAuthPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
 import ReportProblemPage from "./pages/ReportProblemPage";
 import JoinPage from "./pages/JoinPage";
+import CustomWebsitesPage from "./pages/CustomWebsitesPage";
 import ConfirmReceiptPage from "./pages/ConfirmReceiptPage";
 import UnsubscribePage from "./pages/UnsubscribePage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
@@ -44,6 +45,7 @@ function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/about" element={<About />} />
+          <Route path="/websites" element={<CustomWebsitesPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/vendor-terms" element={<VendorTermsPage />} />
           <Route path="/prohibited-items" element={<ProhibitedItemsPage />} />

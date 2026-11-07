@@ -18,6 +18,7 @@ const marketplaceLinks = [
 
 const growLinks = [
   { label: "Become a Seller", path: "/business-form" },
+  { label: "Custom Websites", path: "/websites" },
   { label: "Become a Marketer", path: "/register-marketer" },
   { label: "Marketer Login", path: "/marketer-login" },
 ];
