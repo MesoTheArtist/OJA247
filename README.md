@@ -1,11 +1,15 @@
-# 🚀 OJA247 — Nigerian Multi-Vendor Marketplace
+# 🚀 OJA247 — Grow Your Business Online
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/MesoTheArtist/OJA247?style=social)](https://github.com/MesoTheArtist/OJA247/stargazers)
 
-**OJA247** is a full-featured MERN-stack marketplace platform that lets Nigerian small businesses run their own online store, take payments, manage orders, and grow their customer base — vendors bring their own existing customers rather than competing for strangers' attention the way a Jumia-style marketplace works.
+**OJA247** helps Nigerian businesses of every size get online and grow. Start with a storefront on our marketplace, or get a website that is entirely your own, and we take care of the setup, hosting and day-to-day upkeep so owners can focus on running their business.
 
-> **"Support Local. Shop Small. Grow Together."**
+- **The marketplace** — a full-featured MERN-stack platform where small businesses run their own online store, take payments, manage orders and grow their customer base. Vendors bring their own existing customers rather than competing for strangers' attention the way a Jumia-style marketplace works.
+- **Custom websites** — for service providers, brands and businesses that have outgrown a storefront: a site on their own domain, built and looked after by OJA247.
+- **Referral partners** — marketers earn by bringing businesses on board.
+
+> **"Start small. Grow big. We handle the rest."**
 
 ---
 
@@ -46,6 +50,14 @@
 - Google **login** for vendors who already have an account (it never creates one)
 - A **Verified** badge shows next to approved Verified vendors on their store page and on vendor cards
 
+### 🌐 Custom Websites (for businesses of any size)
+- A dedicated **/websites** page with Basic, Standard and Premium packages for service providers, plus bigger online-store, fashion-brand and custom projects
+- Add-ons (extra pages, booking form, business email, search setup and more), a "how it works" strip and a free-quote section
+- Sample-site cards that show a live preview of each project and link to it
+- Every enquiry button opens WhatsApp with a message already typed
+- A "Get your own website" section on the landing page and a "Custom Websites" link in the navbar and footer
+- The growth path: a business starts on an OJA247 storefront and, when it outgrows it, graduates to its own site that OJA247 builds and maintains
+
 ### 🤝 For Marketers (Referral Partners)
 - Separate marketer accounts with their own login and dashboard. Marketers sign up with a password; Google can be used to log in to an existing account, not to create one
 - Custom short referral code, used to attribute vendor signups/subscriptions
@@ -77,7 +89,7 @@
 ## 🛠️ Tech Stack
 
 ### Frontend
-- **React 18**, **React Router**, **Axios**, **Tailwind CSS**, **Framer Motion**
+- **React 19**, **Vite**, **React Router 7**, **Axios**, **Tailwind CSS 4**, **Framer Motion**
 
 ### Backend
 - **Node.js** / **Express.js**, **MongoDB** / **Mongoose**, **JWT**, **bcryptjs**
@@ -134,7 +146,7 @@ OJA247/
     │   │                   OrderHistory, ConfirmReceipt, ReportProblem,
     │   │                   customer/vendor/marketer login + register +
     │   │                   password pages, MarketerDashboard,
-    │   │                   AdminDashboard, policy pages, About
+    │   │                   AdminDashboard, policy pages, About, CustomWebsites
     │   ├── components/      Navbar, Footer, VerifiedBadge, SubscriptionTab,
     │   │                   WaitingOrdersTab, Dispute/Review forms and tabs,
     │   │                   Admin tabs (customers, campaigns), ImageUpload,
@@ -270,7 +282,7 @@ There is no frontend test suite yet. For manual checks, go through each flow (cu
 ## 🌍 Deployment
 
 Currently deployed as two separate **Vercel** projects:
-- **Backend** — Node server (`backend/`), `vercel.json` also defines the four cron schedules
+- **Backend** — Node server (`backend/`), `vercel.json` also defines the seven cron schedules
 - **Frontend** — Vite build (`oja247/`)
 
 **Database:** MongoDB Atlas (required for transactions). Set `MONGO_URI` on the backend project and redeploy after any change.
@@ -291,15 +303,17 @@ Before deploying to production, double-check:
 - Guest-order-to-account linking requires a **verified** email, closing off a path where someone could register another person's email and read their order history
 - Cron endpoints fail closed (reject) if `CRON_SECRET` is unset, rather than silently becoming public
 - A vendor cannot place an order on their own store using their own email or phone (look-alike spellings of the same address are caught). This is a speed bump rather than a guarantee — someone using entirely unrelated details is not detectable
-- Found a vulnerability? Please email support@oja247.com instead of opening a public issue
+- Found a vulnerability? Please email support@oja247.store instead of opening a public issue
 
 ---
 
 ## 🗺️ Roadmap
 
-Shipped since the last time this file was accurate: bank-transfer checkout with receipts and delivery confirmation, subscription payments with auto-renewal, customer accounts + email verification, reviews, follow + new-product emails, disputes (customer, guest, and vendor-facing), subscriptions + visibility enforcement, the marketer/referral system with points, the full admin dashboard, email announcements, WhatsApp order alerts, admin two-factor, the Verified badge, and a security hardening pass with automated tests.
+Shipped since the last time this file was accurate: bank-transfer checkout with receipts and delivery confirmation, subscription payments with auto-renewal, customer accounts + email verification, reviews, follow + new-product emails, disputes (customer, guest, and vendor-facing), subscriptions + visibility enforcement, the marketer/referral system with points, the full admin dashboard, email announcements, WhatsApp order alerts, admin two-factor, the Verified badge, a security hardening pass with automated tests, and the Custom Websites page for businesses that want a site of their own.
 
 Still open / under consideration:
+- [ ] Website clients tab in the admin dashboard (client, site, tier, domain, renewal date, status) with renewal reminder emails
+- [ ] Marketer commission records for custom-website referrals
 - [ ] Payout dashboard with a plain-language earnings breakdown
 - [ ] Vendor performance dashboard (views, conversion, top products) — note: a marketer-performance leaderboard already exists (admin-only, ranks referral activity), this would be a separate, vendor-facing one
 - [ ] Non-discouraging public vendor leaderboard (top 10/20 visible, everyone else sees private rank + trend) with milestone badges
@@ -339,7 +353,7 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 - 🐛 **Found a bug?** [Open an issue](https://github.com/MesoTheArtist/OJA247/issues)
 - 💡 **Feature request?** [Start a discussion](https://github.com/MesoTheArtist/OJA247/discussions)
-- 📧 **Email:** support@oja247.com
+- 📧 **Email:** support@oja247.store
 
 ---
 

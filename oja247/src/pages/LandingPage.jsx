@@ -426,7 +426,7 @@ const LandingPage = () => {
             transition={{ delay: 0.8, duration: 0.8 }}
             className="text-base sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed font-light px-4"
           >
-            Support local. Shop small. Grow together.
+            Start small. Grow big. We handle the rest.
             <br />
             <span className="text-orange-600 font-semibold">
               Discover {stats.businesses}+ amazing vendors and businesses —

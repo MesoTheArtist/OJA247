@@ -1,5 +1,6 @@
 {
   "name": "oja247",
+  "description": "OJA247 frontend: marketplace, custom websites and dashboards for Nigerian businesses",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -33,4 +34,4 @@
     "globals": "^16.5.0",
     "vite": "^7.2.4"
   }
-}
+} 

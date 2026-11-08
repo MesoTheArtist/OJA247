@@ -1,7 +1,7 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "OJA247 backend API: marketplace storefronts, orders, subscriptions, payouts and referrals",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

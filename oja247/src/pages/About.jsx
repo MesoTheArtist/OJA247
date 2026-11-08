@@ -206,9 +206,10 @@ const About = () => {
           transition={{ delay: 1.4 }}
           className="max-w-2xl mx-auto mt-6 text-lg text-gray-600 leading-8"
         >
-          OJA247 is a Nigerian marketplace platform built to help small
-          businesses create online storefronts, manage orders, accept
-          payments, and grow digitally.
+          OJA247 helps Nigerian businesses of every size get online and grow.
+          Start with a storefront on our marketplace, or get a website that
+          is entirely your own, and we take care of the setup, hosting and
+          upkeep so you can focus on your business.
         </motion.p>
 
         <motion.div
@@ -217,8 +218,8 @@ const About = () => {
           transition={{ delay: 1.6 }}
           className="mt-6 inline-flex items-center gap-2 bg-gray-900 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-lg"
         >
-          Built for Sellers.{" "}
-          <span className="text-[#F59E0B]">Made for Buyers.</span>
+          Start small. Grow big.{" "}
+          <span className="text-[#F59E0B]">We handle the rest.</span>
         </motion.div>
       </section>
 
@@ -240,9 +241,11 @@ const About = () => {
             presence.
           </p>
           <p className="mt-5 text-gray-700 text-lg leading-8">
-            Our goal is to make online selling simple, affordable, and
-            accessible by giving businesses professional digital tools
-            without complexity.
+            Our goal is to help businesses of every size get online, grow, and
+            have a platform of their own, from a simple storefront on OJA247 to
+            a fully custom website. We take on the setup, hosting and upkeep, so
+            owners are free from the burden of managing it all and can focus on
+            running their business.
           </p>
         </motion.div>
       </section>

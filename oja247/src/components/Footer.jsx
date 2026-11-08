@@ -162,10 +162,11 @@ const Footer = () => {
             </div>
 
             <p className="text-gray-400 leading-relaxed max-w-sm">
-              Nigeria's digital marketplace connecting customers with local
-              businesses. Discover products, support entrepreneurs, and grow
-              together with OJA247 — as a shopper, a seller, or a marketer
-              earning from every business you bring on board.
+              Helping Nigerian businesses of every size get online and grow.
+              Start with a storefront on our marketplace or get a website
+              that is all yours, while we handle the setup and upkeep. Join as
+              a shopper, a seller, or a marketer earning from every business
+              you bring on board.
             </p>
 
             <div className="mt-6 flex gap-4">
