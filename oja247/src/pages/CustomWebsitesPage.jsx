@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useRef, useState } from "react";
+import { motion, useInView } from "framer-motion";
 import {
   ArrowRight,
   CheckCircle2,
@@ -16,6 +16,8 @@ import {
   Sparkles,
   Wrench,
 } from "lucide-react";
+
+import OjaDemo from "../assets/website-demo-image/OJA247demo.png";
 
 // ---- Contact -------------------------------------------------------------
 // Every "talk to us" button opens WhatsApp with a message already typed, so
@@ -145,15 +147,37 @@ const addOns = [
 ];
 
 // ---- Sample sites ----------------------------------------------------------
-// Placeholders for now. To show a real project, fill in a card like this:
-//   { name: "Glow Beauty Studio", type: "Salon website",
-//     url: "https://glowbeauty.com", image: "/samples/glow.png" }
-// Put the screenshot in the public/samples folder. A card with a url becomes a
-// link that opens the live site; a card without one shows as "coming soon".
+// Each card shows the live site, shrunk into a thumbnail, and links to it.
+// Fields:
+//   name, type  shown under the preview
+//   url         the live site (the card opens it in a new tab)
+//   image       optional screenshot; if set it is shown instead of the live frame
+//   preview     set to "off" if a site refuses to be shown inside another page
+//               (the card then shows a clean browser-style box instead)
+// To add a project, copy one of these lines. For a screenshot, put the file in
+// public/samples and use image: "/samples/name.png".
 const sampleSites = [
-  { name: "Your project here", type: "Sample coming soon", url: null, image: null },
-  { name: "Your project here", type: "Sample coming soon", url: null, image: null },
-  { name: "Your project here", type: "Sample coming soon", url: null, image: null },
+  {
+    name: "Chef Headiez",
+    type: "Chef and catering website",
+    url: "https://chef-headiez.vercel.app/",
+  },
+  {
+    name: "ASA Learns",
+    type: "Tech training institute",
+    url: "https://asa-learns-vx-1.vercel.app/",
+  },
+  {
+    name: "Montero Designs",
+    type: "Designer portfolio",
+    url: "https://my-portfolio-vert-nine-33.vercel.app/",
+  },
+  {
+    name: "OJA247",
+    type: "Online marketplace, our own platform",
+    url: "https://www.oja247.store",
+    image: OjaDemo,
+  },
 ];
 
 // ---- Small pieces --------------------------------------------------------
@@ -182,21 +206,102 @@ const WhatsAppButton = ({ message, children, className = "" }) => (
   </a>
 );
 
+// The browser-style box used when there is nothing to preview.
+const hostOf = (url) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+};
+
+const PREVIEW_WIDTH = 1280;
+const PREVIEW_HEIGHT = 800;
+
+const BrowserBox = ({ site }) => (
+  <div className="absolute inset-0 flex flex-col bg-white">
+    <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 border-b border-gray-200">
+      <span className="w-2.5 h-2.5 rounded-full bg-red-300" />
+      <span className="w-2.5 h-2.5 rounded-full bg-yellow-300" />
+      <span className="w-2.5 h-2.5 rounded-full bg-green-300" />
+      <span className="ml-2 text-xs text-gray-500 truncate">
+        {site.url ? hostOf(site.url) : "your-website.com"}
+      </span>
+    </div>
+    <div className="flex-1 flex flex-col items-center justify-center gap-2 text-gray-400">
+      <Globe size={36} />
+      <span className="text-sm font-semibold text-gray-500">{site.name}</span>
+    </div>
+  </div>
+);
+
+// Shows the live site scaled down to fit the card. The frame is only loaded
+// once the card is near the screen, and it ignores taps, so tapping the card
+// opens the real site instead of scrolling or clicking inside the preview.
+const SitePreview = ({ site }) => {
+  const boxRef = useRef(null);
+  const inView = useInView(boxRef, { once: true, margin: "200px" });
+  const [scale, setScale] = useState(0.3);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return undefined;
+    const update = () => setScale(el.clientWidth / PREVIEW_WIDTH);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const showFrame = site.url && site.preview !== "off" && !site.image;
+
+  return (
+    <div
+      ref={boxRef}
+      className="relative aspect-[16/10] w-full overflow-hidden bg-gray-100"
+    >
+      {site.image ? (
+        <img
+          src={site.image}
+          alt={`${site.name} website preview`}
+          loading="lazy"
+          className="w-full h-full object-cover object-top"
+        />
+      ) : showFrame ? (
+        <>
+          {!loaded && <div className="absolute inset-0 animate-pulse bg-gray-200" />}
+          {inView && (
+            <iframe
+              src={site.url}
+              title={`${site.name} preview`}
+              loading="lazy"
+              tabIndex={-1}
+              aria-hidden="true"
+              sandbox="allow-scripts allow-same-origin"
+              onLoad={() => setLoaded(true)}
+              style={{
+                width: PREVIEW_WIDTH,
+                height: PREVIEW_HEIGHT,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+                pointerEvents: "none",
+                border: 0,
+              }}
+            />
+          )}
+        </>
+      ) : (
+        <BrowserBox site={site} />
+      )}
+    </div>
+  );
+};
+
 const SampleCard = ({ site, index }) => {
   const inner = (
     <>
-      <div className="aspect-[16/10] w-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center overflow-hidden">
-        {site.image ? (
-          <img
-            src={site.image}
-            alt={`${site.name} website preview`}
-            loading="lazy"
-            className="w-full h-full object-cover object-top"
-          />
-        ) : (
-          <Globe size={40} className="text-gray-300" />
-        )}
-      </div>
+      <SitePreview site={site} />
       <div className="p-5 flex items-center justify-between gap-3">
         <div>
           <h3 className="font-bold text-gray-900">{site.name}</h3>
@@ -499,7 +604,7 @@ const CustomWebsitesPage = () => {
             title="Sites we've built"
             subtitle="A look at our work. Tap a site to open it."
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {sampleSites.map((site, i) => (
               <SampleCard key={`${site.name}-${i}`} site={site} index={i} />
             ))}
