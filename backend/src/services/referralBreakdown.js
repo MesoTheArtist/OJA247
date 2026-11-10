@@ -20,6 +20,14 @@ function baseReferral(attribution) {
     id: attribution._id,
     businessName: attribution.referredBusinessId?.name || "(business deleted)",
     status: attribution.status, // "pending" | "converted"
+    // Free-trial state of the referred business (only meaningful while pending).
+    onTrial: Boolean(
+      attribution.status !== "converted" &&
+        attribution.referredBusinessId?.trialEndsAt &&
+        !attribution.referredBusinessId?.hasPaidFirstSubscription &&
+        new Date(attribution.referredBusinessId.trialEndsAt).getTime() > Date.now()
+    ),
+    trialEndsAt: attribution.referredBusinessId?.trialEndsAt || null,
     referredAt: attribution.createdAt,
     convertedAt: attribution.convertedAt,
     ...conversionOf(attribution),

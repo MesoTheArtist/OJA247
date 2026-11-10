@@ -466,6 +466,7 @@ const BusinessDashboard = () => {
         subExpiringSoon={subExpiringSoon}
         neverSubscribed={neverSubscribed}
         daysUntilSubExpiry={daysUntilSubExpiry}
+        onTrial={Boolean(business.trialEndsAt && !business.hasPaidFirstSubscription)}
         onGoToVerification={() => setActiveTab("payouts")}
         onGoToSubscription={() => setActiveTab("subscription")}
       />

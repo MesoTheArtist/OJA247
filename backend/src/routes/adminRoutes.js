@@ -14,6 +14,7 @@ import {
   getPlatformSettings,
   setSubscriptionVisibilityEnforcement,
   setAdsEnabled,
+  setReferralTrialDays,
   getAllBusinessesAdmin,
   setBusinessVisibilityExempt,
   setBusinessGrandfatherExemption,
@@ -118,6 +119,7 @@ router.get("/payouts", getPayouts);
 router.get("/settings", getPlatformSettings);
 router.patch("/settings/subscription-visibility", setSubscriptionVisibilityEnforcement);
 router.patch("/settings/ads", setAdsEnabled);
+router.patch("/settings/referral-trial", setReferralTrialDays);
 
 // Unfiltered business list for admin management (see getAllBusinessesAdmin)
 router.get("/businesses", getAllBusinessesAdmin);

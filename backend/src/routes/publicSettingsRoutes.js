@@ -11,7 +11,10 @@ router.get("/public", async (req, res) => {
   try {
     const settings = await PlatformSettings.getSettings();
     res.set("Cache-Control", "public, max-age=60");
-    res.json({ adsEnabled: settings.adsEnabled !== false });
+    res.json({
+      adsEnabled: settings.adsEnabled !== false,
+      referralTrialDays: settings.referralTrialDays ?? 7,
+    });
   } catch (error) {
     console.error("Request failed:", error);
     res.status(500).json({ message: "Something went wrong. Please try again." });

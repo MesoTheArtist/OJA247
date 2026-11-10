@@ -17,6 +17,11 @@ const PlatformSettingsSchema = new mongoose.Schema(
     // can turn them off instantly without redeploying. The frontend reads it
     // from GET /api/settings/public.
     adsEnabled: { type: Boolean, default: true },
+
+    // Free days a new vendor gets when they sign up with a valid referral code
+    // (marketer code or another vendor's code). 0 turns the free trial off.
+    // Admin-editable so it can be run as a promo (e.g. 14 days in December).
+    referralTrialDays: { type: Number, default: 7, min: 0, max: 60 },
   },
   { timestamps: true }
 );

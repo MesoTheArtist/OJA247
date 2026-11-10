@@ -64,6 +64,13 @@ const BusinessSchema = new mongoose.Schema(
       default: "inactive",
     },
     subscriptionExpiresAt: { type: Date, default: null },
+    // Referral free trial: set ONCE at signup when the vendor joined with a valid
+    // referral code (see services/referralTrial.js). While it runs,
+    // subscriptionExpiresAt holds the same date, so store visibility, the expiry
+    // emails and "a paid period starts when the trial ends" all reuse the normal
+    // subscription rules. A business is "on trial" while
+    // trialEndsAt > now and hasPaidFirstSubscription is still false.
+    trialEndsAt: { type: Date, default: null },
     hasPaidFirstSubscription: { type: Boolean, default: false }, // gates the marketer payout rule
     subscriptionAutoRenew: { type: Boolean, default: false },
     subscriptionAutoRenewPlanType: {

@@ -14,6 +14,7 @@ function AccountAlertsPopup({
   subExpiringSoon,
   neverSubscribed,
   daysUntilSubExpiry,
+  onTrial = false,
   onGoToVerification,
   onGoToSubscription,
 }) {
@@ -78,14 +79,22 @@ function AccountAlertsPopup({
               {neverSubscribed
                 ? "Your store isn't visible to customers yet"
                 : subExpired
-                ? "Your subscription has expired"
+                ? onTrial
+                  ? "Your free trial has ended"
+                  : "Your subscription has expired"
+                : onTrial
+                ? "Your free trial is ending soon"
                 : "Your subscription is expiring soon"}
             </h3>
             <p className="text-sm text-gray-600 mb-6">
               {neverSubscribed
                 ? "Subscribing is what puts your store in customer search and on the Explore page. Right now it's set up but hidden — subscribe to go live."
                 : subExpired
-                ? "Your store is currently hidden from customer search because your subscription period has ended. Renew now to bring it back — it goes live again immediately after payment."
+                ? onTrial
+                  ? "Your free trial is over, so your store is hidden from customer search. Subscribe to bring it back — it goes live again immediately after payment."
+                  : "Your store is currently hidden from customer search because your subscription period has ended. Renew now to bring it back — it goes live again immediately after payment."
+                : onTrial
+                ? `Your free trial ends in ${daysUntilSubExpiry} day${daysUntilSubExpiry === 1 ? "" : "s"}. Subscribe before then so your store stays visible. Your paid time starts when the trial ends, so you won't lose any free days.`
                 : `Your subscription expires in ${daysUntilSubExpiry} day${daysUntilSubExpiry === 1 ? "" : "s"}. Renew before then so your store stays visible to customers without interruption.`}
             </p>
             <div className="flex gap-3">
@@ -97,7 +106,7 @@ function AccountAlertsPopup({
                 }}
                 className="flex-1 bg-green-600 text-white font-semibold py-2.5 rounded-xl hover:bg-green-700 transition"
               >
-                {neverSubscribed ? "Subscribe now" : subExpired ? "Renew now" : "Renew subscription"}
+                {neverSubscribed || (onTrial && subExpired) ? "Subscribe now" : subExpired ? "Renew now" : onTrial ? "Choose a plan" : "Renew subscription"}
               </button>
               <button
                 type="button"

@@ -28,7 +28,7 @@ export const getPointsDashboard = async (req, res) => {
       referrerType: "business",
       referrerId: businessId,
     })
-      .populate("referredBusinessId", "name createdAt")
+      .populate("referredBusinessId", "name createdAt trialEndsAt hasPaidFirstSubscription")
       .sort({ createdAt: -1 });
 
     // Every points entry earned from a referral (not just the latest 50), so

@@ -64,16 +64,20 @@ function ReferralActivityList({ referrals, title = "Your Referrals", emptyCta })
                   className={`text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 ${
                     r.status === "converted"
                       ? "bg-green-100 text-green-700"
+                      : r.onTrial
+                      ? "bg-blue-100 text-blue-700"
                       : "bg-yellow-100 text-yellow-700"
                   }`}
                 >
-                  {r.status === "converted" ? "Converted" : "Pending"}
+                  {r.status === "converted" ? "Converted" : r.onTrial ? "Free trial" : "Pending"}
                 </span>
               </div>
 
               <p className="text-sm text-gray-600 mt-2">
                 {r.status === "converted" && r.planType ? `${planLabel(r.planType)}. ` : ""}
-                {earningSummary(r)}
+                {r.onTrial
+                  ? `On a free trial until ${formatDate(r.trialEndsAt)}. You're paid once they subscribe.`
+                  : earningSummary(r)}
               </p>
 
               <details className="mt-2 group">

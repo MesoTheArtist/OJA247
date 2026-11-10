@@ -60,13 +60,19 @@ export const getGrowthAnalytics = async (req, res) => {
 export const getSubscriptionBreakdown = async (req, res) => {
   try {
     const now = new Date();
-    const [active, expired, neverSubscribed] = await Promise.all([
+    const [visibleNow, expired, neverSubscribed, onTrial] = await Promise.all([
       Business.countDocuments({ subscriptionExpiresAt: { $gt: now } }),
       Business.countDocuments({ subscriptionExpiresAt: { $lte: now, $ne: null } }),
       Business.countDocuments({ subscriptionExpiresAt: null }),
+      // Still on the referral free trial and haven't paid yet.
+      Business.countDocuments({
+        trialEndsAt: { $gt: now },
+        hasPaidFirstSubscription: { $ne: true },
+      }),
     ]);
 
-    res.json({ active, expired, neverSubscribed });
+    // "active" stays the paid subscribers; trial vendors are counted separately.
+    res.json({ active: Math.max(visibleNow - onTrial, 0), onTrial, expired, neverSubscribed });
   } catch (error) {
     console.error("Get subscription breakdown error:", error);
     res.status(500).json({ message: "Something went wrong. Please try again." });

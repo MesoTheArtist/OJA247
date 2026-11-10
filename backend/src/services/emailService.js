@@ -228,7 +228,7 @@ export async function sendCustomerVerificationEmail({ to, name, verifyUrl }) {
 
 // --- Vendor / business -----------------------------------------------------
 
-export async function sendVendorWelcomeEmail({ to, businessName }) {
+export async function sendVendorWelcomeEmail({ to, businessName, trialEndsAt = null }) {
   return sendEmail({
     to,
     subject: `Welcome to OJA247, ${businessName}!`,
@@ -236,6 +236,13 @@ export async function sendVendorWelcomeEmail({ to, businessName }) {
       `
       <h1 style="margin:0 0 4px; font-size:20px; color:#111827;">Welcome to OJA247, ${esc(businessName)} 🎉</h1>
       <p style="color:#4b5563; font-size:14px; line-height:1.6;">Your store is live on OJA247 — Nigeria's marketplace built for local businesses to sell to the customers they already have.</p>
+      ${
+        trialEndsAt
+          ? `<div style="background:#f0fdf4; border:1px dashed #16a34a; border-radius:10px; padding:14px 16px; margin:16px 0;">
+        <p style="margin:0; font-size:14px; color:#166534; line-height:1.6;">🎁 <strong>Your free trial has started.</strong> Your store is visible to customers until <strong>${formatDate(trialEndsAt)}</strong>, with no payment needed. Subscribe before then to stay visible without a break. Your paid time starts the day your trial ends, so you don't lose any free days.</p>
+      </div>`
+          : ""
+      }
       <p style="color:#4b5563; font-size:14px; line-height:1.6; margin-bottom:4px;">Here's what to do next:</p>
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%; margin: 12px 0 4px;">
         <tr>
@@ -568,6 +575,41 @@ export async function sendSubscriptionExpiringEmail({ to, businessName, daysLeft
       ${button("Renew my subscription", `${SITE_URL}/dashboard`)}
       `,
       { preheader: `${daysLeft} day${daysLeft === 1 ? "" : "s"} left on your subscription` }
+    ),
+  });
+}
+
+// Referral free trial: ending soon (sent once, a couple of days before it ends).
+export async function sendTrialEndingEmail({ to, businessName, daysLeft, endsAt }) {
+  const days = `${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
+  return sendEmail({
+    to,
+    subject: `Your free trial ends in ${days}`,
+    html: layout(
+      `
+      ${h1("Your free trial is almost over ⏳")}
+      ${p(`Hi ${esc(businessName)}, your free trial on OJA247 ends on <strong>${formatDate(endsAt)}</strong>, which is ${days} away.`)}
+      ${p("Subscribe before then and your store stays visible to customers without a break. Your paid time starts when the trial ends, so you won't lose any free days by subscribing early.")}
+      ${button("Choose a plan", `${SITE_URL}/dashboard`)}
+      `,
+      { preheader: `${days} left on your free trial` }
+    ),
+  });
+}
+
+// Referral free trial: it ended and no plan was bought (sent once).
+export async function sendTrialEndedEmail({ to, businessName }) {
+  return sendEmail({
+    to,
+    subject: "Your free trial has ended",
+    html: layout(
+      `
+      ${h1("Your free trial has ended")}
+      ${p(`Hi ${esc(businessName)}, your free trial on OJA247 is over, so your store is no longer showing to customers. Your products and account are safe, and nothing has been deleted.`)}
+      ${p("Subscribe any time and your store goes live again right after payment.")}
+      ${button("Subscribe now", `${SITE_URL}/dashboard`)}
+      `,
+      { preheader: "Subscribe to put your store back in front of customers" }
     ),
   });
 }

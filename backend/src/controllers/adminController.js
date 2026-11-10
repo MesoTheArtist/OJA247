@@ -339,6 +339,7 @@ export const reviewVendor = async (req, res) => {
 const settingsPayload = (settings) => ({
   enforceSubscriptionVisibility: settings.enforceSubscriptionVisibility,
   adsEnabled: settings.adsEnabled !== false,
+  referralTrialDays: settings.referralTrialDays ?? 7,
 });
 
 // GET /api/admin/settings
@@ -366,6 +367,27 @@ export const setSubscriptionVisibilityEnforcement = async (req, res) => {
 
     const settings = await PlatformSettings.getSettings();
     settings.enforceSubscriptionVisibility = enabled;
+    await settings.save();
+
+    res.json(settingsPayload(settings));
+  } catch (error) {
+    console.error("Request failed:", error);
+    res.status(500).json({ message: "Something went wrong. Please try again." });
+  }
+};
+
+// PATCH /api/admin/settings/referral-trial
+// How many free days a vendor gets for signing up with a valid referral code.
+// 0 switches the free trial off. Only affects signups from now on.
+export const setReferralTrialDays = async (req, res) => {
+  try {
+    const days = Number(req.body.days);
+    if (!Number.isInteger(days) || days < 0 || days > 60) {
+      return res.status(400).json({ message: "Free trial days must be a whole number from 0 to 60." });
+    }
+
+    const settings = await PlatformSettings.getSettings();
+    settings.referralTrialDays = days;
     await settings.save();
 
     res.json(settingsPayload(settings));
@@ -557,7 +579,7 @@ export const getMarketerDetailAdmin = async (req, res) => {
       referrerType: "marketer",
       referrerId: id,
     })
-      .populate("referredBusinessId", "name createdAt")
+      .populate("referredBusinessId", "name createdAt trialEndsAt hasPaidFirstSubscription")
       .sort({ createdAt: -1 });
 
     const payouts = await MarketerPayout.find({ marketerId: id }).sort({ createdAt: -1 });

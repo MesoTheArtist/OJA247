@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Eye, EyeOff, Check } from "lucide-react";
 import Logo from "../assets/OJA247 VX1.png";
+import { getPublicSettings } from "../services/api";
 import { useDialog } from "../components/DialogProvider";
 
 // Registration is three short steps instead of one 16-field page. All the
@@ -28,6 +29,20 @@ const BusinessForm = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [step, setStep] = useState(1);
+  // Free days a valid referral code earns (set by the admin; 0 hides the hint).
+  const [trialDays, setTrialDays] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPublicSettings()
+      .then((res) => {
+        if (!cancelled) setTrialDays(Number(res.data?.referralTrialDays) || 0);
+      })
+      .catch(() => {}); // the hint is optional; signup works without it
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // Must be ticked on the last step before a store can be registered.
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const cardRef = useRef(null);
@@ -380,6 +395,12 @@ const BusinessForm = () => {
                   <p className="text-xs text-gray-500 mt-1">
                     Were you referred by a marketer or another business? Enter their code here.
                   </p>
+                  {trialDays > 0 && (
+                    <p className="text-xs font-semibold text-green-700 mt-1">
+                      🎁 Sign up with a valid referral code and get {trialDays} day{trialDays === 1 ? "" : "s"} free, no
+                      payment needed.
+                    </p>
+                  )}
                 </div>
               </div>
             )}

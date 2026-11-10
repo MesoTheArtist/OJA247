@@ -19,7 +19,7 @@ export const getMarketerDashboard = async (req, res) => {
       referrerType: "marketer",
       referrerId: marketerId,
     })
-      .populate("referredBusinessId", "name createdAt")
+      .populate("referredBusinessId", "name createdAt trialEndsAt hasPaidFirstSubscription")
       .sort({ createdAt: -1 });
 
     const payouts = await MarketerPayout.find({ marketerId });

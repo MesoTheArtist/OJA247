@@ -4,12 +4,25 @@ import PlatformSettings from "../models/PlatformSettings.js";
 import {
   sendSubscriptionExpiringEmail,
   sendSubscriptionExpiredEmail,
+  sendTrialEndingEmail,
+  sendTrialEndedEmail,
   sendNeverSubscribedReminderEmail,
   sendSubscriptionRenewalNoticeEmail,
   sendExemptionEndingEmail,
 } from "../services/emailService.js";
 
 const REMINDER_WINDOW_DAYS = 4; // matches the in-dashboard popup's warning window
+// A free trial is short, so its "ending soon" email goes out closer to the end.
+const TRIAL_REMINDER_WINDOW_DAYS = 2;
+
+// Still on the referral free trial: the expiry date is the trial's end date, so
+// no payment has moved it. Once a vendor pays, the date moves past the trial.
+const isTrialPeriod = (business) =>
+  Boolean(
+    business.trialEndsAt &&
+      business.subscriptionExpiresAt &&
+      business.subscriptionExpiresAt.getTime() === business.trialEndsAt.getTime()
+  );
 // Re-nag cadence for pass 3 below — this cron runs daily, but emailing a
 // never-subscribed vendor every single day would be spammy for something
 // that isn't urgent/time-boxed the way an expiring subscription is. Matches
@@ -92,12 +105,30 @@ export const runSubscriptionExpiryCheck = async (req, res) => {
       subscriptionExpiresAt: { $gte: now, $lte: reminderCutoff },
       subscriptionReminderSentAt: null,
       ...notExempt,
-    }).select("name subscriptionExpiresAt subscriptionAutoRenew subscriptionCardBrand subscriptionCardLast4 subscriptionAutoRenewPlanType subscriptionAutoRenewAmount");
+    }).select("name subscriptionExpiresAt trialEndsAt subscriptionAutoRenew subscriptionCardBrand subscriptionCardLast4 subscriptionAutoRenewPlanType subscriptionAutoRenewAmount");
 
     let remindersSent = 0;
     for (const business of expiringSoon) {
       const daysLeft = Math.ceil((business.subscriptionExpiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       const to = await getOwnerEmail(business._id);
+
+      // Free trial: its own, later reminder with trial wording.
+      if (isTrialPeriod(business)) {
+        if (daysLeft > TRIAL_REMINDER_WINDOW_DAYS) continue; // too early, try again tomorrow
+        const { settled, sent } = await deliver("Trial-ending reminder", business._id, to, () =>
+          sendTrialEndingEmail({
+            to,
+            businessName: business.name,
+            daysLeft,
+            endsAt: business.subscriptionExpiresAt,
+          })
+        );
+        if (!settled) continue;
+        if (sent) remindersSent += 1;
+        business.subscriptionReminderSentAt = now;
+        await business.save();
+        continue;
+      }
 
       // On automatic card renewal: don't say "renew now" (they might pay twice).
       // Tell them what will be charged and when instead.
@@ -144,13 +175,20 @@ export const runSubscriptionExpiryCheck = async (req, res) => {
       subscriptionExpiredEmailSentAt: null,
       subscriptionAutoRenew: { $ne: true },
       ...notExempt,
-    }).select("name");
+    }).select("name subscriptionExpiresAt trialEndsAt");
 
     let expiredNoticesSent = 0;
     for (const business of expired) {
       const to = await getOwnerEmail(business._id);
-      const { settled, sent } = await deliver("Expired-subscription notice", business._id, to, () =>
-        sendSubscriptionExpiredEmail({ to, businessName: business.name })
+      const onTrial = isTrialPeriod(business);
+      const { settled, sent } = await deliver(
+        onTrial ? "Trial-ended notice" : "Expired-subscription notice",
+        business._id,
+        to,
+        () =>
+          onTrial
+            ? sendTrialEndedEmail({ to, businessName: business.name })
+            : sendSubscriptionExpiredEmail({ to, businessName: business.name })
       );
       if (!settled) continue;
       if (sent) expiredNoticesSent += 1;

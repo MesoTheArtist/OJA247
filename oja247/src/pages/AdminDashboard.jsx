@@ -74,6 +74,8 @@ const getBusinessStatusTag = (biz) => {
   const now = Date.now();
   const at = (date) => (date ? new Date(date).getTime() : 0);
   if (biz.isHidden) return { label: "Banned / hidden", color: "red" };
+  if (biz.trialEndsAt && !biz.hasPaidFirstSubscription && at(biz.subscriptionExpiresAt) > now)
+    return { label: "Free trial", color: "blue" };
   if (at(biz.subscriptionExpiresAt) > now) return { label: "Subscribed", color: "green" };
   if (at(biz.subscriptionGraceUntil) > now) return { label: "Renewal retrying", color: "amber" };
   if (biz.visibilityExempt) return { label: "Exempt (always visible)", color: "blue" };
@@ -160,6 +162,7 @@ function exportAnalyticsCsv(analytics) {
 
   for (const [label, value] of [
     ["Active subscriptions", analytics.subscriptions.active],
+    ["On free trial", analytics.subscriptions.onTrial ?? 0],
     ["Expired subscriptions", analytics.subscriptions.expired],
     ["Never subscribed", analytics.subscriptions.neverSubscribed],
   ]) {
@@ -221,7 +224,8 @@ const AdminDashboard = () => {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [vendors, setVendors] = useState([]);
-  const [settings, setSettings] = useState({ enforceSubscriptionVisibility: false, adsEnabled: true });
+  const [settings, setSettings] = useState({ enforceSubscriptionVisibility: false, adsEnabled: true, referralTrialDays: 7 });
+  const [trialDaysInput, setTrialDaysInput] = useState("7");
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -315,6 +319,34 @@ const AdminDashboard = () => {
         "success"
       );
       fetchAllData(); // businesses list changes shape immediately when this flips
+    } catch (error) {
+      showToast(error.response?.data?.message || "Could not update the setting.", "error");
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  // Keep the input box in step with whatever the server says is saved.
+  useEffect(() => {
+    if (settings.referralTrialDays !== undefined) setTrialDaysInput(String(settings.referralTrialDays));
+  }, [settings.referralTrialDays]);
+
+  const handleSaveTrialDays = async () => {
+    const days = Number(trialDaysInput);
+    if (trialDaysInput.trim() === "" || !Number.isInteger(days) || days < 0 || days > 60) {
+      showToast("Enter a whole number of days from 0 to 60.", "error");
+      return;
+    }
+    setSettingsSaving(true);
+    try {
+      const res = await axiosInstance.patch("/api/admin/settings/referral-trial", { days });
+      setSettings(res.data);
+      showToast(
+        days === 0
+          ? "Referral free trial turned OFF for new signups."
+          : `New vendors who sign up with a valid referral code now get ${days} day${days === 1 ? "" : "s"} free.`,
+        "success"
+      );
     } catch (error) {
       showToast(error.response?.data?.message || "Could not update the setting.", "error");
     } finally {
@@ -1054,6 +1086,43 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
+              {/* Platform Settings — referral free trial length */}
+              <div className="mb-8 relative rounded-2xl p-6 sm:p-8 border overflow-hidden bg-gray-50 border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-gray-900">Referral free trial</h3>
+                    <p className="text-sm text-gray-500 mt-1 max-w-xl">
+                      Free days a new vendor gets when they sign up with a valid referral code (a marketer's code or
+                      another vendor's). Currently{" "}
+                      <span className={settings.referralTrialDays > 0 ? "text-green-700 font-semibold" : "text-amber-600 font-semibold"}>
+                        {settings.referralTrialDays > 0
+                          ? `${settings.referralTrialDays} day${settings.referralTrialDays === 1 ? "" : "s"}`
+                          : "OFF"}
+                      </span>
+                      . Set 0 to turn it off. Changes only affect new signups.
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="60"
+                      value={trialDaysInput}
+                      onChange={(e) => setTrialDaysInput(e.target.value)}
+                      aria-label="Free trial days"
+                      className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900"
+                    />
+                    <button
+                      onClick={handleSaveTrialDays}
+                      disabled={settingsSaving || trialDaysInput === String(settings.referralTrialDays)}
+                      className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Stats Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
                 {[
@@ -1355,9 +1424,10 @@ const AdminDashboard = () => {
                   {/* Subscription status breakdown */}
                   <div className="bg-white border border-gray-200 shadow-sm rounded-2xl p-6">
                     <h3 className="font-bold text-gray-900 mb-4">Subscription Status</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       {[
                         { label: "Active", value: analytics.subscriptions.active, color: "text-green-700 bg-green-50 border-green-200" },
+                        { label: "On Free Trial", value: analytics.subscriptions.onTrial ?? 0, color: "text-blue-700 bg-blue-50 border-blue-200" },
                         { label: "Expired", value: analytics.subscriptions.expired, color: "text-red-600 bg-red-50 border-red-200" },
                         { label: "Never Subscribed", value: analytics.subscriptions.neverSubscribed, color: "text-gray-600 bg-gray-50 border-gray-200" },
                       ].map((s) => (

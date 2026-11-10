@@ -9,6 +9,7 @@ const STATUS_LABELS = {
 };
 
 function SubscriptionTab({ businessId, business, email }) {
+  const [renderedAt] = useState(() => Date.now()); // fixed at mount so render stays pure
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState("yearly");
@@ -37,7 +38,15 @@ function SubscriptionTab({ businessId, business, email }) {
     ? "Billed every month"
     : `₦${(plan.price / plan.months).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month · save ${((1 - plan.price / (monthlyPrice * plan.months)) * 100).toFixed(1)}%`;
 
-  const status = STATUS_LABELS[business?.subscriptionStatus] || STATUS_LABELS.inactive;
+  // Referral free trial: counts until the vendor pays for the first time.
+  const onTrialPeriod = Boolean(business?.trialEndsAt && !business?.hasPaidFirstSubscription);
+  const trialActive = onTrialPeriod && new Date(business.trialEndsAt).getTime() > renderedAt;
+  const baseStatus = STATUS_LABELS[business?.subscriptionStatus] || STATUS_LABELS.inactive;
+  const status = trialActive
+    ? { text: "Free trial", color: "text-green-600" }
+    : onTrialPeriod
+    ? { text: "Free trial ended", color: "text-red-600" }
+    : baseStatus;
   const expiresAt = business?.subscriptionExpiresAt
     ? new Date(business.subscriptionExpiresAt).toLocaleDateString("en-NG", {
         year: "numeric",
@@ -140,7 +149,20 @@ function SubscriptionTab({ businessId, business, email }) {
         <p className={`font-semibold ${status.color}`}>{status.text}</p>
         {expiresAt && (
           <p className="text-sm text-gray-500 mt-1">
-            {business?.subscriptionStatus === "active" ? "Renews / expires" : "Expired"} on {expiresAt}
+            {trialActive
+              ? "Your free trial ends"
+              : onTrialPeriod
+              ? "Your free trial ended"
+              : business?.subscriptionStatus === "active"
+              ? "Renews / expires"
+              : "Expired"}{" "}
+            on {expiresAt}
+          </p>
+        )}
+        {trialActive && (
+          <p className="text-sm text-gray-600 mt-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            Your store is visible to customers during the trial. Subscribe any time before it ends and your paid
+            time starts the day the trial finishes, so you don't lose any free days.
           </p>
         )}
         {business?.subscriptionStatus === "active" && business?.subscriptionAutoRenew && (

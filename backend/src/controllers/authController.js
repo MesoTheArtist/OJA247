@@ -16,6 +16,7 @@ import { sanitizeSocialLinks, sanitizeHighlights } from "../services/businessPro
 import { clearSessionCookies, setUserSessionCookie } from "../middleware/sessionCookies.js";
 import { normalizeProfileImage } from "../services/imageStorage.js";
 import { generateUniqueSlug } from "../services/storeSlug.js";
+import { grantReferralTrial } from "../services/referralTrial.js";
 
 // Generate JWT Token
 const generateToken = (id, authVersion = 1) => {
@@ -104,13 +105,27 @@ export const register = async (req, res) => {
 
     // If they signed up via someone else's referral link/code, attribute it.
     // Silently no-ops on an invalid code so it never blocks registration.
+    // A valid, accepted code also earns the free trial (length set by the admin;
+    // see services/referralTrial.js). Invalid codes and self-referrals get none.
+    let referralTrial = null;
     if (referralCodeUsed) {
-      await attributeReferral({
+      const attribution = await attributeReferral({
         businessId: savedBusiness._id,
         referralCodeUsed,
         ownerEmail: email,
         contact: normalizedBusinessData.contact,
       });
+      if (attribution) {
+        referralTrial = await grantReferralTrial({
+          businessId: savedBusiness._id,
+          contact: normalizedBusinessData.contact,
+        });
+        if (referralTrial) {
+          // Keep the in-memory copy returned below in step with the database.
+          savedBusiness.trialEndsAt = referralTrial.endsAt;
+          savedBusiness.subscriptionExpiresAt = referralTrial.endsAt;
+        }
+      }
     }
 
     console.log("Creating user...");
@@ -130,7 +145,7 @@ export const register = async (req, res) => {
     await notifyAdmin({
       type: "signup_vendor",
       title: `New vendor: ${savedBusiness.name}`,
-      message: `${savedUser.email} · ${savedBusiness.category} · ${savedBusiness.location}. ${referralLine(referralInfo)}`,
+      message: `${savedUser.email} · ${savedBusiness.category} · ${savedBusiness.location}. ${referralLine(referralInfo)}${referralTrial ? ` Free trial: ${referralTrial.days} days.` : ""}`,
       tab: "businesses",
       meta: {
         businessId: String(savedBusiness._id),
@@ -144,7 +159,11 @@ export const register = async (req, res) => {
     });
 
     // Fire-and-forget — a mail server hiccup should never block registration.
-    await sendVendorWelcomeEmail({ to: savedUser.email, businessName: savedBusiness.name });
+    await sendVendorWelcomeEmail({
+      to: savedUser.email,
+      businessName: savedBusiness.name,
+      trialEndsAt: referralTrial?.endsAt || null,
+    });
 
     const token = generateToken(savedUser._id, savedUser.authVersion);
     setUserSessionCookie(res, token);
