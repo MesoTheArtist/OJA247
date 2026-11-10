@@ -17,6 +17,7 @@ import { clearSessionCookies, setUserSessionCookie } from "../middleware/session
 import { normalizeProfileImage } from "../services/imageStorage.js";
 import { generateUniqueSlug } from "../services/storeSlug.js";
 import { grantReferralTrial } from "../services/referralTrial.js";
+import { emailKey, phoneKey } from "../utils/identityKeys.js";
 
 // Generate JWT Token
 const generateToken = (id, authVersion = 1) => {
@@ -96,6 +97,8 @@ export const register = async (req, res) => {
     console.log("Creating business...");
     // Every business gets its own referral code (business-owner referral track)
     normalizedBusinessData.referralCode = await generateUniqueBusinessReferralCode();
+    normalizedBusinessData.contactKey = phoneKey(normalizedBusinessData.contact);
+    normalizedBusinessData.ownerEmailKey = emailKey(email);
     // ...and a readable store link (/business/chioma-fashion) instead of a raw id.
     // The vendor can still change it later in dashboard Settings.
     normalizedBusinessData.slug = await generateUniqueSlug(normalizedBusinessData.name);
@@ -119,6 +122,7 @@ export const register = async (req, res) => {
         referralTrial = await grantReferralTrial({
           businessId: savedBusiness._id,
           contact: normalizedBusinessData.contact,
+          ownerEmail: email,
         });
         if (referralTrial) {
           // Keep the in-memory copy returned below in step with the database.

@@ -7,6 +7,7 @@ import MarketerPayout from "../models/MarketerPayout.js";
 import PointsLedger from "../models/PointsLedger.js";
 import { sendMarketerConversionEmail, sendBusinessReferralConversionEmail } from "./emailService.js";
 import { runInTransaction } from "../utils/transactions.js";
+import { emailKey, phoneKey } from "../utils/identityKeys.js";
 
 // Marketer payout rate is tiered by which plan the referral bought — the rate
 // drops as the plan (and payout) grows, so acquisition cost doesn't scale
@@ -87,8 +88,8 @@ export async function isMarketerReferralCodeTaken(code, excludeMarketerId = null
 
 // --- Attribution -------------------------------------------------------
 
-const normalizeEmail = (s) => String(s || "").toLowerCase().trim();
-const normalizePhone = (s) => String(s || "").replace(/\D/g, "");
+// Compared via emailKey/phoneKey so formatting tricks (+234 vs 0, me+2@gmail.com,
+// j.ohn@gmail.com) can't get around the check.
 
 // Fraud guard: a referrer (marketer or business) gets paid/earns points for
 // whatever business they refer, so nothing should stop them referring a
@@ -96,17 +97,16 @@ const normalizePhone = (s) => String(s || "").replace(/\D/g, "");
 // check. Compares the referrer's own contact details against the new
 // business owner's, since that's all we have at signup time (no shared
 // account link between the two record types).
-function isSelfReferral({ referrerEmail, referrerPhone }, { ownerEmail, contact }) {
-  const email = normalizeEmail(referrerEmail);
-  if (email && ownerEmail && email === normalizeEmail(ownerEmail)) {
+export function isSelfReferral({ referrerEmail, referrerPhone }, { ownerEmail, contact }) {
+  const email = emailKey(referrerEmail);
+  if (email && email === emailKey(ownerEmail)) {
     return true;
   }
 
-  const phone = normalizePhone(referrerPhone);
-  const contactPhone = normalizePhone(contact);
-  // Require a reasonably-full phone number match — short/partial digit
-  // strings could coincidentally collide and wrongly block a legit referral.
-  if (phone.length >= 7 && phone === contactPhone) {
+  // phoneKey returns null for short/partial numbers, which never match, so a
+  // few coincidental digits can't wrongly block a legitimate referral.
+  const phone = phoneKey(referrerPhone);
+  if (phone && phone === phoneKey(contact)) {
     return true;
   }
 

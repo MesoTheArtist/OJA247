@@ -9,6 +9,7 @@ import { sendBusinessReferralCodeChangedEmail } from "../services/emailService.j
 import { sanitizeSocialLinks, sanitizeHighlights } from "../services/businessProfile.js";
 import { normalizeProfileImage } from "../services/imageStorage.js";
 import { slugify } from "../services/storeSlug.js";
+import { phoneKey } from "../utils/identityKeys.js";
 
 const PUBLIC_BUSINESS_FIELDS = [
   "_id",
@@ -181,6 +182,9 @@ export const updateBusiness = async (req, res) => {
 
     // Social links end up as <a href> on the storefront, so only plain web
     // addresses are allowed through; highlights are trimmed and capped.
+    if (sanitizedUpdates.contact !== undefined) {
+      sanitizedUpdates.contactKey = phoneKey(sanitizedUpdates.contact);
+    }
     if (sanitizedUpdates.socialLinks !== undefined) {
       const links = sanitizeSocialLinks(sanitizedUpdates.socialLinks);
       if (links.error) return res.status(400).json({ message: links.error });

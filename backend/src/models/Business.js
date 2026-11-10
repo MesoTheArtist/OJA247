@@ -71,6 +71,11 @@ const BusinessSchema = new mongoose.Schema(
     // subscription rules. A business is "on trial" while
     // trialEndsAt > now and hasPaidFirstSubscription is still false.
     trialEndsAt: { type: Date, default: null },
+    // Normalized copies of the contact phone and the owner's email (see
+    // utils/identityKeys.js), used to spot the same person signing up again
+    // so they can't collect a second free trial.
+    contactKey: { type: String, default: null, index: true },
+    ownerEmailKey: { type: String, default: null, index: true },
     hasPaidFirstSubscription: { type: Boolean, default: false }, // gates the marketer payout rule
     subscriptionAutoRenew: { type: Boolean, default: false },
     subscriptionAutoRenewPlanType: {
