@@ -5,6 +5,14 @@
       "destination": "/api/business-preview?id=:id"
     },
     {
+      "source": "/product/:id",
+      "destination": "/api/product-preview?id=:id"
+    },
+    {
+      "source": "/business-form",
+      "destination": "/api/referral-preview"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://oja-247.vercel.app/api/:path*"
     },
