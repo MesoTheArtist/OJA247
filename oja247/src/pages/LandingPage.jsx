@@ -429,8 +429,7 @@ const LandingPage = () => {
             Start small. Grow big. We handle the rest.
             <br />
             <span className="text-orange-600 font-semibold">
-              Discover {stats.businesses}+ amazing vendors and businesses —
-              24/7!
+              Discover amazing vendors and businesses — 24/7!
             </span>
           </motion.p>
         </motion.div>
@@ -522,14 +521,9 @@ const LandingPage = () => {
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.4 }}
-          className="mt-12 sm:mt-20 grid grid-cols-3 gap-3 sm:gap-8 max-w-3xl w-full px-4"
+          className="mt-12 sm:mt-20 grid grid-cols-2 gap-3 sm:gap-8 max-w-xl w-full px-4"
         >
           {[
-            {
-              value: stats.businesses,
-              label: "Active Businesses",
-              color: "from-green-500 to-emerald-500",
-            },
             {
               value: stats.products,
               label: "Products Listed",
