@@ -24,7 +24,63 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Static copy served before the app loads, so crawlers and visitors on slow
+           connections see real content. React replaces everything in #root when it starts. -->
+      <div style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #111827; max-width: 960px; margin: 0 auto; padding: 24px 20px; line-height: 1.6;">
+        <header>
+          <p style="font-size: 24px; font-weight: 800; color: #16a34a; margin: 0;">OJA247</p>
+          <nav aria-label="Main">
+            <a href="/explore">Explore Vendors</a> ·
+            <a href="/products">Shop Products</a> ·
+            <a href="/websites">Custom Websites</a> ·
+            <a href="/about">About</a> ·
+            <a href="/contact">Contact</a>
+          </nav>
+        </header>
+        <main>
+          <h1 style="font-size: 32px; line-height: 1.2; margin: 32px 0 12px;">Start small. Grow big. We handle the rest.</h1>
+          <p>
+            OJA247 helps Nigerian businesses of every size get online and grow. Vendors get a branded
+            storefront with a shareable link, and shoppers can browse and search products from
+            businesses across the marketplace.
+          </p>
+          <h2 style="font-size: 22px; margin-top: 28px;">For businesses</h2>
+          <p>
+            Open a storefront on the OJA247 marketplace, list your products, and receive order alerts by
+            email and WhatsApp. Brands that need a site of their own can ask about a custom website,
+            with setup and upkeep handled for you.
+          </p>
+          <h2 style="font-size: 22px; margin-top: 28px;">For shoppers</h2>
+          <p>
+            Explore vendors and shop products from local businesses. Every purchase happens on the
+            vendor's storefront, where you can see their brand and details before you buy.
+          </p>
+          <h2 style="font-size: 22px; margin-top: 28px;">For marketers</h2>
+          <p>
+            Earn by referring businesses to OJA247. It is free to join, with no inventory and no
+            storefront to manage.
+          </p>
+          <p style="margin-top: 24px;">
+            <a href="/explore">Explore vendors</a> ·
+            <a href="/business-form">Become a seller</a> ·
+            <a href="/register-marketer">Become a marketer</a>
+          </p>
+        </main>
+        <footer style="margin-top: 40px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 14px;">
+          <nav aria-label="Footer">
+            <a href="/help">Help Center</a> ·
+            <a href="/delivery-information">Delivery &amp; Payments</a> ·
+            <a href="/terms">Terms &amp; Conditions</a> ·
+            <a href="/vendor-terms">Seller Terms</a> ·
+            <a href="/prohibited-items">Prohibited Items</a> ·
+            <a href="/privacy">Privacy Policy</a> ·
+            <a href="/report-problem">Report a Problem</a>
+          </nav>
+          <p>OJA247 is based in Lagos, Nigeria.</p>
+        </footer>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
