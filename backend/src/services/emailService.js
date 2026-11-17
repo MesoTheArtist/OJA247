@@ -1660,3 +1660,46 @@ export async function sendSubscriptionRenewalFailedEmail({ to, businessName, pla
     html: layout(body, { preheader: final ? "Automatic renewal is off and your store is hidden until you renew." : `We'll try again on ${formatDate(retryDate)}.` }),
   });
 }
+
+// Twice-a-month nudge to stores below the feature target of products. Their
+// store stays live either way. `tip` is one short marketing tip.
+export async function sendAddProductsReminderEmail({ to, businessName, productCount, targetProducts, tip, dashboardUrl }) {
+  const have =
+    productCount === 0
+      ? "has no products yet"
+      : `has ${productCount} product${productCount === 1 ? "" : "s"} so far`;
+  return sendEmail({
+    to,
+    subject: `Grow your store: ${productCount} of ${targetProducts} products`,
+    html: layout(
+      `
+      ${h1("Keep your store growing")}
+      ${p(`Hi ${esc(businessName)}, your store ${have}. Stores with at least <strong>${targetProducts} products</strong> are eligible to be featured on OJA247, which means more visitors and more sales.`)}
+      <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px 16px; margin:20px 0;">
+        <p style="margin:0; font-size:13px; color:#166534; line-height:1.6;"><strong>Tip:</strong> ${esc(tip)}</p>
+      </div>
+      ${button("Add products", dashboardUrl)}
+      <p style="color:#9ca3af; font-size:12px; line-height:1.6; margin-top:20px;">We send this about twice a month until your store reaches ${targetProducts} products.</p>
+      `,
+      { preheader: `You have ${productCount} of ${targetProducts} products. Add more to be eligible to be featured.` }
+    ),
+  });
+}
+
+// Lighter monthly nudge to stores that already reached the feature target.
+export async function sendKeepStoreFreshEmail({ to, businessName, productCount, dashboardUrl }) {
+  return sendEmail({
+    to,
+    subject: "Fresh products bring customers back",
+    html: layout(
+      `
+      ${h1("Keep your store fresh")}
+      ${p(`Hi ${esc(businessName)}, your store has <strong>${productCount} products</strong>. Great work. Stores that add new products regularly give customers a reason to keep coming back.`)}
+      ${p("If you have new arrivals or restocked items, now is a good time to add them.")}
+      ${button("Add products", dashboardUrl)}
+      <p style="color:#9ca3af; font-size:12px; line-height:1.6; margin-top:20px;">We send this about once a month.</p>
+      `,
+      { preheader: "Add your new arrivals to keep customers coming back." }
+    ),
+  });
+}
