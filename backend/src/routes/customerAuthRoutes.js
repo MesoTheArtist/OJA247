@@ -9,6 +9,7 @@ import {
   customerResendVerification,
   getCustomerMe,
 } from "../controllers/customerAuthController.js";
+import { updateCustomerProfile } from "../controllers/customerProfileController.js";
 import { protect, requireCustomer } from "../middleware/authMiddleware.js";
 import { authLimiter } from "../middleware/rateLimiters.js";
 
@@ -23,5 +24,6 @@ router.post("/verify-email", authLimiter, customerVerifyEmail);
 router.post("/resend-verification", authLimiter, protect, requireCustomer, customerResendVerification);
 
 router.get("/me", protect, requireCustomer, getCustomerMe);
+router.patch("/me", protect, requireCustomer, updateCustomerProfile);
 
 export default router;
