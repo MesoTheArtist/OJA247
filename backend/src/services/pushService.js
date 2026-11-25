@@ -74,9 +74,16 @@ export async function pushToBusinessOwner(businessId, payload) {
 export async function pushToOrderCustomer(order, payload) {
   try {
     let userId = order?.userId || null;
+    let email = order?.customer?.email || null;
     if (!userId && order?._id) {
-      const row = await Order.findById(order._id).select("userId");
+      const row = await Order.findById(order._id).select("userId customer.email");
       userId = row?.userId || null;
+      email = email || row?.customer?.email || null;
+    }
+    if (!userId && email) {
+      // Same rule as linkGuestOrders: the order belongs to the account with this email.
+      const shopper = await User.findOne({ email: String(email).trim() }).collation({ locale: "en", strength: 2 }).select("_id");
+      userId = shopper?._id || null;
     }
     if (userId) await sendPushToUser(userId, payload);
   } catch (error) {
