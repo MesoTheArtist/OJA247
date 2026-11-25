@@ -1,3 +1,4 @@
+import { pushToOrderCustomer } from "../services/pushService.js";
 import Order from "../models/Order.js";
 import User from "../models/User.js";
 import {
@@ -89,6 +90,7 @@ export const markVendorShipped = async (req, res) => {
       orderReference: order.reference,
       confirmUrl: receiptUrlFor(order.reference, businessId),
     }).catch((err) => console.error("Order-shipped email failed:", err));
+    await pushToOrderCustomer(order, { title: "Your order is on its way", body: `${vendor.businessName} has sent your order ${order.reference}.`, data: { type: "order", reference: order.reference } });
 
     res.json({ order: updated });
   } catch (error) {

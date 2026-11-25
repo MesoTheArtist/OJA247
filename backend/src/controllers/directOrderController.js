@@ -1,3 +1,4 @@
+import { pushToBusinessOwner, pushToOrderCustomer } from "../services/pushService.js";
 import { notifyAdmin } from "../services/adminNotificationService.js";
 import crypto from "crypto";
 import mongoose from "mongoose";
@@ -333,6 +334,7 @@ export const createDirectOrder = async (req, res) => {
     });
 
     stage = "sending_notifications";
+    await pushToBusinessOwner(businessId, { title: "New order", body: `${order.customer.fullName} placed order ${reference}. Open OJA247 to confirm the payment.`, data: { type: "order", reference } });
     // Notifications are best-effort. The order is already saved, so a mail
     // hiccup must not make the customer think it failed and pay twice.
     await Promise.allSettled([
@@ -436,6 +438,7 @@ export const confirmTransferPayment = async (req, res) => {
       console.error("Stock adjustment failed:", stockError);
     }
 
+    await pushToOrderCustomer(order, { title: "Payment confirmed", body: `Your payment for order ${order.reference} has been confirmed.`, data: { type: "order", reference: order.reference } });
     res.json({ message: "Payment confirmed.", order: paid, stockWarnings });
   } catch (error) {
     console.error("Confirm transfer payment error:", error);
@@ -490,6 +493,7 @@ export const rejectTransferPayment = async (req, res) => {
       }),
     ]);
 
+    await pushToOrderCustomer(updated, { title: "Payment not confirmed", body: `Order ${updated.reference}: ${reason}`, data: { type: "order", reference: updated.reference } });
     res.json({ message: "Payment rejected. The customer has been told why.", order: updated });
   } catch (error) {
     console.error("Reject transfer payment error:", error);
@@ -536,6 +540,7 @@ export const resubmitReceipt = async (req, res) => {
 
     const businessId = updated.vendors[0]?.businessId;
     const vendor = businessId ? await Vendor.findOne({ businessId }) : null;
+    await pushToBusinessOwner(businessId, { title: "New payment receipt", body: `${updated.customer.fullName} sent a new receipt for order ${updated.reference}.`, data: { type: "order", reference: updated.reference } });
     if (vendor?.contactEmail) {
       await Promise.allSettled([
         sendVendorTransferOrderEmail({

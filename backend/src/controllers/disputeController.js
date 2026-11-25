@@ -1,3 +1,4 @@
+import { pushToBusinessOwner, pushToOrderCustomer } from "../services/pushService.js";
 import { notifyAdmin } from "../services/adminNotificationService.js";
 import Order from "../models/Order.js";
 import Dispute, { DISPUTE_WINDOW_DAYS, SELF_RESOLVE_WINDOW_DAYS, UNCONFIRMED_PAYMENT_DAYS } from "../models/Dispute.js";
@@ -171,6 +172,7 @@ export const fileDispute = async (req, res) => {
     // Notifications — fire-and-forget, matches the rest of the codebase's
     // pattern (a broken mail server shouldn't fail the dispute filing).
     const vendorEmail = await getOwnerEmail(businessId);
+    await pushToBusinessOwner(businessId, { title: "New dispute", body: `A customer opened a dispute on order ${order.reference}. Please respond in OJA247.`, data: { type: "dispute", reference: order.reference } });
 
     // A dispute on an unconfirmed transfer starts out already escalated, so
     // everyone gets the "escalated" emails instead of the self-resolve ones.
@@ -293,6 +295,7 @@ export const vendorResolveDispute = async (req, res) => {
     // settleOrderAfterResolution).
     await settleOrderAfterResolution(dispute.orderId, refunded);
 
+    await pushToOrderCustomer({ _id: dispute.orderId }, { title: "Dispute resolved", body: `${dispute.businessName} resolved your dispute on order ${dispute.orderReference}.`, data: { type: "dispute", reference: dispute.orderReference } });
     sendDisputeResolvedCustomerEmail({
       to: dispute.customer.email,
       customerName: dispute.customer.fullName,

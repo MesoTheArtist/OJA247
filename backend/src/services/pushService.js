@@ -1,3 +1,5 @@
+import User from "../models/User.js";
+import Order from "../models/Order.js";
 import DeviceToken from "../models/DeviceToken.js";
 import { buildMulticastMessage, deadTokens } from "./pushMessage.js";
 
@@ -51,5 +53,33 @@ export async function sendPushToUser(userId, payload) {
   } catch (error) {
     console.error("Sending a push notification failed:", error.message);
     return { configured: true, devices: 0, sent: 0, failed: 0, error: true };
+  }
+}
+
+// Tells the owner of a store (the user whose businessId matches).
+// Never throws, so a failed notification cannot break an order or a dispute.
+export async function pushToBusinessOwner(businessId, payload) {
+  try {
+    if (!businessId) return;
+    const owner = await User.findOne({ businessId }).select("_id");
+    if (owner) await sendPushToUser(owner._id, payload);
+  } catch (error) {
+    console.error("Push to business owner failed:", error.message);
+  }
+}
+
+// Tells the shopper who placed an order (only signed-in shoppers have a phone
+// on file; guest orders have no userId and are skipped).
+// Never throws.
+export async function pushToOrderCustomer(order, payload) {
+  try {
+    let userId = order?.userId || null;
+    if (!userId && order?._id) {
+      const row = await Order.findById(order._id).select("userId");
+      userId = row?.userId || null;
+    }
+    if (userId) await sendPushToUser(userId, payload);
+  } catch (error) {
+    console.error("Push to order customer failed:", error.message);
   }
 }
