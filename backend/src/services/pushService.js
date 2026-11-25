@@ -20,10 +20,10 @@ function getMessaging() {
       if (typeof credential.private_key === "string") {
         credential.private_key = credential.private_key.replace(/\\n/g, "\n");
       }
-      const adminModule = await import("firebase-admin");
-      const admin = adminModule.default || adminModule;
-      const app = admin.apps.length ? admin.app() : admin.initializeApp({ credential: admin.credential.cert(credential) });
-      return admin.messaging(app);
+      const { getApps, getApp, initializeApp, cert } = await import("firebase-admin/app");
+      const { getMessaging: getFirebaseMessaging } = await import("firebase-admin/messaging");
+      const app = getApps().length ? getApp() : initializeApp({ credential: cert(credential) });
+      return getFirebaseMessaging(app);
     } catch (error) {
       console.error("Push notifications could not start:", error.message);
       return null;
