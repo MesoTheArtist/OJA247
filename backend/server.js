@@ -28,6 +28,7 @@ import unsubscribeRoutes from "./src/routes/unsubscribeRoutes.js";
 import disputeRoutes from "./src/routes/disputeRoutes.js";
 import customerAuthRoutes from "./src/routes/customerAuthRoutes.js";
 import followRoutes from "./src/routes/followRoutes.js";
+import deviceRoutes from "./src/routes/deviceRoutes.js";
 import reviewRoutes from "./src/routes/reviewRoutes.js";
 import publicSettingsRoutes from "./src/routes/publicSettingsRoutes.js";
 import { verifyEmailTransporter } from "./src/services/emailService.js";
@@ -149,6 +150,7 @@ app.use("/api/unsubscribe", unsubscribeRoutes);
 app.use("/api/disputes", disputeRoutes);
 app.use("/api/customer-auth", customerAuthRoutes);
 app.use("/api/follows", followRoutes);
+app.use("/api/devices", deviceRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/settings", publicSettingsRoutes);
 
